@@ -3,17 +3,16 @@ import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Replace these values with your own Firebase project config.
-// Go to: Firebase Console → Project Settings → Your apps → SDK snippet (Config)
+// Firebase config loaded from environment variables (.env.local)
 // ─────────────────────────────────────────────────────────────────────────────
 const firebaseConfig = {
-  apiKey: "AIzaSyBm1SKcznRcFptgxISETz92CRGMN2evWvk",
-  authDomain: "ultimate-warrior-501cb.firebaseapp.com",
-  projectId: "ultimate-warrior-501cb",
-  storageBucket: "ultimate-warrior-501cb.firebasestorage.app",
-  messagingSenderId: "509664285842",
-  appId: "1:509664285842:web:d21063ece9ad7f2a76024b",
-  measurementId: "G-2C91PQMJCX",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
 const app = initializeApp(firebaseConfig);
