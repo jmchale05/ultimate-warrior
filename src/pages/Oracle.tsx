@@ -3,7 +3,7 @@ import Navbar from "../components/Navbar";
 import Card from "../components/Card";
 
 export default function Oracle() {
-  const { appUser } = useAuth();
+  useAuth();
 
   return (
     <div className="min-h-screen bg-stone-900 text-stone-100">
