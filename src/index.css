@@ -1,0 +1,97 @@
+@import "tailwindcss";
+
+/* ─── Roman Theme Custom Properties ──────────────────────────── */
+@theme {
+  --color-roman-red: #8b1c1c;
+  --color-roman-red-dark: #5e1313;
+  --color-roman-gold: #d4af37;
+  --color-roman-gold-light: #f0d060;
+  --color-roman-stone: #2c2c2c;
+  --color-roman-marble: #e8dcc8;
+  --color-roman-parchment: #c9b896;
+}
+
+/* ─── Base ────────────────────────────────────────────────────── */
+@layer base {
+  html,
+  body {
+    @apply bg-stone-900 text-stone-100 font-sans;
+    scrollbar-gutter: stable;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+}
+
+/* ─── Components ──────────────────────────────────────────────── */
+@layer components {
+  .roman-btn {
+    @apply bg-roman-red hover:bg-roman-red/80 text-roman-gold font-bold
+           uppercase tracking-widest py-2.5 px-4 rounded-lg border
+           border-roman-gold/40 transition-colors cursor-pointer
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .roman-divider {
+    @apply flex items-center gap-3 my-4;
+  }
+  .roman-divider::before,
+  .roman-divider::after {
+    content: "";
+    @apply flex-1 h-px bg-roman-gold/30;
+  }
+
+  .roman-card {
+    position: relative;
+    background:
+      linear-gradient(135deg, rgba(139, 28, 28, 0.08) 0%, transparent 50%),
+      linear-gradient(225deg, rgba(212, 175, 55, 0.06) 0%, transparent 50%),
+      #1c1917;
+    border: 1px solid rgba(212, 175, 55, 0.25);
+    box-shadow:
+      0 0 40px rgba(139, 28, 28, 0.15),
+      inset 0 1px 0 rgba(212, 175, 55, 0.1);
+  }
+  .roman-card::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, #d4af37, transparent);
+  }
+
+  .roman-input {
+    @apply w-full bg-stone-800/80 border border-stone-600 rounded-lg px-4 py-2.5
+           text-stone-100 placeholder-stone-500
+           focus:outline-none focus:border-roman-gold focus:ring-1 focus:ring-roman-gold/30
+           transition-all;
+  }
+
+  .roman-input:-webkit-autofill,
+  .roman-input:-webkit-autofill:hover,
+  .roman-input:-webkit-autofill:focus,
+  .roman-input:-webkit-autofill:active {
+    -webkit-text-fill-color: #f5f5f4;
+    caret-color: #f5f5f4;
+    -webkit-box-shadow: 0 0 0 1000px rgba(41, 37, 36, 0.8) inset;
+    box-shadow: 0 0 0 1000px rgba(41, 37, 36, 0.8) inset;
+    border: 1px solid rgba(87, 83, 78, 1);
+    transition: background-color 9999s ease-out 0s;
+  }
+
+  .roman-glow {
+    text-shadow: 0 0 20px rgba(212, 175, 55, 0.3);
+  }
+}
+
+/* ─── Background pattern ─────────────────────────────────────── */
+.roman-bg {
+  background-color: #0c0a09;
+  background-image:
+    radial-gradient(ellipse at 20% 50%, rgba(139, 28, 28, 0.18) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(212, 175, 55, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 100%, rgba(139, 28, 28, 0.12) 0%, transparent 40%),
+    radial-gradient(circle at 50% 40%, rgba(212, 175, 55, 0.04) 0%, transparent 60%);
+}
