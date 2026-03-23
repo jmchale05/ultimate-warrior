@@ -18,6 +18,23 @@ import Oracle from "./pages/Oracle";
 import StudentCampaign from "./pages/StudentCampaign";
 import AdminDashboard from "./pages/AdminDashboard";
 
+const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+
+function RootRedirect() {
+  if (isTauri) return <Navigate to="/login" replace />;
+  return <DownloadPage />;
+}
+
+function DownloadRoute() {
+  if (isTauri) return <Navigate to="/login" replace />;
+  return <DownloadPage />;
+}
+
+function FallbackRoute() {
+  if (isTauri) return <Navigate to="/login" replace />;
+  return <Navigate to="/" replace />;
+}
+
 function PrivateRoute() {
   const { currentUser, loading } = useAuth();
 
@@ -75,8 +92,8 @@ export default function App() {
       <MobileBlock />
       <AuthProvider>
           <Routes>
-            <Route path="/" element={<DownloadPage />} />
-            <Route path="/download" element={<DownloadPage />} />
+            <Route path="/" element={<RootRedirect />} />
+            <Route path="/download" element={<DownloadRoute />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/mobile-login" element={<MobileLoginPage />} />
             <Route path="/mobile-campaigns" element={<MobileCampaigns />} />
@@ -88,7 +105,7 @@ export default function App() {
                 <Route path="/admin" element={<AdminDashboard />} />
               </Route>
             </Route>
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<FallbackRoute />} />
           </Routes>
       </AuthProvider>
     </BrowserRouter>
