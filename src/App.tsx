@@ -5,34 +5,42 @@ import {
   Route,
   Navigate,
   Outlet,
+  useLocation,
 } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { FullPageLoader } from "./components/LoadingSpinner";
+import DownloadPage from "./pages/DownloadPage";
 import LoginPage from "./pages/LoginPage";
 import MobileLoginPage from "./pages/MobileLoginPage";
 import Campaigns from "./pages/Campaigns";
 import MobileCampaigns from "./pages/MobileCampaigns";
 import Oracle from "./pages/Oracle";
-import TheBeginning from "./pages/TheBeginning";
+import StudentCampaign from "./pages/StudentCampaign";
+import AdminDashboard from "./pages/AdminDashboard";
 
 function PrivateRoute() {
   const { currentUser, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-stone-900 flex items-center justify-center">
-        <div className="text-roman-gold text-xl animate-pulse">
-          ⚔️ Loading the Legion...
-        </div>
-      </div>
-    );
+    return <FullPageLoader />;
   }
 
   if (!currentUser) return <Navigate to="/login" replace />;
   return <Outlet />;
 }
 
+function AdminRoute() {
+  const { appUser, loading } = useAuth();
+
+  if (loading) return <FullPageLoader />;
+  if (!appUser || appUser.role !== "admin") return <Navigate to="/campaigns" replace />;
+  return <Outlet />;
+}
+
 function MobileBlock() {
+  const location = useLocation();
   const [isMobile, setIsMobile] = useState(false);
+  const isPublicLanding = location.pathname === "/" || location.pathname === "/download";
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 1024);
@@ -41,10 +49,10 @@ function MobileBlock() {
     return () => window.removeEventListener("resize", check);
   }, []);
 
-  if (!isMobile) return null;
+  if (!isMobile || isPublicLanding) return null;
 
   return (
-    <div className="fixed inset-0 z-[9999] bg-stone-950 flex flex-col items-center justify-center text-center px-8 gap-6">
+    <div className="fixed inset-0 z-9999 bg-stone-950 flex flex-col items-center justify-center text-center px-8 gap-6">
       <img
         src="/ultimate-warrior.png"
         alt="Ultimate Warrior"
@@ -63,23 +71,26 @@ function MobileBlock() {
 
 export default function App() {
   return (
-    <>
+    <BrowserRouter>
       <MobileBlock />
       <AuthProvider>
-        <BrowserRouter>
           <Routes>
+            <Route path="/" element={<DownloadPage />} />
+            <Route path="/download" element={<DownloadPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/mobile-login" element={<MobileLoginPage />} />
             <Route path="/mobile-campaigns" element={<MobileCampaigns />} />
             <Route element={<PrivateRoute />}>
               <Route path="/campaigns" element={<Campaigns />} />
+              <Route path="/campaigns/:uid" element={<StudentCampaign />} />
               <Route path="/oracle" element={<Oracle />} />
-              <Route path="/the-beginning" element={<TheBeginning />} />
+              <Route element={<AdminRoute />}>
+                <Route path="/admin" element={<AdminDashboard />} />
+              </Route>
             </Route>
-            <Route path="*" element={<Navigate to="/campaigns" replace />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
-        </BrowserRouter>
       </AuthProvider>
-    </>
+    </BrowserRouter>
   );
 }

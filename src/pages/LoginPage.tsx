@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { ButtonSpinner } from "../components/LoadingSpinner";
 
 type Mode = "signin" | "signup";
 
@@ -128,7 +129,7 @@ export default function LoginPage() {
             className="w-full bg-linear-to-r from-roman-red to-roman-red-dark hover:from-roman-red/90 hover:to-roman-red-dark/90 text-roman-gold font-bold uppercase tracking-widest py-3 rounded-lg border border-roman-gold/40 transition-all shadow-[0_0_15px_rgba(139,28,28,0.4)] hover:shadow-[0_0_25px_rgba(139,28,28,0.6)] disabled:opacity-50 disabled:cursor-not-allowed mt-2"
           >
             {loading
-              ? "Loading..."
+              ? <><ButtonSpinner /> Entering...</>
               : mode === "signin"
               ? "Enter the Arena"
               : "Enlist Now"}

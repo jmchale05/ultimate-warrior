@@ -10,8 +10,33 @@ import {
   where,
   arrayUnion,
 } from "firebase/firestore";
-import { db } from "./firebase";
-import type { AppUser, Class, Challenge, Result } from "../types";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { db, storage } from "./firebase";
+import type { AppUser, School, Class, Challenge, Result } from "../types";
+
+// ─── Schools ──────────────────────────────────────────────────────────────────
+
+export async function createSchool(
+  name: string,
+  address?: string
+): Promise<string> {
+  const ref = await addDoc(collection(db, "schools"), {
+    name,
+    address,
+    createdAt: Date.now(),
+  });
+  return ref.id;
+}
+
+export async function getSchoolById(schoolId: string): Promise<School | null> {
+  const snap = await getDoc(doc(db, "schools", schoolId));
+  return snap.exists() ? ({ id: snap.id, ...snap.data() } as School) : null;
+}
+
+export async function getAllSchools(): Promise<School[]> {
+  const snap = await getDocs(collection(db, "schools"));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as School));
+}
 
 // ─── Users ────────────────────────────────────────────────────────────────────
 
@@ -34,10 +59,12 @@ export async function getUsersByIds(uids: string[]): Promise<AppUser[]> {
 
 export async function createClass(
   name: string,
+  schoolId: string,
   teacherId: string
 ): Promise<string> {
   const ref = await addDoc(collection(db, "classes"), {
     name,
+    schoolId,
     teacherId,
     studentIds: [],
     createdAt: Date.now(),
@@ -49,6 +76,15 @@ export async function getClassesByTeacher(teacherId: string): Promise<Class[]> {
   const q = query(
     collection(db, "classes"),
     where("teacherId", "==", teacherId)
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Class));
+}
+
+export async function getClassesBySchool(schoolId: string): Promise<Class[]> {
+  const q = query(
+    collection(db, "classes"),
+    where("schoolId", "==", schoolId)
   );
   const snap = await getDocs(q);
   return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Class));
@@ -132,6 +168,24 @@ export async function getResultsByClass(classId: string): Promise<Result[]> {
     where("classId", "==", classId)
   );
   const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Result));
+}
+
+export async function updateUserPhoto(uid: string, file: File): Promise<string> {
+  const storageRef = ref(storage, `profile-photos/${uid}`);
+  await uploadBytes(storageRef, file);
+  const url = await getDownloadURL(storageRef);
+  await updateDoc(doc(db, "users", uid), { photoUrl: url });
+  return url;
+}
+
+export async function getAllUsers(): Promise<AppUser[]> {
+  const snap = await getDocs(collection(db, "users"));
+  return snap.docs.map((d) => d.data() as AppUser);
+}
+
+export async function getAllResults(): Promise<Result[]> {
+  const snap = await getDocs(collection(db, "results"));
   return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Result));
 }
 

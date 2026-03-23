@@ -86,6 +86,71 @@
   }
 }
 
+/* ─── Loading Animations ─────────────────────────────────────── */
+
+/* Spinning ring loader */
+.roman-loader {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.roman-loader.roman-loader-lg {
+  width: 72px;
+  height: 72px;
+}
+.roman-loader-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid rgba(212, 175, 55, 0.15);
+  border-top-color: #d4af37;
+  animation: roman-spin 1s cubic-bezier(0.6, 0.15, 0.35, 0.85) infinite;
+}
+.roman-loader-lg .roman-loader-ring {
+  border-width: 3.5px;
+}
+.roman-loader-icon {
+  font-size: 1.25rem;
+  color: #d4af37;
+  animation: roman-pulse 2s ease-in-out infinite;
+  filter: drop-shadow(0 0 6px rgba(212, 175, 55, 0.4));
+}
+.roman-loader-lg .roman-loader-icon {
+  font-size: 1.5rem;
+}
+
+@keyframes roman-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes roman-pulse {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50%      { opacity: 1;   transform: scale(1.1); }
+}
+
+/* Skeleton shimmer */
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(120, 113, 108, 0.08) 0%,
+    rgba(212, 175, 55, 0.12) 40%,
+    rgba(120, 113, 108, 0.08) 80%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Button spinner */
+.roman-btn-spinner {
+  animation: roman-spin 0.8s linear infinite;
+}
+
 /* ─── Background pattern ─────────────────────────────────────── */
 .roman-bg {
   background-color: #0c0a09;
