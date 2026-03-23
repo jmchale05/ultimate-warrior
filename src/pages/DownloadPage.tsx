@@ -7,19 +7,19 @@ const downloads = [
   {
     name: "Windows",
     label: "Download for Windows",
-    assetName: "ultimate-warrior-challenges-windows.exe",
+    assetPattern: /\.(exe|msi)$/i,
     hint: "Recommended for most desktop users.",
   },
   {
     name: "macOS",
     label: "Download for Mac",
-    assetName: "ultimate-warrior-challenges-mac.dmg",
+    assetPattern: /\.dmg$/i,
     hint: "Signed build and notarization ready when you publish it.",
   },
   {
     name: "Linux",
     label: "Download for Linux",
-    assetName: "ultimate-warrior-challenges-linux.AppImage",
+    assetPattern: /\.AppImage$/i,
     hint: "AppImage works well for direct installs.",
   },
 ];
@@ -61,7 +61,7 @@ export default function DownloadPage() {
           : [];
 
         const nextLinks = downloads.map((download) => {
-          const match = assets.find((asset) => asset.name === download.assetName);
+          const match = assets.find((asset) => download.assetPattern.test(asset.name ?? ""));
 
           return {
             ...download,
