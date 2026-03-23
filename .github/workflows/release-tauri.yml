@@ -35,16 +35,24 @@ jobs:
       - name: Build Tauri installer
         run: npm run tauri build
 
-      - name: Upload installer artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: ultimate-warrior-challenges-windows-installer
-          path: src-tauri/target/release/bundle/**/*
-          if-no-files-found: error
+      - name: Collect release files
+        shell: pwsh
+        run: |
+          $bundleRoot = "src-tauri/target/release/bundle"
+          if (-not (Test-Path $bundleRoot)) {
+            throw "No bundle directory found at $bundleRoot"
+          }
 
-      - name: Upload release assets
+          New-Item -ItemType Directory -Force -Path release-assets | Out-Null
+          Get-ChildItem -Path $bundleRoot -Recurse -File |
+            Copy-Item -Destination release-assets -Force
+
+      - name: Create GitHub release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
           files: |
-            src-tauri/target/release/bundle/**/*
+            release-assets/**/*
