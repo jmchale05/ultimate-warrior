@@ -13,7 +13,7 @@ import {
   type User,
 } from "firebase/auth";
 import { auth } from "../lib/firebase";
-import { createUserDoc, getUserDoc } from "../lib/firestore";
+import { createUserDoc, getSchoolByAccessCode, getUserDoc } from "../lib/firestore";
 import type { AppUser, UserRole } from "../types";
 
 interface AuthContextValue {
@@ -25,7 +25,8 @@ interface AuthContextValue {
     email: string,
     password: string,
     displayName: string,
-    role: UserRole
+    role: UserRole,
+    accessCode: string
   ) => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -59,14 +60,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     email: string,
     password: string,
     displayName: string,
-    role: UserRole
+    role: UserRole,
+    accessCode: string
   ) {
+    const school = await getSchoolByAccessCode(accessCode);
+    if (!school) {
+      throw new Error("Invalid access code. Please check the code and try again.");
+    }
+
     const cred = await createUserWithEmailAndPassword(auth, email, password);
     const newUser: AppUser = {
       uid: cred.user.uid,
       email,
       displayName,
       role,
+      schoolId: school.id,
       createdAt: Date.now(),
     };
     await createUserDoc(newUser);

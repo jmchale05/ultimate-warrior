@@ -16,21 +16,44 @@ import type { AppUser, School, Class, Challenge, Result } from "../types";
 
 // ─── Schools ──────────────────────────────────────────────────────────────────
 
+function generateAccessCode() {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
+  for (let i = 0; i < 6; i++) {
+    code += alphabet[Math.floor(Math.random() * alphabet.length)];
+  }
+  return code;
+}
+
 export async function createSchool(
   name: string,
   address?: string
-): Promise<string> {
+): Promise<{ id: string; accessCode: string }> {
+  const accessCode = generateAccessCode();
   const ref = await addDoc(collection(db, "schools"), {
     name,
     address,
+    accessCode,
     createdAt: Date.now(),
   });
-  return ref.id;
+  return { id: ref.id, accessCode };
 }
 
 export async function getSchoolById(schoolId: string): Promise<School | null> {
   const snap = await getDoc(doc(db, "schools", schoolId));
   return snap.exists() ? ({ id: snap.id, ...snap.data() } as School) : null;
+}
+
+export async function getSchoolByAccessCode(accessCode: string): Promise<School | null> {
+  const normalizedCode = accessCode.trim().toUpperCase();
+  const q = query(
+    collection(db, "schools"),
+    where("accessCode", "==", normalizedCode)
+  );
+  const snap = await getDocs(q);
+  if (snap.empty) return null;
+  const schoolDoc = snap.docs[0];
+  return { id: schoolDoc.id, ...schoolDoc.data() } as School;
 }
 
 export async function getAllSchools(): Promise<School[]> {

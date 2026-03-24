@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { ButtonSpinner } from "../components/LoadingSpinner";
+import { getSchoolByAccessCode } from "../lib/firestore";
 
 type Mode = "signin" | "signup";
 
@@ -13,8 +14,12 @@ export default function LoginPage() {
   const [email, setEmail] = useState("test@email.com");
   const [password, setPassword] = useState("123456");
   const [displayName, setDisplayName] = useState("");
+  const [accessCode, setAccessCode] = useState("");
+  const [confirmedSchoolName, setConfirmedSchoolName] = useState<string | null>(null);
+  const [accessCodeConfirmed, setAccessCodeConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [confirmingCode, setConfirmingCode] = useState(false);
 
   // Navigate once Firebase auth state actually confirms the user is signed in
   useEffect(() => {
@@ -29,7 +34,7 @@ export default function LoginPage() {
       if (mode === "signin") {
         await signIn(email, password);
       } else {
-        await signUp(email, password, displayName, "teacher");
+        await signUp(email, password, displayName, "teacher", accessCode);
       }
       // Navigation happens via the useEffect above when currentUser updates
     } catch (err: unknown) {
@@ -53,6 +58,29 @@ export default function LoginPage() {
       }
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleConfirmAccessCode() {
+    setError(null);
+    setConfirmingCode(true);
+    try {
+      const school = await getSchoolByAccessCode(accessCode);
+      if (!school) {
+        setAccessCodeConfirmed(false);
+        setConfirmedSchoolName(null);
+        setError("That access code is not valid. Please check it and try again.");
+        return;
+      }
+
+      setAccessCodeConfirmed(true);
+      setConfirmedSchoolName(school.name);
+    } catch {
+      setAccessCodeConfirmed(false);
+      setConfirmedSchoolName(null);
+      setError("Unable to verify the access code right now. Please try again.");
+    } finally {
+      setConfirmingCode(false);
     }
   }
 
@@ -97,6 +125,43 @@ export default function LoginPage() {
           {mode === "signup" && (
             <div>
               <label className="block text-roman-gold/70 text-xs uppercase tracking-wider mb-1.5 font-semibold">
+                ◆ Access Code
+              </label>
+              <input
+                type="text"
+                required
+                value={accessCode}
+                onChange={(e) => {
+                  if (accessCodeConfirmed) return;
+                  setAccessCode(e.target.value.toUpperCase());
+                  setAccessCodeConfirmed(false);
+                  setConfirmedSchoolName(null);
+                }}
+                disabled={accessCodeConfirmed}
+                placeholder="ABC123"
+                className="roman-input uppercase tracking-[0.3em] disabled:cursor-not-allowed disabled:opacity-70"
+              />
+              {!accessCodeConfirmed && (
+                <button
+                  type="button"
+                  onClick={handleConfirmAccessCode}
+                  disabled={confirmingCode || !accessCode.trim()}
+                  className="mt-3 w-full rounded-lg border border-roman-gold/40 bg-roman-gold/10 px-4 py-2.5 text-xs font-semibold uppercase tracking-widest text-roman-gold transition-colors hover:bg-roman-gold/15 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {confirmingCode ? "Checking Code..." : "Confirm Access Code"}
+                </button>
+              )}
+              {accessCodeConfirmed && confirmedSchoolName && (
+                <p className="mt-2 text-xs text-roman-gold/80 uppercase tracking-widest">
+                  Access code confirmed for {confirmedSchoolName}
+                </p>
+              )}
+            </div>
+          )}
+
+          {mode === "signup" && accessCodeConfirmed && (
+            <div>
+              <label className="block text-roman-gold/70 text-xs uppercase tracking-wider mb-1.5 font-semibold">
                 ◆ Full Name
               </label>
               <input
@@ -110,34 +175,38 @@ export default function LoginPage() {
             </div>
           )}
 
-          <div>
-            <label className="block text-roman-gold/70 text-xs uppercase tracking-wider mb-1.5 font-semibold">
-              ◆ Email
-            </label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="your@email.com"
-              className="roman-input"
-            />
-          </div>
+          {(mode === "signin" || accessCodeConfirmed) && (
+            <div>
+              <label className="block text-roman-gold/70 text-xs uppercase tracking-wider mb-1.5 font-semibold">
+                ◆ Email
+              </label>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="your@email.com"
+                className="roman-input"
+              />
+            </div>
+          )}
 
-          <div>
-            <label className="block text-roman-gold/70 text-xs uppercase tracking-wider mb-1.5 font-semibold">
-              ◆ Password
-            </label>
-            <input
-              type="password"
-              required
-              minLength={6}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="roman-input"
-            />
-          </div>
+          {(mode === "signin" || accessCodeConfirmed) && (
+            <div>
+              <label className="block text-roman-gold/70 text-xs uppercase tracking-wider mb-1.5 font-semibold">
+                ◆ Password
+              </label>
+              <input
+                type="password"
+                required
+                minLength={6}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="roman-input"
+              />
+            </div>
+          )}
 
           {error && (
             <p className="text-red-400 text-sm bg-red-900/20 border border-red-800 rounded-lg px-3 py-2">
@@ -145,17 +214,19 @@ export default function LoginPage() {
             </p>
           )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-linear-to-r from-roman-red to-roman-red-dark hover:from-roman-red/90 hover:to-roman-red-dark/90 text-roman-gold font-bold uppercase tracking-widest py-3 rounded-lg border border-roman-gold/40 transition-all shadow-[0_0_15px_rgba(139,28,28,0.4)] hover:shadow-[0_0_25px_rgba(139,28,28,0.6)] disabled:opacity-50 disabled:cursor-not-allowed mt-2"
-          >
-            {loading
-              ? <><ButtonSpinner /> Entering...</>
-              : mode === "signin"
-              ? "Enter the Arena"
-              : "Enlist Now"}
-          </button>
+          {(mode === "signin" || accessCodeConfirmed) && (
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-linear-to-r from-roman-red to-roman-red-dark hover:from-roman-red/90 hover:to-roman-red-dark/90 text-roman-gold font-bold uppercase tracking-widest py-3 rounded-lg border border-roman-gold/40 transition-all shadow-[0_0_15px_rgba(139,28,28,0.4)] hover:shadow-[0_0_25px_rgba(139,28,28,0.6)] disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+            >
+              {loading
+                ? <><ButtonSpinner /> Entering...</>
+                : mode === "signin"
+                ? "Enter the Arena"
+                : "Enlist Now"}
+            </button>
+          )}
         </form>
 
         <div className="roman-divider text-stone-600 text-xs mt-6">◆</div>
@@ -166,7 +237,7 @@ export default function LoginPage() {
               New to the Legion?{" "}
               <button
                 type="button"
-                onClick={() => { setMode("signup"); setError(null); }}
+                onClick={() => { setMode("signup"); setError(null); setAccessCode(""); setAccessCodeConfirmed(false); setConfirmedSchoolName(null); }}
                 className="text-roman-gold hover:text-roman-gold-light hover:underline transition-colors"
               >
                 Register

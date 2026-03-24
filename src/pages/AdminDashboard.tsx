@@ -39,6 +39,7 @@ export default function AdminDashboard() {
   const [schoolAddress, setSchoolAddress] = useState("");
   const [schoolSaving, setSchoolSaving] = useState(false);
   const [schoolError, setSchoolError] = useState("");
+  const [schoolAccessCode, setSchoolAccessCode] = useState("");
 
   // Add Student modal
   const [showAddStudent, setShowAddStudent] = useState(false);
@@ -93,9 +94,9 @@ export default function AdminDashboard() {
     setSchoolSaving(true);
     setSchoolError("");
     try {
-      await createSchool(schoolName.trim(), schoolAddress.trim() || undefined);
+      const created = await createSchool(schoolName.trim(), schoolAddress.trim() || undefined);
+      setSchoolAccessCode(created.accessCode);
       setSchoolName(""); setSchoolAddress("");
-      setShowAddSchool(false);
       await loadData();
     } catch {
       setSchoolError("Failed to create school. Try again.");
@@ -158,10 +159,10 @@ export default function AdminDashboard() {
     : null;
 
   return (
-    <div className="min-h-screen bg-stone-900 text-stone-100 flex flex-col">
+    <div className="h-screen bg-stone-900 text-stone-100 flex flex-col overflow-hidden">
       <Navbar />
 
-      <div className="flex-1 w-full px-14 py-10">
+      <div className="flex-1 min-h-0 w-full px-14 py-10 overflow-y-auto overflow-x-hidden">
         {/* Global stat cards */}
         <div className="grid grid-cols-4 gap-3 mb-8">
           {[
@@ -362,7 +363,7 @@ export default function AdminDashboard() {
                             <div className="w-9 h-9 rounded-full border border-roman-gold/20 overflow-hidden bg-stone-800 flex items-center justify-center shrink-0">
                               {user.photoUrl
                                 ? <img src={user.photoUrl} alt={user.displayName} className="w-full h-full object-cover" />
-                                : <span className="text-stone-600 text-sm">🛡</span>
+                                : <img src="/warrior.png" alt="Warrior" className="w-full h-full object-cover opacity-60" />
                               }
                             </div>
                           </td>
@@ -406,6 +407,13 @@ export default function AdminDashboard() {
             <div className="h-px w-full bg-linear-to-r from-transparent via-roman-gold/50 to-transparent" />
             <div className="px-8 py-8">
               <h2 className="text-roman-gold font-serif text-2xl font-bold mb-6 tracking-wide">Add School</h2>
+              {schoolAccessCode && (
+                <div className="mb-4 rounded-lg border border-roman-gold/30 bg-roman-gold/10 px-4 py-3">
+                  <p className="text-roman-gold text-xs uppercase tracking-widest font-semibold mb-1">Access Code</p>
+                  <p className="font-mono text-xl tracking-[0.3em] text-stone-100">{schoolAccessCode}</p>
+                  <p className="text-stone-500 text-xs mt-2">Share this code with teachers and staff.</p>
+                </div>
+              )}
               <div className="space-y-4">
                 <div>
                   <label className="block text-stone-400 text-xs uppercase tracking-widest mb-2">School Name *</label>

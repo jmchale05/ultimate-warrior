@@ -11,12 +11,43 @@
   --color-roman-parchment: #c9b896;
 }
 
+/* ─── Custom Scrollbar ────────────────────────────────────────── */
+
+/* WebKit (Chrome, Edge, Safari) */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #1c1917;
+  border-left: 1px solid rgba(212, 175, 55, 0.12);
+}
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #d4af37 0%, #b8962f 40%, #8b1c1c 100%);
+  border-radius: 999px;
+  border: 2px solid #1c1917;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #f0d060 0%, #d4af37 40%, #a52020 100%);
+}
+::-webkit-scrollbar-thumb:active {
+  background: linear-gradient(180deg, #b8962f 0%, #8b1c1c 100%);
+}
+::-webkit-scrollbar-corner {
+  background: #1c1917;
+}
+
+/* Firefox */
+* {
+  scrollbar-width: auto;
+  scrollbar-color: #d4af37 #1c1917;
+}
+
 /* ─── Base ────────────────────────────────────────────────────── */
 @layer base {
   html,
   body {
     @apply bg-stone-900 text-stone-100 font-sans;
-    scrollbar-gutter: stable;
     -webkit-font-smoothing: antialiased;
   }
 

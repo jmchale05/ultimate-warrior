@@ -11,7 +11,6 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import { FullPageLoader } from "./components/LoadingSpinner";
 import DownloadPage from "./pages/DownloadPage";
 import LoginPage from "./pages/LoginPage";
-import MobileLoginPage from "./pages/MobileLoginPage";
 import Campaigns from "./pages/Campaigns";
 import MobileCampaigns from "./pages/MobileCampaigns";
 import Oracle from "./pages/Oracle";
@@ -95,7 +94,7 @@ export default function App() {
             <Route path="/" element={<RootRedirect />} />
             <Route path="/download" element={<DownloadRoute />} />
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/mobile-login" element={<MobileLoginPage />} />
+            <Route path="/mobile-login" element={<Navigate to="/login" replace />} />
             <Route path="/mobile-campaigns" element={<MobileCampaigns />} />
             <Route element={<PrivateRoute />}>
               <Route path="/campaigns" element={<Campaigns />} />

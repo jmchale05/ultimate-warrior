@@ -9,6 +9,7 @@ import {
   getUsersByIds,
   getResultsByClass,
   createUserDoc,
+  createClass,
   addStudentToClass,
   updateUserPhoto,
 } from "../lib/firestore";
@@ -58,6 +59,7 @@ export default function Campaigns() {
   const [classes, setClasses] = useState<Class[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showAddClassModal, setShowAddClassModal] = useState(false);
   const [formName, setFormName] = useState("");
   const [formAge, setFormAge] = useState("");
   const [formClassId, setFormClassId] = useState("");
@@ -66,15 +68,72 @@ export default function Campaigns() {
   const [formPhoto, setFormPhoto] = useState<File | null>(null);
   const [formPhotoPreview, setFormPhotoPreview] = useState<string | null>(null);
   const formPhotoRef = useRef<HTMLInputElement>(null);
+  const [className, setClassName] = useState("");
+  const [classSaving, setClassSaving] = useState(false);
+  const [classError, setClassError] = useState("");
+
+  async function handleAddClass() {
+    if (!appUser?.schoolId) {
+      setClassError("You need a school before creating classes.");
+      return;
+    }
+    if (!className.trim()) {
+      setClassError("Class name is required.");
+      return;
+    }
+
+    setClassSaving(true);
+    setClassError("");
+    try {
+      await createClass(className.trim(), appUser.schoolId, appUser.uid);
+      setClassName("");
+      setShowAddClassModal(false);
+      await loadData();
+    } catch (err) {
+      console.error(err);
+      setClassError("Failed to create class. Try again.");
+    } finally {
+      setClassSaving(false);
+    }
+  }
 
   async function handleAddStudent() {
-    if (!appUser || !formName.trim() || !formClassId) {
+    if (!appUser || !formName.trim()) {
       setFormError("Please fill in name and select a class.");
       return;
     }
     setFormSaving(true);
     setFormError("");
     try {
+      const schoolId = appUser.schoolId;
+      let classId = formClassId;
+
+      if (!classId) {
+        if (!schoolId) {
+          setFormError("You need a school before adding students.");
+          return;
+        }
+
+        if (classes.length === 0) {
+          classId = await createClass("Class 1", schoolId, appUser.uid);
+          setClasses((prev) => [
+            ...prev,
+            {
+              id: classId,
+              name: "Class 1",
+              schoolId,
+              teacherId: appUser.uid,
+              studentIds: [],
+              createdAt: Date.now(),
+            },
+          ]);
+          setFormClassId(classId);
+        } else {
+          setFormError("Please select a class.");
+          return;
+        }
+      }
+
       const newUid = crypto.randomUUID();
       const newUser: AppUser = {
         uid: newUid,
@@ -82,12 +141,12 @@ export default function Campaigns() {
         displayName: formName.trim(),
         role: "student",
         schoolId: appUser.schoolId,
-        classId: formClassId,
+        classId,
         age: formAge ? parseInt(formAge) : undefined,
         createdAt: Date.now(),
       };
       await createUserDoc(newUser);
-      await addStudentToClass(formClassId, newUid);
+      await addStudentToClass(classId, newUid);
       if (formPhoto) {
         await updateUserPhoto(newUid, formPhoto);
       }
@@ -170,17 +229,52 @@ export default function Campaigns() {
   const filtered = students;
 
   return (
-    <div className="min-h-screen bg-stone-900 text-stone-100 flex flex-col">
+    <div className="h-screen bg-stone-900 text-stone-100 flex flex-col overflow-hidden">
       <Navbar />
 
-      <div className="flex-1 w-full px-14 py-14">
+      <div className="flex-1 min-h-0 w-full px-14 py-14 overflow-y-auto overflow-x-hidden">
+        <div className="flex items-center justify-between gap-3 mb-6">
+          <div>
+            <h2 className="text-roman-gold/70 text-xs uppercase tracking-[0.2em] font-semibold">Students and Classes</h2>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setShowAddClassModal(true); setClassError(""); }}
+              className="px-3 py-1.5 rounded-lg border border-stone-700 text-stone-300 text-xs uppercase tracking-wider font-semibold hover:bg-stone-800/60 transition-colors"
+            >
+              + Add Class
+            </button>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="px-3 py-1.5 rounded-lg border border-roman-gold/40 text-roman-gold text-xs uppercase tracking-wider font-semibold hover:bg-roman-gold/10 transition-colors"
+            >
+              + Add Student
+            </button>
+          </div>
+        </div>
 
         {loading ? (
           <CampaignsTableSkeleton />
         ) : filtered.length === 0 ? (
-          <div className="text-center text-stone-500 py-20">
-            <p className="text-lg mb-2">No students found</p>
-            <p className="text-sm">Add students to your classes to see their progress here.</p>
+          <div className="text-center text-stone-500 py-20 flex flex-col items-center gap-4">
+            <div>
+              <p className="text-lg mb-2">No students found</p>
+              <p className="text-sm">Add students to your classes to see their progress here.</p>
+            </div>
+            <div className="flex flex-wrap justify-center gap-3">
+              <button
+                onClick={() => { setShowAddClassModal(true); setClassError(""); }}
+                className="px-4 py-2 rounded-lg border border-stone-700 text-stone-300 text-sm uppercase tracking-wider font-semibold hover:bg-stone-800/60 transition-colors"
+              >
+                + Add Class
+              </button>
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="px-4 py-2 rounded-lg border border-roman-gold/40 text-roman-gold text-sm uppercase tracking-wider font-semibold hover:bg-roman-gold/10 transition-colors"
+              >
+                + Add Student
+              </button>
+            </div>
           </div>
         ) : (
           <div className="rounded-xl border border-stone-700/50 overflow-hidden">
@@ -207,7 +301,7 @@ export default function Campaigns() {
                         <div className="w-9 h-9 rounded-full border border-roman-gold/20 overflow-hidden bg-stone-800 flex items-center justify-center shrink-0">
                           {s.photoUrl
                             ? <img src={s.photoUrl} alt={s.name} className="w-full h-full object-cover" />
-                            : <span className="text-stone-600 text-sm">🛡</span>
+                            : <img src="/warrior.png" alt={s.name} className="w-full h-full object-cover opacity-60" />
                           }
                         </div>
                         <span className="font-medium text-stone-100 text-lg">{s.name}</span>
@@ -312,7 +406,7 @@ export default function Campaigns() {
                   >
                     {formPhotoPreview
                       ? <img src={formPhotoPreview} alt="preview" className="w-full h-full object-cover" />
-                      : <span className="text-3xl text-stone-600 group-hover:text-stone-400 transition-colors">🛡</span>
+                      : <img src="/warrior.png" alt="Warrior" className="w-full h-full object-cover opacity-60" />
                     }
                   </button>
                   <span className="text-stone-500 text-xs">{formPhotoPreview ? "Click to change photo" : "Add photo (optional)"}</span>
@@ -360,15 +454,21 @@ export default function Campaigns() {
 
                 <div>
                   <label className="block text-stone-400 text-xs uppercase tracking-widest mb-2">Class</label>
-                  <select
-                    value={formClassId}
-                    onChange={(e) => setFormClassId(e.target.value)}
-                    className="w-full bg-stone-800 border border-stone-700 rounded-lg px-4 py-3 text-stone-100 focus:outline-none focus:border-roman-gold/60 transition-colors"
-                  >
-                    {classes.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
+                  {classes.length === 0 ? (
+                    <div className="rounded-lg border border-dashed border-roman-gold/30 bg-stone-800/60 px-4 py-3 text-stone-400 text-sm">
+                      No classes yet. A default class will be created for this student.
+                    </div>
+                  ) : (
+                    <select
+                      value={formClassId}
+                      onChange={(e) => setFormClassId(e.target.value)}
+                      className="w-full bg-stone-800 border border-stone-700 rounded-lg px-4 py-3 text-stone-100 focus:outline-none focus:border-roman-gold/60 transition-colors"
+                    >
+                      {classes.map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  )}
                 </div>
 
                 {formError && (
@@ -389,6 +489,53 @@ export default function Campaigns() {
                   className="flex-1 py-3 rounded-xl bg-roman-gold text-stone-950 font-semibold hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {formSaving ? "Adding..." : "Add Student"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Class Modal */}
+      {showAddClassModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-stone-950/80 backdrop-blur-sm" onClick={() => setShowAddClassModal(false)} />
+          <div className="relative bg-stone-900 border border-roman-gold/20 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+            <div className="h-px w-full bg-linear-to-r from-transparent via-roman-gold/50 to-transparent" />
+            <div className="px-8 py-8">
+              <h2 className="text-roman-gold font-serif text-2xl font-bold mb-3 tracking-wide">Add Class</h2>
+              <p className="text-stone-500 text-sm mb-6">Create a class for your students to join.</p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-stone-400 text-xs uppercase tracking-widest mb-2">Class Name</label>
+                  <input
+                    type="text"
+                    value={className}
+                    onChange={(e) => setClassName(e.target.value)}
+                    placeholder="e.g. Period 1"
+                    className="w-full bg-stone-800 border border-stone-700 rounded-lg px-4 py-3 text-stone-100 placeholder-stone-600 focus:outline-none focus:border-roman-gold/60 transition-colors"
+                  />
+                </div>
+
+                {classError && (
+                  <p className="text-red-400 text-sm">{classError}</p>
+                )}
+              </div>
+
+              <div className="flex gap-3 mt-8">
+                <button
+                  onClick={() => { setShowAddClassModal(false); setClassError(""); }}
+                  className="flex-1 py-3 rounded-xl border border-stone-700 text-stone-400 hover:text-stone-200 hover:border-stone-500 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddClass}
+                  disabled={classSaving}
+                  className="flex-1 py-3 rounded-xl bg-roman-gold text-stone-950 font-semibold hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {classSaving ? "Creating..." : "Add Class"}
                 </button>
               </div>
             </div>

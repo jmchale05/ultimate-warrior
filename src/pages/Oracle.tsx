@@ -6,10 +6,10 @@ export default function Oracle() {
   useAuth();
 
   return (
-    <div className="min-h-screen bg-stone-900 text-stone-100">
+    <div className="h-screen bg-stone-900 text-stone-100 flex flex-col overflow-hidden">
       <Navbar />
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden max-w-7xl mx-auto px-6 py-8 w-full">
         {/* Welcome banner */}
         <div className="mb-8">
           <h2 className="text-roman-gold font-serif text-3xl font-bold">

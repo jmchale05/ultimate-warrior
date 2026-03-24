@@ -22,6 +22,10 @@ const CAMPAIGNS = [
 
 const TOTAL_MILES = 78; // 1+2+...+12
 
+function roundMiles(value: number) {
+  return Math.round(value * 10) / 10;
+}
+
 export default function StudentCampaign() {
   const { uid } = useParams<{ uid: string }>();
   const navigate = useNavigate();
@@ -55,7 +59,7 @@ export default function StudentCampaign() {
     if (!input || input <= 0 || !uid || !student) return;
     const already = campaignMiles[campaignNumber] ?? 0;
     const remaining = milesRequired - already;
-    const toLog = Math.min(input, remaining);
+    const toLog = roundMiles(Math.min(input, remaining));
     if (toLog <= 0) return;
     setSubmitting(campaignNumber);
     await submitResult({
@@ -85,7 +89,7 @@ export default function StudentCampaign() {
         const match = r.challengeId?.match(/^campaign-(\d+)$/);
         if (match) {
           const num = parseInt(match[1]);
-          bycampaign[num] = Math.min((bycampaign[num] ?? 0) + r.distanceMiles, num);
+          bycampaign[num] = roundMiles(Math.min((bycampaign[num] ?? 0) + r.distanceMiles, num));
         }
       }
       setCampaignMiles(bycampaign);
@@ -126,10 +130,10 @@ export default function StudentCampaign() {
   }
 
   return (
-    <div className="min-h-screen bg-stone-900 text-stone-100 flex flex-col">
+    <div className="h-screen bg-stone-900 text-stone-100 flex flex-col overflow-hidden">
       <Navbar />
 
-      <div className="flex-1 w-full px-14 py-10">
+      <div className="flex-1 min-h-0 w-full px-14 py-10 overflow-y-auto overflow-x-hidden">
         {/* Back button */}
         <button
           onClick={() => navigate("/campaigns")}
@@ -155,7 +159,7 @@ export default function StudentCampaign() {
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <span className="text-3xl text-stone-600">🛡</span>
+                      <img src="/warrior.png" alt="Warrior" className="w-full h-full object-cover opacity-60" />
                     )}
                   </div>
                   <button
@@ -291,7 +295,7 @@ export default function StudentCampaign() {
                     {(status === "active" || status === "complete") && (
                       <div className="mt-4 border-t border-stone-700/40 pt-4 flex flex-wrap gap-2">
                         {status === "active" && (
-                          watchedCampaigns.has(c.number) ? (
+                          watchedCampaigns.has(c.number) || (campaignMiles[c.number] ?? 0) > 0 ? (
                             <div className="flex items-center gap-2">
                               <input
                                 type="number"
@@ -344,40 +348,79 @@ export default function StudentCampaign() {
             </div>
 
             {videoModal && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-10">
-                <div
-                  className="absolute inset-0 bg-stone-950/80 backdrop-blur-sm"
-                  onClick={closeVideoModal}
-                />
-                <div className="relative w-full max-w-4xl rounded-2xl border border-roman-gold/30 bg-stone-900 shadow-2xl overflow-hidden" style={{ maxHeight: 'calc(100vh - 8rem)' }}>
+              <div className="fixed inset-0 z-50 bg-black flex flex-col">
+                {/* Top bar */}
+                <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-8 py-5 bg-linear-to-b from-black/90 to-transparent">
+                  <div>
+                    <p className="text-roman-gold/60 text-[10px] uppercase tracking-[0.35em] font-semibold mb-0.5">
+                      {videoModal.isEnd ? "End of Campaign" : "Campaign"} {videoModal.campaignNumber}
+                    </p>
+                    <h2 className="text-roman-gold font-serif text-xl font-bold tracking-wide roman-glow">
+                      {CAMPAIGNS[videoModal.campaignNumber - 1].name}
+                    </h2>
+                    <p className="text-stone-400 text-xs mt-0.5 italic">
+                      {CAMPAIGNS[videoModal.campaignNumber - 1].subtitle}
+                    </p>
+                  </div>
                   <button
                     onClick={closeVideoModal}
-                    className="absolute top-3 right-3 z-10 text-stone-400 hover:text-stone-100 text-sm uppercase tracking-wider cursor-pointer bg-stone-950/70 px-3 py-1.5 rounded"
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg border border-stone-700 text-stone-400 hover:text-stone-100 hover:border-stone-500 text-xs uppercase tracking-widest font-semibold transition-all cursor-pointer bg-black/40"
                   >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
                     Close
                   </button>
-                  <div className="px-6 pt-6 pb-10">
-                    {!isPlayingVideo ? (
-                      <div className="w-full h-80 rounded-lg bg-black flex items-center justify-center">
+                </div>
+
+                {/* Video area */}
+                <div className="flex-1 flex items-center justify-center">
+                  {!isPlayingVideo ? (
+                    /* Play screen */
+                    <div className="flex flex-col items-center gap-8">
+                      <div className="relative">
+                        {/* Glow rings */}
+                        <div className="absolute inset-0 rounded-full bg-roman-gold/10 blur-2xl scale-150" />
                         <button
                           onClick={() => setIsPlayingVideo(true)}
-                          className="group relative flex items-center justify-center w-20 h-20 rounded-full border-2 border-roman-gold bg-roman-gold/10 hover:bg-roman-gold/20 transition-all hover:scale-110"
+                          className="relative w-28 h-28 rounded-full border-2 border-roman-gold bg-stone-950/80 hover:bg-roman-gold/10 hover:scale-110 active:scale-95 transition-all duration-200 flex items-center justify-center shadow-[0_0_60px_rgba(212,175,55,0.25)] cursor-pointer"
                         >
-                          <span className="text-4xl text-roman-gold">⏵</span>
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-12 h-12 text-roman-gold ml-1.5">
+                            <path d="M8 5v14l11-7z"/>
+                          </svg>
                         </button>
                       </div>
-                    ) : (
-                      <video
-                        key={videoModal.src}
-                        controls
-                        autoPlay
-                        className="block w-full rounded-lg bg-black mb-4"
-                      >
-                        <source src={videoModal.src} type="video/mp4" />
-                        Your browser does not support the video tag.
-                      </video>
-                    )}
-                  </div>
+                      <p className="text-stone-500 text-sm tracking-widest uppercase font-semibold">
+                        {videoModal.isEnd ? "Watch Closing Video" : "Watch Intro to Begin"}
+                      </p>
+                    </div>
+                  ) : (
+                    <video
+                      key={videoModal.src}
+                      controls
+                      autoPlay
+                      className="w-full h-full object-contain"
+                      onError={() => {}}
+                      onEnded={closeVideoModal}
+                    >
+                      <source src={videoModal.src} type="video/mp4" />
+                    </video>
+                  )}
+                </div>
+
+                {/* Bottom bar */}
+                <div className="absolute bottom-0 left-0 right-0 z-10 px-8 py-4 bg-linear-to-t from-black/90 to-transparent flex items-center justify-between">
+                  <p className="text-stone-600 text-xs uppercase tracking-[0.25em] font-semibold">
+                    {videoModal.isEnd ? "Complete this video to unlock the next campaign" : "Watch this video to begin logging miles"}
+                  </p>
+                  {isPlayingVideo && (
+                    <button
+                      onClick={closeVideoModal}
+                      className="px-5 py-2.5 rounded-lg bg-roman-gold/20 border border-roman-gold/50 text-roman-gold text-xs uppercase tracking-wider font-bold hover:bg-roman-gold/30 transition-colors cursor-pointer"
+                    >
+                      Done ✓
+                    </button>
+                  )}
                 </div>
               </div>
             )}

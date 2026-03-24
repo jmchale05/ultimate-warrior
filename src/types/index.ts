@@ -6,6 +6,7 @@ export interface School {
   id: string;
   name: string;
   address?: string;
+  accessCode: string;
   createdAt: number;
 }
 
