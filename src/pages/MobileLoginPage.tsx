@@ -28,7 +28,24 @@ export default function MobileLoginPage() {
       }
       navigate("/campaigns");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Authentication failed.");
+      const code = (err as { code?: string }).code;
+      if (code === "auth/invalid-credential" || code === "auth/wrong-password" || code === "auth/user-not-found") {
+        setError("Incorrect email or password. Please try again.");
+      } else if (code === "auth/invalid-email") {
+        setError("Please enter a valid email address.");
+      } else if (code === "auth/user-disabled") {
+        setError("This account has been disabled. Please contact support.");
+      } else if (code === "auth/too-many-requests") {
+        setError("Too many failed attempts. Please wait a moment and try again.");
+      } else if (code === "auth/email-already-in-use") {
+        setError("An account with this email already exists.");
+      } else if (code === "auth/weak-password") {
+        setError("Password must be at least 6 characters.");
+      } else if (code === "auth/network-request-failed") {
+        setError("Network error. Please check your internet connection.");
+      } else {
+        setError("Something went wrong. Please try again.");
+      }
     } finally {
       setLoading(false);
     }

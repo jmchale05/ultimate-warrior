@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { ButtonSpinner } from "../components/LoadingSpinner";
@@ -6,7 +6,7 @@ import { ButtonSpinner } from "../components/LoadingSpinner";
 type Mode = "signin" | "signup";
 
 export default function LoginPage() {
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, currentUser } = useAuth();
   const navigate = useNavigate();
 
   const [mode, setMode] = useState<Mode>("signin");
@@ -15,6 +15,11 @@ export default function LoginPage() {
   const [displayName, setDisplayName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Navigate once Firebase auth state actually confirms the user is signed in
+  useEffect(() => {
+    if (currentUser) navigate("/campaigns", { replace: true });
+  }, [currentUser]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -26,9 +31,26 @@ export default function LoginPage() {
       } else {
         await signUp(email, password, displayName, "teacher");
       }
-      navigate("/teacher");
+      // Navigation happens via the useEffect above when currentUser updates
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Authentication failed.");
+      const code = (err as { code?: string }).code;
+      if (code === "auth/invalid-credential" || code === "auth/wrong-password" || code === "auth/user-not-found") {
+        setError("Incorrect email or password. Please try again.");
+      } else if (code === "auth/invalid-email") {
+        setError("Please enter a valid email address.");
+      } else if (code === "auth/user-disabled") {
+        setError("This account has been disabled. Please contact support.");
+      } else if (code === "auth/too-many-requests") {
+        setError("Too many failed attempts. Please wait a moment and try again.");
+      } else if (code === "auth/email-already-in-use") {
+        setError("An account with this email already exists.");
+      } else if (code === "auth/weak-password") {
+        setError("Password must be at least 6 characters.");
+      } else if (code === "auth/network-request-failed") {
+        setError("Network error. Please check your internet connection.");
+      } else {
+        setError("Something went wrong. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
