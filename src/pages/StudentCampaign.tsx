@@ -6,7 +6,7 @@ import { getUserDoc, getResultsByStudent, submitResult, updateUserPhoto } from "
 import type { AppUser, Result } from "../types";
 
 const CAMPAIGNS = [
-  { number: 1,  name: "The Beginning",            subtitle: "Mars God of War",              milesRequired: 1,  startVideo: "/roman-vid.mp4", endVideo: "/roman-vid.mp4" },
+  { number: 1,  name: "The Beginning",            subtitle: "Mars God of War",              milesRequired: 1,  startVideo: "/beginning.mars.mov", endVideo: "/end.mars.mov" },
   { number: 2,  name: "The Foundations",           subtitle: "Romulus & Remus",              milesRequired: 2,  startVideo: "/roman-vid.mp4", endVideo: "/roman-vid.mp4" },
   { number: 3,  name: "The Emperor",               subtitle: "Augustus",                     milesRequired: 3,  startVideo: "/roman-vid.mp4", endVideo: "/roman-vid.mp4" },
   { number: 4,  name: "The Legion",                subtitle: "Domination of the Roman Army", milesRequired: 4,  startVideo: "/roman-vid.mp4", endVideo: "/roman-vid.mp4" },
@@ -133,11 +133,19 @@ export default function StudentCampaign() {
     <div className="h-screen bg-stone-900 text-stone-100 flex flex-col overflow-hidden">
       <Navbar />
 
-      <div className="flex-1 min-h-0 w-full px-14 py-10 overflow-y-auto overflow-x-hidden">
+      <div className="flex-1 min-h-0 flex overflow-hidden relative">
+        {/* Left side image */}
+        <div className="w-32 shrink-0 select-none pointer-events-none" style={{
+          backgroundImage: 'url("/SIDE.png")',
+          backgroundRepeat: 'repeat-y',
+          backgroundSize: '100% auto',
+        }} />
+
+        <div className="flex-1 min-h-0 w-full px-14 py-10 overflow-y-auto overflow-x-hidden">
         {/* Back button */}
         <button
           onClick={() => navigate("/campaigns")}
-          className="flex items-center gap-2 text-stone-500 hover:text-roman-gold transition-colors mb-8 text-sm uppercase tracking-wider font-semibold cursor-pointer"
+          className="flex items-center gap-2 text-stone-500 hover:text-roman-gold transition-colors mb-8 text-base uppercase tracking-wider font-semibold cursor-pointer"
         >
           ← Back to Legion
         </button>
@@ -189,27 +197,27 @@ export default function StudentCampaign() {
                   />
                 </div>
                 <div>
-                  <p className="text-roman-gold/50 text-xs uppercase tracking-[0.25em] font-semibold mb-1">
+                  <p className="text-roman-gold/50 text-sm uppercase tracking-[0.25em] font-semibold mb-1">
                     Campaign Progress
                   </p>
-                  <h1 className="text-stone-100 font-serif text-4xl font-bold">
+                  <h1 className="text-stone-100 font-serif text-5xl font-bold">
                     {student?.displayName ?? "Unknown Warrior"}
                   </h1>
                   {student?.age && (
-                    <p className="text-stone-500 text-sm mt-1">Age {student.age}</p>
+                    <p className="text-stone-500 text-base mt-1">Age {student.age}</p>
                   )}
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-roman-gold/50 text-xs uppercase tracking-[0.25em] font-semibold mb-1">Total Miles</p>
-                <p className="text-roman-gold font-serif text-4xl font-bold">{totalMiles.toFixed(1)}</p>
-                <p className="text-stone-500 text-sm">of {TOTAL_MILES} mi</p>
+                <p className="text-roman-gold/50 text-sm uppercase tracking-[0.25em] font-semibold mb-1">Total Miles</p>
+                <p className="text-roman-gold font-serif text-5xl font-bold">{totalMiles.toFixed(1)}</p>
+                <p className="text-stone-500 text-base">of {TOTAL_MILES} mi</p>
               </div>
             </div>
 
             {/* Overall progress bar */}
             <div className="mb-10">
-              <div className="flex justify-between text-xs uppercase tracking-widest text-stone-500 font-semibold mb-2">
+              <div className="flex justify-between text-sm uppercase tracking-widest text-stone-500 font-semibold mb-2">
                 <span>Overall Journey</span>
                 <span>{overallProgress}%</span>
               </div>
@@ -239,7 +247,7 @@ export default function StudentCampaign() {
                   >
                     <div className="flex items-center gap-6">
                       {/* Number */}
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center font-serif font-bold text-lg shrink-0 ${
+                        <div className={`w-11 h-11 rounded-full flex items-center justify-center font-serif font-bold text-xl shrink-0 ${
                         status === "complete"
                           ? "bg-roman-gold text-stone-950"
                           : status === "active"
@@ -253,16 +261,16 @@ export default function StudentCampaign() {
                       <div className="flex-1">
                         <div className="flex items-center justify-between mb-1">
                           <div>
-                            <span className={`font-semibold text-base ${
+                            <span className={`font-semibold text-lg ${
                               status === "locked" ? "text-stone-600" : "text-stone-100"
                             }`}>
                               {c.name}
                             </span>
-                            <p className={`text-xs mt-0.5 ${
+                            <p className={`text-sm mt-0.5 ${
                               status === "locked" ? "text-stone-700" : "text-stone-400"
                             }`}>{c.subtitle}</p>
                           </div>
-                          <span className="text-stone-500 text-sm font-mono shrink-0 ml-4">
+                          <span className="text-stone-500 text-base font-mono shrink-0 ml-4">
                             {campaignMiles[c.number] ?? 0}/{c.milesRequired} mi
                           </span>
                         </div>
@@ -281,13 +289,13 @@ export default function StudentCampaign() {
                       {/* Status badge */}
                       <div className="w-24 text-right shrink-0">
                         {status === "complete" && (
-                          <span className="text-xs uppercase tracking-widest text-roman-gold font-semibold">Complete</span>
+                          <span className="text-sm uppercase tracking-widest text-roman-gold font-semibold">Complete</span>
                         )}
                         {status === "active" && (
-                          <span className="text-xs uppercase tracking-widest text-roman-gold/70 font-semibold">{progress}%</span>
+                          <span className="text-sm uppercase tracking-widest text-roman-gold/70 font-semibold">{progress}%</span>
                         )}
                         {status === "locked" && (
-                          <span className="text-xs uppercase tracking-widest text-stone-600 font-semibold">Locked</span>
+                          <span className="text-sm uppercase tracking-widest text-stone-600 font-semibold">Locked</span>
                         )}
                       </div>
                     </div>
@@ -348,10 +356,22 @@ export default function StudentCampaign() {
             </div>
 
             {videoModal && (
-              <div className="fixed inset-0 z-50 bg-black flex flex-col">
-                {/* Top bar */}
-                <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-8 py-5 bg-linear-to-b from-black/90 to-transparent">
-                  <div>
+              <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center">
+                {/* Close button */}
+                <button
+                  onClick={closeVideoModal}
+                  className="absolute top-5 right-5 z-20 flex items-center gap-2 px-4 py-2 rounded-lg border border-stone-700 text-stone-400 hover:text-stone-100 hover:border-stone-500 text-xs uppercase tracking-widest font-semibold transition-all cursor-pointer bg-black/60"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                  Close
+                </button>
+
+                {/* Center content */}
+                <div className="flex flex-col items-center w-full h-full">
+                  {/* Title header */}
+                  <div className="text-center pt-6 pb-4 z-10">
                     <p className="text-roman-gold/60 text-[10px] uppercase tracking-[0.35em] font-semibold mb-0.5">
                       {videoModal.isEnd ? "End of Campaign" : "Campaign"} {videoModal.campaignNumber}
                     </p>
@@ -362,70 +382,67 @@ export default function StudentCampaign() {
                       {CAMPAIGNS[videoModal.campaignNumber - 1].subtitle}
                     </p>
                   </div>
-                  <button
-                    onClick={closeVideoModal}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg border border-stone-700 text-stone-400 hover:text-stone-100 hover:border-stone-500 text-xs uppercase tracking-widest font-semibold transition-all cursor-pointer bg-black/40"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                    </svg>
-                    Close
-                  </button>
-                </div>
 
-                {/* Video area */}
-                <div className="flex-1 flex items-center justify-center">
-                  {!isPlayingVideo ? (
-                    /* Play screen */
-                    <div className="flex flex-col items-center gap-8">
-                      <div className="relative">
-                        {/* Glow rings */}
-                        <div className="absolute inset-0 rounded-full bg-roman-gold/10 blur-2xl scale-150" />
-                        <button
-                          onClick={() => setIsPlayingVideo(true)}
-                          className="relative w-28 h-28 rounded-full border-2 border-roman-gold bg-stone-950/80 hover:bg-roman-gold/10 hover:scale-110 active:scale-95 transition-all duration-200 flex items-center justify-center shadow-[0_0_60px_rgba(212,175,55,0.25)] cursor-pointer"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-12 h-12 text-roman-gold ml-1.5">
-                            <path d="M8 5v14l11-7z"/>
-                          </svg>
-                        </button>
+                  {/* Video area — portrait-optimized */}
+                  <div className="flex-1 min-h-0 flex items-center justify-center w-full px-4">
+                    {!isPlayingVideo ? (
+                      <div className="flex flex-col items-center gap-8">
+                        <div className="relative">
+                          <div className="absolute inset-0 rounded-full bg-roman-gold/10 blur-2xl scale-150" />
+                          <button
+                            onClick={() => setIsPlayingVideo(true)}
+                            className="relative w-28 h-28 rounded-full border-2 border-roman-gold bg-stone-950/80 hover:bg-roman-gold/10 hover:scale-110 active:scale-95 transition-all duration-200 flex items-center justify-center shadow-[0_0_60px_rgba(212,175,55,0.25)] cursor-pointer"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-12 h-12 text-roman-gold ml-1.5">
+                              <path d="M8 5v14l11-7z"/>
+                            </svg>
+                          </button>
+                        </div>
+                        <p className="text-stone-500 text-sm tracking-widest uppercase font-semibold">
+                          {videoModal.isEnd ? "Watch Closing Video" : "Watch Intro to Begin"}
+                        </p>
                       </div>
-                      <p className="text-stone-500 text-sm tracking-widest uppercase font-semibold">
-                        {videoModal.isEnd ? "Watch Closing Video" : "Watch Intro to Begin"}
-                      </p>
-                    </div>
-                  ) : (
-                    <video
-                      key={videoModal.src}
-                      controls
-                      autoPlay
-                      className="w-full h-full object-contain"
-                      onError={() => {}}
-                      onEnded={closeVideoModal}
-                    >
-                      <source src={videoModal.src} type="video/mp4" />
-                    </video>
-                  )}
-                </div>
+                    ) : (
+                      <video
+                        key={videoModal.src}
+                        src={videoModal.src}
+                        controls
+                        autoPlay
+                        playsInline
+                        className="max-h-full max-w-[min(100%,480px)] rounded-lg shadow-[0_0_80px_rgba(0,0,0,0.8)]"
+                        onEnded={closeVideoModal}
+                      />
+                    )}
+                  </div>
 
-                {/* Bottom bar */}
-                <div className="absolute bottom-0 left-0 right-0 z-10 px-8 py-4 bg-linear-to-t from-black/90 to-transparent flex items-center justify-between">
-                  <p className="text-stone-600 text-xs uppercase tracking-[0.25em] font-semibold">
-                    {videoModal.isEnd ? "Complete this video to unlock the next campaign" : "Watch this video to begin logging miles"}
-                  </p>
-                  {isPlayingVideo && (
-                    <button
-                      onClick={closeVideoModal}
-                      className="px-5 py-2.5 rounded-lg bg-roman-gold/20 border border-roman-gold/50 text-roman-gold text-xs uppercase tracking-wider font-bold hover:bg-roman-gold/30 transition-colors cursor-pointer"
-                    >
-                      Done ✓
-                    </button>
-                  )}
+                  {/* Bottom bar */}
+                  <div className="w-full px-8 py-4 flex items-center justify-between z-10">
+                    <p className="text-stone-600 text-xs uppercase tracking-[0.25em] font-semibold">
+                      {videoModal.isEnd ? "Complete this video to unlock the next campaign" : "Watch this video to begin logging miles"}
+                    </p>
+                    {isPlayingVideo && (
+                      <button
+                        onClick={closeVideoModal}
+                        className="px-5 py-2.5 rounded-lg bg-roman-gold/20 border border-roman-gold/50 text-roman-gold text-xs uppercase tracking-wider font-bold hover:bg-roman-gold/30 transition-colors cursor-pointer"
+                      >
+                        Done ✓
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
           </>
         )}
+      </div>
+
+        {/* Right side image */}
+        <div className="w-32 shrink-0 select-none pointer-events-none" style={{
+          backgroundImage: 'url("/SIDE.png")',
+          backgroundRepeat: 'repeat-y',
+          backgroundSize: '100% auto',
+          transform: 'scaleX(-1)',
+        }} />
       </div>
     </div>
   );

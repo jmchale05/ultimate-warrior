@@ -12,8 +12,10 @@ import {
   createClass,
   addStudentToClass,
   updateUserPhoto,
+  updateSchoolLogo,
+  getSchoolById,
 } from "../lib/firestore";
-import type { AppUser, Class, Result } from "../types";
+import type { AppUser, Class, Result, School } from "../types";
 
 const CAMPAIGNS = [
   { number: 1,  name: "The Beginning",            minMiles: 0  },
@@ -71,6 +73,9 @@ export default function Campaigns() {
   const [className, setClassName] = useState("");
   const [classSaving, setClassSaving] = useState(false);
   const [classError, setClassError] = useState("");
+  const [school, setSchool] = useState<School | null>(null);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   async function handleAddClass() {
     if (!appUser?.schoolId) {
@@ -166,9 +171,25 @@ export default function Campaigns() {
     }
   }
 
+  async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !appUser?.schoolId) return;
+    setLogoUploading(true);
+    try {
+      const url = await updateSchoolLogo(appUser.schoolId, file);
+      setSchool((prev) => prev ? { ...prev, logoUrl: url } : prev);
+    } finally {
+      setLogoUploading(false);
+      if (logoInputRef.current) logoInputRef.current.value = "";
+    }
+  }
+
   useEffect(() => {
     if (!appUser) return;
     loadData();
+    if (appUser.schoolId) {
+      getSchoolById(appUser.schoolId).then(setSchool);
+    }
   }, [appUser]);
 
   async function loadData() {
@@ -232,10 +253,50 @@ export default function Campaigns() {
     <div className="h-screen bg-stone-900 text-stone-100 flex flex-col overflow-hidden">
       <Navbar />
 
-      <div className="flex-1 min-h-0 w-full px-14 py-14 overflow-y-auto overflow-x-hidden">
+      <div className="flex-1 min-h-0 flex overflow-hidden relative">
+        {/* Left side image */}
+        <div className="w-32 shrink-0 select-none pointer-events-none" style={{
+          backgroundImage: 'url("/SIDE.png")',
+          backgroundRepeat: 'repeat-y',
+          backgroundSize: '100% auto',
+        }} />
+
+        {/* Main content */}
+        <div className="flex-1 min-w-0 px-12 py-14 overflow-y-auto overflow-x-hidden">
         <div className="flex items-center justify-between gap-3 mb-6">
-          <div>
-            <h2 className="text-roman-gold/70 text-xs uppercase tracking-[0.2em] font-semibold">Students and Classes</h2>
+          <div className="flex items-center gap-4">
+            {/* School logo */}
+            <div className="relative group shrink-0">
+              <button
+                type="button"
+                onClick={() => logoInputRef.current?.click()}
+                disabled={logoUploading}
+                title="Upload school logo"
+                className="w-24 h-24 rounded-xl border-2 border-dashed border-roman-gold/30 hover:border-roman-gold/60 bg-stone-800 flex items-center justify-center overflow-hidden transition-colors group cursor-pointer disabled:cursor-wait"
+              >
+                {logoUploading ? (
+                  <svg className="roman-btn-spinner w-5 h-5 text-roman-gold" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeDasharray="50 20" />
+                  </svg>
+                ) : (
+                  <img src={school?.logoUrl ?? "/warriorschool.png"} alt="School logo" className="w-full h-full object-cover" />
+                )}
+              </button>
+              {!logoUploading && (
+                <div className="absolute inset-0 rounded-xl bg-stone-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-roman-gold">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="17 8 12 3 7 8" />
+                    <line x1="12" y1="3" x2="12" y2="15" />
+                  </svg>
+                </div>
+              )}
+              <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+            </div>
+            <div>
+              <h2 className="text-roman-gold/70 text-xs uppercase tracking-[0.2em] font-semibold">Students and Classes</h2>
+              {school?.name && <p className="text-stone-300 text-sm font-semibold mt-0.5">{school.name}</p>}
+            </div>
           </div>
           <div className="flex gap-2">
             <button
@@ -281,12 +342,12 @@ export default function Campaigns() {
             <table className="w-full text-left">
               <thead>
                 <tr className="bg-stone-800/80 border-b border-stone-700/50">
-                  <th className="pl-8 pr-8 py-5 text-base uppercase tracking-wider text-stone-400 font-semibold">Name</th>
-                  <th className="px-8 py-5 text-base uppercase tracking-wider text-stone-400 font-semibold w-24">Age</th>
-                  <th className="px-8 py-5 text-base uppercase tracking-wider text-stone-400 font-semibold w-40">Class</th>
-                  <th className="px-8 py-5 text-base uppercase tracking-wider text-stone-400 font-semibold w-32">Miles</th>
-                  <th className="px-8 py-5 text-base uppercase tracking-wider text-stone-400 font-semibold w-44">Campaign</th>
-                  <th className="px-8 py-5 text-base uppercase tracking-wider text-stone-400 font-semibold w-96">Progress</th>
+                  <th className="pl-8 pr-8 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold">Name</th>
+                  <th className="px-8 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold w-24">Age</th>
+                  <th className="px-8 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold w-40">Class</th>
+                  <th className="px-8 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold w-32">Miles</th>
+                  <th className="px-8 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold w-44">Campaign</th>
+                  <th className="px-8 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold w-96">Progress</th>
                 </tr>
               </thead>
               <tbody>
@@ -298,29 +359,29 @@ export default function Campaigns() {
                   >
                     <td className="pl-8 pr-8 py-6">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full border border-roman-gold/20 overflow-hidden bg-stone-800 flex items-center justify-center shrink-0">
+                        <div className="w-20 h-20 rounded-full border border-roman-gold/20 overflow-hidden bg-stone-800 flex items-center justify-center shrink-0">
                           {s.photoUrl
                             ? <img src={s.photoUrl} alt={s.name} className="w-full h-full object-cover" />
                             : <img src="/warrior.png" alt={s.name} className="w-full h-full object-cover opacity-60" />
                           }
                         </div>
-                        <span className="font-medium text-stone-100 text-lg">{s.name}</span>
+                        <span className="font-medium text-stone-100 text-3xl">{s.name}</span>
                       </div>
                     </td>
-                    <td className="px-8 py-6 text-stone-400 text-lg">{s.age ?? "—"}</td>
+                    <td className="px-8 py-6 text-stone-400 text-xl">{s.age ?? "—"}</td>
                     <td className="px-8 py-6">
-                      <span className="text-stone-300 text-base">
+                      <span className="text-stone-300 text-lg">
                         {s.className}
                       </span>
                     </td>
                     <td className="px-8 py-6">
-                      <span className="text-roman-gold font-bold text-lg">{s.campaignNumber}</span>
-                      <span className="text-stone-500 text-base ml-1">mi</span>
+                      <span className="text-roman-gold font-bold text-xl">{s.campaignNumber}</span>
+                      <span className="text-stone-500 text-lg ml-1">mi</span>
                     </td>
                     <td className="px-8 py-6">
                       <div>
-                        <span className="text-roman-gold/60 text-sm font-mono">#{s.campaignNumber}</span>
-                        <span className="text-stone-300 text-base ml-2">{s.campaignName}</span>
+                        <span className="text-roman-gold/60 text-base font-mono">#{s.campaignNumber}</span>
+                        <span className="text-stone-300 text-lg ml-2">{s.campaignName}</span>
                       </div>
                     </td>
                     <td className="px-8 py-6">
@@ -333,7 +394,7 @@ export default function Campaigns() {
                               style={{ width: `${s.campaignProgress}%` }}
                             />
                           </div>
-                          <span className="text-roman-gold/80 text-base font-mono w-12 text-right">
+                          <span className="text-roman-gold/80 text-lg font-mono w-12 text-right">
                             {s.campaignProgress}%
                           </span>
                         </div>
@@ -345,7 +406,7 @@ export default function Campaigns() {
                               style={{ width: `${Math.round((s.campaignNumber / CAMPAIGNS.length) * 100)}%` }}
                             />
                           </div>
-                          <span className="text-stone-500 text-xs font-mono w-12 text-right">
+                          <span className="text-stone-500 text-sm font-mono w-12 text-right">
                             {s.campaignNumber}/{CAMPAIGNS.length}
                           </span>
                         </div>
@@ -385,6 +446,15 @@ export default function Campaigns() {
             </span>
           </div>
         )}
+      </div>
+
+        {/* Right side image */}
+        <div className="w-32 shrink-0 select-none pointer-events-none" style={{
+          backgroundImage: 'url("/SIDE.png")',
+          backgroundRepeat: 'repeat-y',
+          backgroundSize: '100% auto',
+          transform: 'scaleX(-1)',
+        }} />
       </div>
 
       {/* Add Student Modal */}

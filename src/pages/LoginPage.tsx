@@ -11,8 +11,8 @@ export default function LoginPage() {
   const navigate = useNavigate();
 
   const [mode, setMode] = useState<Mode>("signin");
-  const [email, setEmail] = useState("test@email.com");
-  const [password, setPassword] = useState("123456");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [accessCode, setAccessCode] = useState("");
   const [confirmedSchoolName, setConfirmedSchoolName] = useState<string | null>(null);
@@ -183,6 +183,7 @@ export default function LoginPage() {
               <input
                 type="email"
                 required
+                autoComplete="off"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="your@email.com"
@@ -200,6 +201,7 @@ export default function LoginPage() {
                 type="password"
                 required
                 minLength={6}
+                autoComplete="off"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"

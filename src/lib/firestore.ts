@@ -194,6 +194,14 @@ export async function getResultsByClass(classId: string): Promise<Result[]> {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Result));
 }
 
+export async function updateSchoolLogo(schoolId: string, file: File): Promise<string> {
+  const storageRef = ref(storage, `school-logos/${schoolId}`);
+  await uploadBytes(storageRef, file);
+  const url = await getDownloadURL(storageRef);
+  await updateDoc(doc(db, "schools", schoolId), { logoUrl: url });
+  return url;
+}
+
 export async function updateUserPhoto(uid: string, file: File): Promise<string> {
   const storageRef = ref(storage, `profile-photos/${uid}`);
   await uploadBytes(storageRef, file);

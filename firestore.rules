@@ -1,0 +1,120 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    // Is the request from a signed-in user?
+    function isAuthed() {
+      return request.auth != null;
+    }
+
+    // Fetch the caller's user document (cached per request)
+    function callerDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function callerRole() {
+      return callerDoc().role;
+    }
+
+    function callerSchool() {
+      return callerDoc().schoolId;
+    }
+
+    function isAdmin() {
+      return isAuthed() && callerRole() == 'admin';
+    }
+
+    function isTeacher() {
+      return isAuthed() && callerRole() == 'teacher';
+    }
+
+    function isStudent() {
+      return isAuthed() && callerRole() == 'student';
+    }
+
+    function sameSchool(schoolId) {
+      return isAuthed() && callerSchool() == schoolId;
+    }
+
+    // ── /schools ─────────────────────────────────────────────────────────────
+    // Admins: full access
+    // Teachers/students: read only their own school document (no listing all schools)
+    match /schools/{schoolId} {
+      allow get: if isAuthed() && (isAdmin() || sameSchool(schoolId));
+      allow list: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin() || (isTeacher() && sameSchool(schoolId));
+      allow delete: if isAdmin();
+    }
+
+    // ── /users ────────────────────────────────────────────────────────────────
+    // Users can read/write their own doc.
+    // Teachers can read docs for students in their school.
+    // Admins have full access.
+    match /users/{uid} {
+      allow read: if isAuthed() && (
+        request.auth.uid == uid ||
+        isAdmin() ||
+        (isTeacher() && sameSchool(resource.data.schoolId))
+      );
+      // Allow creation of new student accounts by teachers in the same school
+      allow create: if isAuthed() && (
+        isAdmin() ||
+        (isTeacher() && sameSchool(request.resource.data.schoolId))
+      );
+      allow update: if isAuthed() && (
+        request.auth.uid == uid ||
+        isAdmin() ||
+        (isTeacher() && sameSchool(resource.data.schoolId))
+      );
+      allow delete: if isAdmin() || (isTeacher() && sameSchool(resource.data.schoolId));
+    }
+
+    // ── /classes ──────────────────────────────────────────────────────────────
+    // Teachers can CRUD classes they own in their school.
+    // Students can read their own class.
+    // Admins have full access.
+    match /classes/{classId} {
+      allow read: if isAuthed() && (
+        isAdmin() ||
+        sameSchool(resource.data.schoolId)
+      );
+      allow create: if isTeacher() && sameSchool(request.resource.data.schoolId);
+      allow update: if isAdmin() || (isTeacher() && sameSchool(resource.data.schoolId));
+      allow delete: if isAdmin() || (isTeacher() && resource.data.teacherId == request.auth.uid);
+    }
+
+    // ── /challenges ───────────────────────────────────────────────────────────
+    match /challenges/{challengeId} {
+      allow read: if isAuthed() && (
+        isAdmin() ||
+        sameSchool(resource.data.schoolId)
+      );
+      allow create: if isTeacher() && sameSchool(request.resource.data.schoolId);
+      allow update: if isAdmin() || (isTeacher() && sameSchool(resource.data.schoolId));
+      allow delete: if isAdmin() || (isTeacher() && sameSchool(resource.data.schoolId));
+    }
+
+    // ── /results ──────────────────────────────────────────────────────────────
+    // Students can submit their own results.
+    // Teachers can read results for their school.
+    // Admins have full access.
+    match /results/{resultId} {
+      allow read: if isAuthed() && (
+        isAdmin() ||
+        (isTeacher() && sameSchool(resource.data.schoolId)) ||
+        (isStudent() && resource.data.studentId == request.auth.uid)
+      );
+      allow create: if isAuthed() && (
+        isAdmin() ||
+        isTeacher() ||
+        (isStudent() && request.resource.data.studentId == request.auth.uid)
+      );
+      allow update: if isAdmin() || isTeacher();
+      allow delete: if isAdmin() || isTeacher();
+    }
+  }
+}
