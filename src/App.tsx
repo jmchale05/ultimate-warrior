@@ -20,8 +20,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 function RootRedirect() {
-  if (isTauri) return <Navigate to="/login" replace />;
-  return <DownloadPage />;
+  return <Navigate to="/login" replace />;
 }
 
 function DownloadRoute() {
