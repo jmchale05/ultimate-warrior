@@ -85,7 +85,9 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen roman-bg flex flex-col items-center justify-center px-4 relative overflow-hidden">
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 relative overflow-hidden">
+      {/* Background image */}
+      <div className="absolute inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/BACKGROUND-login.png')" }} />
       {/* Atmospheric corner glows */}
       <div className="absolute top-0 left-0 w-96 h-96 bg-roman-red/10 rounded-full blur-[120px] -translate-x-1/2 -translate-y-1/2" />
       <div className="absolute bottom-0 right-0 w-80 h-80 bg-roman-gold/5 rounded-full blur-[100px] translate-x-1/3 translate-y-1/3" />
@@ -98,14 +100,14 @@ export default function LoginPage() {
           <div className="w-40 h-40 bg-roman-gold/10 rounded-full blur-3xl" />
         </div>
         <img
-          src="/ultimate-warrior.png"
+          src="/logonew.jpeg"
           alt="Ultimate Warrior"
-          className="w-56 h-56 object-cover rounded-full border-4 border-roman-gold shadow-[0_0_30px_rgba(212,175,55,0.3)] mx-auto mb-5 relative z-10 [image-rendering:--webkit-optimize-contrast] transform-gpu"
+          className="w-full max-w-96 h-auto object-contain mx-auto mb-5 relative z-10 [image-rendering:--webkit-optimize-contrast] transform-gpu"
         />
-        <h1 className="text-roman-gold font-serif text-4xl font-bold tracking-widest uppercase roman-glow relative z-10">
+        <h1 className="text-roman-gold-light font-serif text-4xl font-bold tracking-widest uppercase relative z-10 [text-shadow:0_2px_12px_rgba(0,0,0,0.9),0_0_30px_rgba(0,0,0,0.7)]">
           Ultimate Warrior
         </h1>
-        <div className="roman-divider text-roman-gold/40 text-xs font-serif mt-2">
+        <div className="roman-divider text-roman-gold text-xs font-serif mt-2 [text-shadow:0_1px_8px_rgba(0,0,0,0.9)]">
           ⚔ CHALLENGES OF THE LEGION ⚔
         </div>
       </div>
@@ -117,7 +119,7 @@ export default function LoginPage() {
         </h2>
         <p className="text-stone-500 text-xs text-center mb-6 italic font-serif">
           {mode === "signin"
-            ? "Enter your credentials to access the Praetorium"
+            ? "Enter your credentials to access your account"
             : "Register to lead your warriors to glory"}
         </p>
 

@@ -9,7 +9,6 @@ import {
 } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { FullPageLoader } from "./components/LoadingSpinner";
-import DownloadPage from "./pages/DownloadPage";
 import LoginPage from "./pages/LoginPage";
 import Campaigns from "./pages/Campaigns";
 import MobileCampaigns from "./pages/MobileCampaigns";
@@ -21,11 +20,6 @@ const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
 
 function RootRedirect() {
   return <Navigate to="/login" replace />;
-}
-
-function DownloadRoute() {
-  if (isTauri) return <Navigate to="/login" replace />;
-  return <DownloadPage />;
 }
 
 function FallbackRoute() {
@@ -55,7 +49,7 @@ function AdminRoute() {
 function MobileBlock() {
   const location = useLocation();
   const [isMobile, setIsMobile] = useState(false);
-  const isPublicLanding = location.pathname === "/" || location.pathname === "/download";
+  const isPublicLanding = location.pathname === "/";
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 1024);
@@ -91,7 +85,6 @@ export default function App() {
       <AuthProvider>
           <Routes>
             <Route path="/" element={<RootRedirect />} />
-            <Route path="/download" element={<DownloadRoute />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/mobile-login" element={<Navigate to="/login" replace />} />
             <Route path="/mobile-campaigns" element={<MobileCampaigns />} />
