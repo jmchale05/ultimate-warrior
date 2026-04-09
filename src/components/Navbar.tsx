@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { getSchoolById } from "../lib/firestore";
+import type { School } from "../types";
 
 function calculateBusinessDays(startTimestamp: number): number {
   const start = new Date(startTimestamp);
@@ -29,6 +31,13 @@ export default function Navbar() {
   const { appUser, signOut } = useAuth();
   const navigate = useNavigate();
   const [showSupport, setShowSupport] = useState(false);
+  const [school, setSchool] = useState<School | null>(null);
+
+  useEffect(() => {
+    if (appUser?.schoolId) {
+      getSchoolById(appUser.schoolId).then(setSchool);
+    }
+  }, [appUser]);
 
   async function handleSignOut() {
     await signOut();
@@ -61,8 +70,22 @@ export default function Navbar() {
           </div>
         </div>
 
-        {/* Center — spacer */}
-        <div className="flex-1" />
+        {/* Center — School info */}
+        <div className="flex-1 flex justify-center items-center">
+          {school && (
+            <div className="flex items-center gap-4 bg-stone-900/80 px-5 py-2.5 border border-roman-gold/20 rounded-full shadow-inner">
+              <img
+                src={school.logoUrl ?? "/warriorschool.png"}
+                alt={school.name}
+                className="w-12 h-12 rounded-full object-cover border border-roman-gold/30"
+              />
+              <div className="w-px h-8 bg-roman-gold/20" />
+              <span className="text-stone-300 text-lg tracking-wide font-semibold">
+                {school.name}
+              </span>
+            </div>
+          )}
+        </div>
 
         {/* Right — User info & Sign Out */}
         <div className="flex-1 flex justify-end pr-8">
@@ -178,7 +201,7 @@ export default function Navbar() {
                   },
                   {
                     q: "How do I contact support?",
-                    a: "Email us at support@ultimatewarriorchallenge.com and we'll get back to you within one business day.",
+                    a: "Email us at support@tuwc.online and we'll get back to you within one business day.",
                   },
                 ].map(({ q, a }) => (
                   <div key={q} className="border border-stone-700/50 rounded-xl px-5 py-4">
@@ -192,10 +215,10 @@ export default function Navbar() {
               <div className="border-t border-stone-700/40 pt-5 flex items-center justify-between">
                 <div>
                   <p className="text-stone-500 text-xs uppercase tracking-widest font-semibold mb-1">Email Support</p>
-                  <p className="text-roman-gold text-sm font-semibold">support@ultimatewarriorchallenge.com</p>
+                  <p className="text-roman-gold text-sm font-semibold">support@tuwc.online</p>
                 </div>
                 <a
-                  href="mailto:support@ultimatewarriorchallenge.com"
+                  href="mailto:support@tuwc.online"
                   className="px-4 py-2 rounded-lg border border-roman-gold/40 text-roman-gold text-xs uppercase tracking-wider font-semibold hover:bg-roman-gold/10 transition-colors"
                 >
                   Send Email

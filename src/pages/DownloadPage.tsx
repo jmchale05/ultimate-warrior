@@ -208,20 +208,20 @@ export default function DownloadPage() {
                 </p>
                 <div className="mt-4 flex flex-wrap gap-3">
                   <a
-                    href="mailto:support@ultimatewarriorchallenge.com"
+                    href="mailto:support@tuwc.online"
                     className="inline-flex items-center justify-center rounded-xl border border-roman-gold/35 bg-roman-gold/10 px-4 py-2.5 text-sm font-bold uppercase tracking-[0.18em] text-roman-gold transition hover:border-roman-gold hover:bg-roman-gold/15"
                   >
                     Email support
                   </a>
                   <a
-                    href="mailto:support@ultimatewarriorchallenge.com?subject=Ultimate%20Warrior%20Challenges%20Help"
+                    href="mailto:support@tuwc.online?subject=Ultimate%20Warrior%20Challenges%20Help"
                     className="inline-flex items-center justify-center rounded-xl border border-stone-700 px-4 py-2.5 text-sm font-bold uppercase tracking-[0.18em] text-stone-200 transition hover:border-stone-500 hover:bg-stone-900"
                   >
                     Get installation help
                   </a>
                 </div>
                 <p className="mt-3 text-xs uppercase tracking-[0.18em] text-stone-500">
-                  support@ultimatewarriorchallenge.com
+                  support@tuwc.online
                 </p>
               </div>
             </aside>

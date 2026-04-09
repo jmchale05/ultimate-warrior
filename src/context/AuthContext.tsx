@@ -41,13 +41,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
-      if (user) {
-        const doc = await getUserDoc(user.uid);
-        setAppUser(doc);
-      } else {
+      try {
+        if (user) {
+          const doc = await getUserDoc(user.uid);
+          setAppUser(doc);
+        } else {
+          setAppUser(null);
+        }
+      } catch (err) {
+        console.error("Failed to load user profile:", err);
         setAppUser(null);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     });
     return unsub;
   }, []);

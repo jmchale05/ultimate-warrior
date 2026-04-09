@@ -12,7 +12,6 @@ import {
   createClass,
   addStudentToClass,
   updateUserPhoto,
-  updateSchoolLogo,
   getSchoolById,
 } from "../lib/firestore";
 import type { AppUser, Class, Result, School } from "../types";
@@ -74,8 +73,6 @@ export default function Campaigns() {
   const [classSaving, setClassSaving] = useState(false);
   const [classError, setClassError] = useState("");
   const [school, setSchool] = useState<School | null>(null);
-  const [logoUploading, setLogoUploading] = useState(false);
-  const logoInputRef = useRef<HTMLInputElement>(null);
 
   async function handleAddClass() {
     if (!appUser?.schoolId) {
@@ -171,18 +168,7 @@ export default function Campaigns() {
     }
   }
 
-  async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file || !appUser?.schoolId) return;
-    setLogoUploading(true);
-    try {
-      const url = await updateSchoolLogo(appUser.schoolId, file);
-      setSchool((prev) => prev ? { ...prev, logoUrl: url } : prev);
-    } finally {
-      setLogoUploading(false);
-      if (logoInputRef.current) logoInputRef.current.value = "";
-    }
-  }
+  // logo upload removed
 
   useEffect(() => {
     if (!appUser) return;
@@ -194,125 +180,74 @@ export default function Campaigns() {
 
   async function loadData() {
       setLoading(true);
-      
-      // Load all classes in the school if schoolId exists, otherwise just teacher's classes
-      const teacherClasses = appUser!.schoolId 
-        ? await getClassesBySchool(appUser!.schoolId)
-        : await getClassesByTeacher(appUser!.uid);
+      try {
+        // Load all classes in the school if schoolId exists, otherwise just teacher's classes
+        const teacherClasses = appUser!.schoolId 
+          ? await getClassesBySchool(appUser!.schoolId)
+          : await getClassesByTeacher(appUser!.uid);
 
-      setClasses(teacherClasses);
-      if (!formClassId && teacherClasses.length > 0) {
-        setFormClassId(teacherClasses[0].id);
-      }
-
-      const allStudentIds = teacherClasses.flatMap((c) => c.studentIds);
-      const uniqueIds = [...new Set(allStudentIds)];
-      const [users, ...resultArrays] = await Promise.all([
-        getUsersByIds(uniqueIds),
-        ...teacherClasses.map((c) => getResultsByClass(c.id)),
-      ]);
-
-      const userMap = new Map<string, AppUser>();
-      (users as AppUser[]).forEach((u) => userMap.set(u.uid, u));
-
-      const allResults: Result[] = (resultArrays as Result[][]).flat();
-      const milesByStudent = new Map<string, number>();
-      allResults.forEach((r) => {
-        milesByStudent.set(
-          r.studentId,
-          (milesByStudent.get(r.studentId) || 0) + r.distanceMiles
-        );
-      });
-
-      const rows: StudentRow[] = [];
-      for (const cls of teacherClasses) {
-        for (const sid of cls.studentIds) {
-          const user = userMap.get(sid);
-          const totalMiles = milesByStudent.get(sid) || 0;
-          rows.push({
-            uid: sid,
-            name: user?.displayName || "⚠️ Missing Profile",
-            age: user?.age ?? null,
-            photoUrl: user?.photoUrl,
-            className: cls.name,
-            totalMiles,
-            ...getCampaignInfo(totalMiles),
-          });
+        setClasses(teacherClasses);
+        if (!formClassId && teacherClasses.length > 0) {
+          setFormClassId(teacherClasses[0].id);
         }
+
+        const allStudentIds = teacherClasses.flatMap((c) => c.studentIds);
+        const uniqueIds = [...new Set(allStudentIds)];
+        const [users, ...resultArrays] = await Promise.all([
+          getUsersByIds(uniqueIds),
+          ...teacherClasses.map((c) => getResultsByClass(c.id)),
+        ]);
+
+        const userMap = new Map<string, AppUser>();
+        (users as AppUser[]).forEach((u) => userMap.set(u.uid, u));
+
+        const allResults: Result[] = (resultArrays as Result[][]).flat();
+        const milesByStudent = new Map<string, number>();
+        allResults.forEach((r) => {
+          milesByStudent.set(
+            r.studentId,
+            (milesByStudent.get(r.studentId) || 0) + r.distanceMiles
+          );
+        });
+
+        const rows: StudentRow[] = [];
+        for (const cls of teacherClasses) {
+          for (const sid of cls.studentIds) {
+            const user = userMap.get(sid);
+            const totalMiles = milesByStudent.get(sid) || 0;
+            rows.push({
+              uid: sid,
+              name: user?.displayName || "⚠️ Missing Profile",
+              age: user?.age ?? null,
+              photoUrl: user?.photoUrl,
+              className: cls.name,
+              totalMiles,
+              ...getCampaignInfo(totalMiles),
+            });
+          }
+        }
+
+        rows.sort((a, b) => b.campaignNumber - a.campaignNumber);
+
+        setStudents(rows);
+      } catch (err) {
+        console.error("Failed to load campaign data:", err);
+      } finally {
+        setLoading(false);
       }
-
-      rows.sort((a, b) => b.campaignNumber - a.campaignNumber);
-
-      setStudents(rows);
-      setLoading(false);
   }
 
   const filtered = students;
 
   return (
-    <div className="h-screen bg-stone-900 text-stone-100 flex flex-col overflow-hidden">
+    <div className="h-screen text-stone-100 flex flex-col overflow-hidden bg-stone-950">
       <Navbar />
 
-      <div className="flex-1 min-h-0 flex overflow-hidden relative">
-        {/* Left side image */}
-        <div className="w-32 shrink-0 select-none pointer-events-none" style={{
-          backgroundImage: 'url("/SIDE.png")',
-          backgroundRepeat: 'repeat-y',
-          backgroundSize: '100% auto',
-        }} />
-
+      <div className="flex-1 min-h-0 flex overflow-hidden relative" style={{ backgroundImage: 'url(/full-background.png)', backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}>
         {/* Main content */}
-        <div className="flex-1 min-w-0 px-12 py-14 overflow-y-auto overflow-x-hidden">
-        <div className="flex items-center justify-between gap-3 mb-6">
-          <div className="flex items-center gap-4">
-            {/* School logo */}
-            <div className="relative group shrink-0">
-              <button
-                type="button"
-                onClick={() => logoInputRef.current?.click()}
-                disabled={logoUploading}
-                title="Upload school logo"
-                className="w-24 h-24 rounded-xl border-2 border-dashed border-roman-gold/30 hover:border-roman-gold/60 bg-stone-800 flex items-center justify-center overflow-hidden transition-colors group cursor-pointer disabled:cursor-wait"
-              >
-                {logoUploading ? (
-                  <svg className="roman-btn-spinner w-5 h-5 text-roman-gold" viewBox="0 0 24 24" fill="none">
-                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeDasharray="50 20" />
-                  </svg>
-                ) : (
-                  <img src={school?.logoUrl ?? "/warriorschool.png"} alt="School logo" className="w-full h-full object-cover" />
-                )}
-              </button>
-              {!logoUploading && (
-                <div className="absolute inset-0 rounded-xl bg-stone-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-roman-gold">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <polyline points="17 8 12 3 7 8" />
-                    <line x1="12" y1="3" x2="12" y2="15" />
-                  </svg>
-                </div>
-              )}
-              <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
-            </div>
-            <div>
-              <h2 className="text-roman-gold/70 text-xs uppercase tracking-[0.2em] font-semibold">Students and Classes</h2>
-              {school?.name && <p className="text-stone-300 text-sm font-semibold mt-0.5">{school.name}</p>}
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => { setShowAddClassModal(true); setClassError(""); }}
-              className="px-3 py-1.5 rounded-lg border border-stone-700 text-stone-300 text-xs uppercase tracking-wider font-semibold hover:bg-stone-800/60 transition-colors"
-            >
-              + Add Class
-            </button>
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="px-3 py-1.5 rounded-lg border border-roman-gold/40 text-roman-gold text-xs uppercase tracking-wider font-semibold hover:bg-roman-gold/10 transition-colors"
-            >
-              + Add Student
-            </button>
-          </div>
-        </div>
+        <div className="flex-1 min-w-0 px-12 py-14 overflow-y-auto overflow-x-hidden flex flex-col items-center">
+          <div className="w-full max-w-[90rem]">
+        <div className="flex items-center justify-between gap-3 mb-6"></div>
 
         {loading ? (
           <CampaignsTableSkeleton />
@@ -322,32 +257,19 @@ export default function Campaigns() {
               <p className="text-lg mb-2">No students found</p>
               <p className="text-sm">Add students to your classes to see their progress here.</p>
             </div>
-            <div className="flex flex-wrap justify-center gap-3">
-              <button
-                onClick={() => { setShowAddClassModal(true); setClassError(""); }}
-                className="px-4 py-2 rounded-lg border border-stone-700 text-stone-300 text-sm uppercase tracking-wider font-semibold hover:bg-stone-800/60 transition-colors"
-              >
-                + Add Class
-              </button>
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="px-4 py-2 rounded-lg border border-roman-gold/40 text-roman-gold text-sm uppercase tracking-wider font-semibold hover:bg-roman-gold/10 transition-colors"
-              >
-                + Add Student
-              </button>
-            </div>
+            {/* actions removed */}
           </div>
         ) : (
-          <div className="rounded-xl border border-stone-700/50 overflow-hidden">
+          <div className="rounded-2xl border border-roman-gold/15 overflow-hidden bg-stone-950/60 backdrop-blur-md shadow-[0_8px_60px_rgba(0,0,0,0.5)]">
             <table className="w-full text-left">
               <thead>
-                <tr className="bg-stone-800/80 border-b border-stone-700/50">
-                  <th className="pl-8 pr-8 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold">Name</th>
-                  <th className="px-8 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold w-24">Age</th>
-                  <th className="px-8 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold w-40">Class</th>
-                  <th className="px-8 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold w-32">Miles</th>
-                  <th className="px-8 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold w-44">Campaign</th>
-                  <th className="px-8 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold w-96">Progress</th>
+                <tr className="bg-stone-900/50 border-b border-roman-gold/10">
+                  <th className="pl-8 pr-8 py-5 text-lg uppercase tracking-wider text-roman-gold/50 font-semibold">Name</th>
+                  <th className="px-8 py-5 text-lg uppercase tracking-wider text-roman-gold/50 font-semibold w-24">Age</th>
+                  <th className="px-8 py-5 text-lg uppercase tracking-wider text-roman-gold/50 font-semibold w-40">Class</th>
+                  <th className="px-8 py-5 text-lg uppercase tracking-wider text-roman-gold/50 font-semibold w-32">Miles</th>
+                  <th className="px-8 py-5 text-lg uppercase tracking-wider text-roman-gold/50 font-semibold w-44">Campaign</th>
+                  <th className="px-8 py-5 text-lg uppercase tracking-wider text-roman-gold/50 font-semibold w-96">Progress</th>
                 </tr>
               </thead>
               <tbody>
@@ -355,7 +277,7 @@ export default function Campaigns() {
                   <tr
                     key={`${s.uid}-${s.className}`}
                     onClick={() => navigate(`/campaigns/${s.uid}`)}
-                    className="border-b border-stone-800/50 hover:bg-stone-800/40 cursor-pointer transition-colors"
+                    className="border-b border-stone-700/20 hover:bg-stone-800/30 cursor-pointer transition-colors"
                   >
                     <td className="pl-8 pr-8 py-6">
                       <div className="flex items-center gap-3">
@@ -388,7 +310,7 @@ export default function Campaigns() {
                       <div className="flex flex-col gap-2">
                         {/* Overall miles progress */}
                         <div className="flex items-center gap-4">
-                          <div className="flex-1 h-4 rounded-full bg-stone-700/70 overflow-hidden border border-stone-600/30">
+                          <div className="flex-1 h-4 rounded-full bg-stone-700/40 overflow-hidden border border-stone-600/20">
                             <div
                               className="h-full bg-linear-to-r from-roman-gold/60 to-roman-gold rounded-full transition-all duration-500"
                               style={{ width: `${s.campaignProgress}%` }}
@@ -400,7 +322,7 @@ export default function Campaigns() {
                         </div>
                         {/* Campaign count progress */}
                         <div className="flex items-center gap-4">
-                          <div className="flex-1 h-2 rounded-full bg-stone-700/50 overflow-hidden border border-stone-600/20">
+                          <div className="flex-1 h-2 rounded-full bg-stone-700/30 overflow-hidden border border-stone-600/10">
                             <div
                               className="h-full bg-linear-to-r from-roman-red/60 to-roman-red rounded-full transition-all duration-500"
                               style={{ width: `${Math.round((s.campaignNumber / CAMPAIGNS.length) * 100)}%` }}
@@ -415,7 +337,7 @@ export default function Campaigns() {
                   </tr>
                 ))}
                 {filtered.length < 40 && (
-                  <tr className="border-b border-stone-800/50 hover:bg-stone-800/60 transition-colors cursor-pointer">
+                  <tr className="hover:bg-stone-800/30 transition-colors cursor-pointer">
                     <td colSpan={6} className="px-8 py-6 text-center">
                       <button
                         onClick={() => setShowAddModal(true)}
@@ -446,15 +368,10 @@ export default function Campaigns() {
             </span>
           </div>
         )}
+          </div>{/* end max-w-5xl */}
       </div>
 
-        {/* Right side image */}
-        <div className="w-32 shrink-0 select-none pointer-events-none" style={{
-          backgroundImage: 'url("/SIDE.png")',
-          backgroundRepeat: 'repeat-y',
-          backgroundSize: '100% auto',
-          transform: 'scaleX(-1)',
-        }} />
+
       </div>
 
       {/* Add Student Modal */}

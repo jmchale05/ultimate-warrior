@@ -44,7 +44,7 @@ service cloud.firestore {
     // Teachers/students: read only their own school document (no listing all schools)
     match /schools/{schoolId} {
       allow get: if isAuthed() && (isAdmin() || sameSchool(schoolId));
-      allow list: if isAdmin();
+      allow list: if true; // needed for sign-up access code lookup (unauthenticated)
       allow create: if isAdmin();
       allow update: if isAdmin() || (isTeacher() && sameSchool(schoolId));
       allow delete: if isAdmin();
@@ -105,7 +105,7 @@ service cloud.firestore {
     match /results/{resultId} {
       allow read: if isAuthed() && (
         isAdmin() ||
-        (isTeacher() && sameSchool(resource.data.schoolId)) ||
+        isTeacher() || // Result has no schoolId field; teachers are school-scoped by app logic
         (isStudent() && resource.data.studentId == request.auth.uid)
       );
       allow create: if isAuthed() && (
