@@ -12,9 +12,8 @@ import {
   createClass,
   addStudentToClass,
   updateUserPhoto,
-  getSchoolById,
 } from "../lib/firestore";
-import type { AppUser, Class, Result, School } from "../types";
+import type { AppUser, Class, Result } from "../types";
 
 const CAMPAIGNS = [
   { number: 1,  name: "The Beginning",            minMiles: 0  },
@@ -72,7 +71,6 @@ export default function Campaigns() {
   const [className, setClassName] = useState("");
   const [classSaving, setClassSaving] = useState(false);
   const [classError, setClassError] = useState("");
-  const [school, setSchool] = useState<School | null>(null);
 
   async function handleAddClass() {
     if (!appUser?.schoolId) {
@@ -173,9 +171,6 @@ export default function Campaigns() {
   useEffect(() => {
     if (!appUser) return;
     loadData();
-    if (appUser.schoolId) {
-      getSchoolById(appUser.schoolId).then(setSchool);
-    }
   }, [appUser]);
 
   async function loadData() {
