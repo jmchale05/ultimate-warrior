@@ -76,7 +76,7 @@ const CAMPAIGNS = [
   {
     number: 12, name: "The Voice of Rome", subtitle: "Julius Caesar", milesRequired: 12,
     startVideo: "/roman-vid.mp4", endVideo: "/roman-vid.mp4",
-    image: "/campaigns/12.png",
+    image: "/campaigns/julius.png",
     description: "Julius Caesar conquered Gaul, crossed the Rubicon, and changed the world forever. He is the ultimate warrior. Complete the final 12 miles and cement your legacy as a true champion of Rome.",
   },
 ];
