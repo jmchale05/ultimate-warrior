@@ -44,7 +44,8 @@ export default function Navbar() {
     navigate("/login");
   }
 
-  const dayCount = appUser ? calculateBusinessDays(appUser.createdAt) : 0;
+  const campaignStart = school?.campaignStartAt ?? school?.createdAt ?? appUser?.createdAt;
+  const dayCount = campaignStart ? calculateBusinessDays(campaignStart) : 0;
 
   return (
     <>
@@ -124,17 +125,6 @@ export default function Navbar() {
                 <div className="w-px h-10 bg-roman-gold/20" />
               </>
             )}
-            {appUser.role === "admin" && (
-              <>
-                <button
-                  onClick={() => navigate("/admin")}
-                  className="text-roman-gold/60 hover:text-roman-gold border border-roman-gold/25 hover:border-roman-gold/60 px-5 py-2.5 rounded-lg transition-all hover:bg-roman-gold/5 uppercase tracking-wider font-semibold text-sm"
-                >
-                  Admin
-                </button>
-                <div className="w-px h-10 bg-roman-gold/20" />
-              </>
-            )}
             <button
               onClick={handleSignOut}
               className="text-roman-gold/60 hover:text-roman-gold border border-roman-gold/25 hover:border-roman-gold/60 px-5 py-2.5 rounded-lg transition-all hover:bg-roman-gold/5 uppercase tracking-wider font-semibold text-sm"
@@ -162,7 +152,7 @@ export default function Navbar() {
 
       {/* Support Modal */}
       {showSupport && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-6">
+        <div className="fixed inset-0 z-9999 flex items-center justify-center p-6">
           <div
             className="absolute inset-0 bg-stone-950/80 backdrop-blur-sm"
             onClick={() => setShowSupport(false)}
@@ -198,6 +188,10 @@ export default function Navbar() {
                   {
                     q: "How are ranks determined?",
                     a: "Ranks are based on total miles completed across all campaigns. The further a student progresses, the higher their Roman rank.",
+                  },
+                  {
+                    q: "Want to remove a student?",
+                    a: "Contact our support email at support@tuwc.online and we will try to sort that out for you.",
                   },
                   {
                     q: "How do I contact support?",

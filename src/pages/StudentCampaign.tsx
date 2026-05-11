@@ -4,6 +4,7 @@ import confetti from "canvas-confetti";
 import Navbar from "../components/Navbar";
 import { StudentCampaignSkeleton } from "../components/LoadingSpinner";
 import { getUserDoc, getResultsByStudent, submitResult, updateUserPhoto } from "../lib/firestore";
+import { useAuth } from "../context/AuthContext";
 import type { AppUser, Result } from "../types";
 
 const CAMPAIGNS = [
@@ -95,9 +96,11 @@ function getCampaignMedalName(campaignNumber: number) {
 export default function StudentCampaign() {
   const { uid } = useParams<{ uid: string }>();
   const navigate = useNavigate();
+  const { appUser } = useAuth();
   const [student, setStudent] = useState<AppUser | null>(null);
   const [campaignMiles, setCampaignMiles] = useState<Record<number, number>>({});
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [selectedCampaign, setSelectedCampaign] = useState(1);
   const [videoModal, setVideoModal] = useState<{ src: string; campaignNumber: number; isEnd?: boolean } | null>(null);
   const [isPlayingVideo, setIsPlayingVideo] = useState(false);
@@ -136,6 +139,7 @@ export default function StudentCampaign() {
       challengeId: `campaign-${campaignNumber}`,
       studentId: uid,
       classId: student.classId ?? "",
+      schoolId: student.schoolId ?? "",
       distanceMiles: toLog,
       completedAt: Date.now(),
     });
@@ -159,32 +163,46 @@ export default function StudentCampaign() {
 
   useEffect(() => {
     if (!uid) return;
+    const studentUid = uid;
     async function loadData() {
       setLoading(true);
-      const [user, results] = await Promise.all([getUserDoc(uid!), getResultsByStudent(uid!)]);
-      setStudent(user);
-      const bycampaign: Record<number, number> = {};
-      for (const r of results as Result[]) {
-        const match = r.challengeId?.match(/^campaign-(\d+)$/);
-        if (match) {
-          const num = parseInt(match[1]);
-          bycampaign[num] = roundMiles(Math.min((bycampaign[num] ?? 0) + r.distanceMiles, num));
+      setLoadError("");
+      try {
+        const resultsSchoolId = appUser?.role === "teacher" ? appUser.schoolId : undefined;
+        const [user, results] = await Promise.all([
+          getUserDoc(studentUid),
+          getResultsByStudent(studentUid, resultsSchoolId),
+        ]);
+
+        setStudent(user);
+        const bycampaign: Record<number, number> = {};
+        for (const r of results as Result[]) {
+          const match = r.challengeId?.match(/^campaign-(\d+)$/);
+          if (match) {
+            const num = parseInt(match[1]);
+            bycampaign[num] = roundMiles(Math.min((bycampaign[num] ?? 0) + r.distanceMiles, num));
+          }
         }
-      }
-      setCampaignMiles(bycampaign);
-      let activeCampaign = 1;
-      for (const c of CAMPAIGNS) {
-        if ((bycampaign[c.number] ?? 0) >= c.milesRequired) {
-          activeCampaign = Math.min(c.number + 1, 12);
-        } else {
-          break;
+
+        setCampaignMiles(bycampaign);
+        let activeCampaign = 1;
+        for (const c of CAMPAIGNS) {
+          if ((bycampaign[c.number] ?? 0) >= c.milesRequired) {
+            activeCampaign = Math.min(c.number + 1, 12);
+          } else {
+            break;
+          }
         }
+        setSelectedCampaign(activeCampaign);
+      } catch (err) {
+        console.error("Failed to load student campaign data:", err);
+        setLoadError("Could not load this student right now. Please refresh and try again.");
+      } finally {
+        setLoading(false);
       }
-      setSelectedCampaign(activeCampaign);
-      setLoading(false);
     }
     loadData();
-  }, [uid]);
+  }, [uid, appUser?.role, appUser?.schoolId]);
 
   const totalMiles = CAMPAIGNS.reduce((sum, c) => sum + Math.min(campaignMiles[c.number] ?? 0, c.milesRequired), 0);
 
@@ -232,6 +250,19 @@ export default function StudentCampaign() {
           {loading ? (
             <div className="px-14 py-10">
               <StudentCampaignSkeleton />
+            </div>
+          ) : loadError ? (
+            <div className="px-14 py-10 h-full flex items-center justify-center">
+              <div className="roman-card rounded-2xl px-8 py-8 max-w-lg w-full text-center">
+                <h2 className="text-roman-gold font-serif text-2xl font-bold mb-3">Student Data Unavailable</h2>
+                <p className="text-stone-400 mb-6">{loadError}</p>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="px-5 py-2.5 rounded-lg border border-roman-gold/40 text-roman-gold text-xs uppercase tracking-wider font-semibold hover:bg-roman-gold/10 transition-colors"
+                >
+                  Reload
+                </button>
+              </div>
             </div>
           ) : (
             <div className="flex flex-col h-full">

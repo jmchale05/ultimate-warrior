@@ -5,9 +5,10 @@ import { ButtonSpinner } from "../components/LoadingSpinner";
 import { getSchoolByAccessCode } from "../lib/firestore";
 
 type Mode = "signin" | "signup";
+const PRIVACY_POLICY_VERSION = "2026-05";
 
 export default function LoginPage() {
-  const { signIn, signUp, currentUser } = useAuth();
+  const { signIn, signUp, forgotPassword, currentUser, appUser } = useAuth();
   const navigate = useNavigate();
 
   const [mode, setMode] = useState<Mode>("signin");
@@ -15,26 +16,55 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [accessCode, setAccessCode] = useState("");
+  const [signupConsentChecked, setSignupConsentChecked] = useState(false);
   const [confirmedSchoolName, setConfirmedSchoolName] = useState<string | null>(null);
   const [accessCodeConfirmed, setAccessCodeConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [confirmingCode, setConfirmingCode] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [resetMessage, setResetMessage] = useState<string | null>(null);
 
-  // Navigate once Firebase auth state actually confirms the user is signed in
+  // Navigate once Firebase Auth and the Firestore user profile are both ready.
   useEffect(() => {
-    if (currentUser) navigate("/campaigns", { replace: true });
-  }, [currentUser]);
+    if (currentUser && appUser) {
+      navigate(appUser.role === "admin" ? "/admin" : "/campaigns", { replace: true });
+    }
+  }, [currentUser, appUser, navigate]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
+    if (mode === "signup" && !accessCodeConfirmed) {
+      setError("Please confirm your access code before signing up.");
+      return;
+    }
+
+    if (mode === "signup" && !signupConsentChecked) {
+      setError("Please confirm you have authority and consent to manage student data.");
+      return;
+    }
+
+    if (!email.trim()) {
+      setError("Please enter your email address.");
+      return;
+    }
+
+    if (!password.trim()) {
+      setError("Please enter your password.");
+      return;
+    }
+
     setLoading(true);
     try {
       if (mode === "signin") {
         await signIn(email, password);
       } else {
-        await signUp(email, password, displayName, "teacher", accessCode);
+        await signUp(email, password, displayName, "teacher", accessCode, PRIVACY_POLICY_VERSION);
       }
       // Navigation happens via the useEffect above when currentUser updates
     } catch (err: unknown) {
@@ -81,6 +111,37 @@ export default function LoginPage() {
       setError("Unable to verify the access code right now. Please try again.");
     } finally {
       setConfirmingCode(false);
+    }
+  }
+
+  async function handleSendPasswordReset(e: React.FormEvent) {
+    e.preventDefault();
+    setResetError(null);
+    setResetMessage(null);
+
+    const normalizedEmail = resetEmail.trim();
+    if (!normalizedEmail) {
+      setResetError("Please enter your email address.");
+      return;
+    }
+
+    setResetLoading(true);
+    try {
+      await forgotPassword(normalizedEmail);
+      setResetMessage("If an account exists for that email, a reset link has been sent. Please check your spam or junk folder too.");
+    } catch (err: unknown) {
+      const code = (err as { code?: string }).code;
+      if (code === "auth/invalid-email") {
+        setResetError("Please enter a valid email address.");
+      } else if (code === "auth/too-many-requests") {
+        setResetError("Too many attempts. Please wait a moment and try again.");
+      } else if (code === "auth/network-request-failed") {
+        setResetError("Network error. Please check your internet connection.");
+      } else {
+        setResetError("We could not send the reset email right now. Please try again.");
+      }
+    } finally {
+      setResetLoading(false);
     }
   }
 
@@ -133,6 +194,13 @@ export default function LoginPage() {
                 type="text"
                 required
                 value={accessCode}
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter") return;
+                  e.preventDefault();
+                  if (!confirmingCode && accessCode.trim()) {
+                    void handleConfirmAccessCode();
+                  }
+                }}
                 onChange={(e) => {
                   if (accessCodeConfirmed) return;
                   setAccessCode(e.target.value.toUpperCase());
@@ -212,6 +280,23 @@ export default function LoginPage() {
             </div>
           )}
 
+          {mode === "signin" && (
+            <div className="text-right -mt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setResetEmail(email.trim());
+                  setResetError(null);
+                  setResetMessage(null);
+                  setShowForgotPassword(true);
+                }}
+                className="text-roman-gold/80 hover:text-roman-gold text-xs uppercase tracking-wider font-semibold"
+              >
+                Forgot Password?
+              </button>
+            </div>
+          )}
+
           {error && (
             <p className="text-red-400 text-sm bg-red-900/20 border border-red-800 rounded-lg px-3 py-2">
               ⚠ {error}
@@ -231,6 +316,25 @@ export default function LoginPage() {
                 : "Enlist Now"}
             </button>
           )}
+
+          {mode === "signup" && accessCodeConfirmed && (
+            <label className="flex items-start gap-2.5 text-stone-400 text-xs leading-relaxed border border-stone-700/60 rounded-lg px-3 py-2.5">
+              <input
+                type="checkbox"
+                checked={signupConsentChecked}
+                onChange={(e) => setSignupConsentChecked(e.target.checked)}
+                className="mt-0.5 accent-roman-gold"
+              />
+              <span>
+                I confirm I am a staff member with lawful authority to manage student data and have obtained required school/parental consent where needed.
+                {" "}
+                <a href="/privacy" className="text-roman-gold hover:underline">
+                  Read the privacy notice
+                </a>
+                .
+              </span>
+            </label>
+          )}
         </form>
 
         <div className="roman-divider text-stone-600 text-xs mt-6">◆</div>
@@ -241,7 +345,7 @@ export default function LoginPage() {
               New to the Legion?{" "}
               <button
                 type="button"
-                onClick={() => { setMode("signup"); setError(null); setAccessCode(""); setAccessCodeConfirmed(false); setConfirmedSchoolName(null); }}
+                onClick={() => { setMode("signup"); setError(null); setAccessCode(""); setSignupConsentChecked(false); setAccessCodeConfirmed(false); setConfirmedSchoolName(null); }}
                 className="text-roman-gold hover:text-roman-gold-light hover:underline transition-colors"
               >
                 Register
@@ -260,7 +364,70 @@ export default function LoginPage() {
             </>
           )}
         </p>
+        <p className="text-center text-stone-600 text-xs mt-3">
+          <a href="/privacy" className="hover:text-roman-gold transition-colors">
+            Privacy notice and data rights
+          </a>
+        </p>
       </div>
+
+      {showForgotPassword && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-stone-950/85 backdrop-blur-sm" onClick={() => setShowForgotPassword(false)} />
+          <div className="relative w-full max-w-md roman-card rounded-2xl p-7 z-10">
+            <h3 className="text-roman-gold font-serif text-lg font-bold uppercase tracking-wider mb-2">Reset Password</h3>
+            <p className="text-stone-400 text-sm mb-5">
+              Enter your account email and we will send a reset link.
+            </p>
+
+            <form onSubmit={handleSendPasswordReset} className="space-y-4">
+              <div>
+                <label className="block text-roman-gold/70 text-xs uppercase tracking-wider mb-1.5 font-semibold">
+                  ◆ Email
+                </label>
+                <input
+                  type="email"
+                  required
+                  autoFocus
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  placeholder="your@email.com"
+                  className="roman-input"
+                />
+              </div>
+
+              {resetError && (
+                <p className="text-red-400 text-sm bg-red-900/20 border border-red-800 rounded-lg px-3 py-2">
+                  ⚠ {resetError}
+                </p>
+              )}
+
+              {resetMessage && (
+                <p className="text-emerald-300 text-sm bg-emerald-900/20 border border-emerald-700 rounded-lg px-3 py-2">
+                  ✓ {resetMessage}
+                </p>
+              )}
+
+              <div className="flex gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowForgotPassword(false)}
+                  className="flex-1 rounded-lg border border-stone-600/50 px-4 py-2.5 text-stone-300 text-xs font-semibold uppercase tracking-widest hover:bg-stone-800/40"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={resetLoading}
+                  className="flex-1 rounded-lg border border-roman-gold/40 bg-roman-gold/15 px-4 py-2.5 text-roman-gold text-xs font-semibold uppercase tracking-widest hover:bg-roman-gold/25 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {resetLoading ? "Sending..." : "Send Reset Link"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Footer motto */}
       <p className="text-stone-700 text-xs mt-8 font-serif italic tracking-wider select-none">

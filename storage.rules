@@ -5,21 +5,36 @@ service firebase.storage {
 
     // ── Profile photos ────────────────────────────────────────────────────────
     // Only the owner or a teacher in the same school can write.
-    // Any authenticated user in the same school can read.
+    // Read access is restricted to the owner, admins, or teachers in the same school.
     match /profile-photos/{uid} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null && (
+        request.auth.uid == uid ||
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+        (
+          firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'teacher' &&
+          firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.schoolId ==
+            firestore.get(/databases/(default)/documents/users/$(uid)).data.schoolId
+        )
+      );
       allow write: if request.auth != null && (
         request.auth.uid == uid ||
-        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'teacher' ||
-        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin'
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+        (
+          firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'teacher' &&
+          firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.schoolId ==
+            firestore.get(/databases/(default)/documents/users/$(uid)).data.schoolId
+        )
       );
     }
 
     // ── School logos ──────────────────────────────────────────────────────────
     // Only teachers/admins belonging to that school can upload.
-    // Any authenticated user can read.
+    // Only signed-in users at that school, or admins, can read.
     match /school-logos/{schoolId} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null && (
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.schoolId == schoolId
+      );
       allow write: if request.auth != null && (
         firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
         (

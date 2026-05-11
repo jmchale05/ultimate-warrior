@@ -15,6 +15,7 @@ import MobileCampaigns from "./pages/MobileCampaigns";
 import Oracle from "./pages/Oracle";
 import StudentCampaign from "./pages/StudentCampaign";
 import AdminDashboard from "./pages/AdminDashboard";
+import PrivacyPage from "./pages/PrivacyPage";
 
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
@@ -28,13 +29,14 @@ function FallbackRoute() {
 }
 
 function PrivateRoute() {
-  const { currentUser, loading } = useAuth();
+  const { currentUser, appUser, loading } = useAuth();
 
   if (loading) {
     return <FullPageLoader />;
   }
 
   if (!currentUser) return <Navigate to="/login" replace />;
+  if (!appUser) return <FullPageLoader />;
   return <Outlet />;
 }
 
@@ -43,6 +45,15 @@ function AdminRoute() {
 
   if (loading) return <FullPageLoader />;
   if (!appUser || appUser.role !== "admin") return <Navigate to="/campaigns" replace />;
+  return <Outlet />;
+}
+
+function CampaignsRoute() {
+  const { appUser, loading } = useAuth();
+
+  if (loading) return <FullPageLoader />;
+  if (!appUser) return <FullPageLoader />;
+  if (appUser.role === "admin") return <Navigate to="/admin" replace />;
   return <Outlet />;
 }
 
@@ -86,11 +97,14 @@ export default function App() {
           <Routes>
             <Route path="/" element={<RootRedirect />} />
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="/mobile-login" element={<Navigate to="/login" replace />} />
             <Route path="/mobile-campaigns" element={<MobileCampaigns />} />
             <Route element={<PrivateRoute />}>
-              <Route path="/campaigns" element={<Campaigns />} />
-              <Route path="/campaigns/:uid" element={<StudentCampaign />} />
+              <Route element={<CampaignsRoute />}>
+                <Route path="/campaigns" element={<Campaigns />} />
+                <Route path="/campaigns/:uid" element={<StudentCampaign />} />
+              </Route>
               <Route path="/oracle" element={<Oracle />} />
               <Route element={<AdminRoute />}>
                 <Route path="/admin" element={<AdminDashboard />} />
