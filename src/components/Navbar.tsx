@@ -94,7 +94,7 @@ export default function Navbar() {
             <div className="flex items-center gap-5">
             <div className="text-right">
               <div className="text-roman-gold font-semibold text-lg tracking-wide">
-                Mr. {appUser.displayName.split(" ").pop()}
+                {appUser.suffix ? `${appUser.suffix}. ${appUser.displayName.split(" ").pop()}` : appUser.displayName}
               </div>
               <span className="text-xs bg-roman-gold/15 text-roman-gold/80 px-2 py-0.5 rounded-sm uppercase tracking-widest font-semibold border border-roman-gold/20">
                 {appUser.role}

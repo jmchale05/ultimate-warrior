@@ -16,12 +16,15 @@ import {
 } from "firebase/auth";
 import { auth } from "../lib/firebase";
 import {
+  createAdminSignupToken,
   createUserDoc,
+  deleteAdminSignupToken,
+  getAdminAccessCodeStatus,
   getSchoolByAccessCode,
   getUserDoc,
   initializeSchoolCampaignStart,
 } from "../lib/firestore";
-import type { AppUser, UserRole } from "../types";
+import type { AppUser } from "../types";
 
 interface AuthContextValue {
   currentUser: User | null;
@@ -32,9 +35,9 @@ interface AuthContextValue {
     email: string,
     password: string,
     displayName: string,
-    role: UserRole,
     accessCode: string,
-    privacyConsentVersion: string
+    privacyConsentVersion: string,
+    suffix?: string
   ) => Promise<void>;
   forgotPassword: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -127,29 +130,76 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     email: string,
     password: string,
     displayName: string,
-    role: UserRole,
     accessCode: string,
-    privacyConsentVersion: string
+    privacyConsentVersion: string,
+    suffix?: string
   ) {
-    const school = await getSchoolByAccessCode(accessCode);
+    const normalizedEmail = email.trim();
+    const normalizedDisplayName = displayName.trim();
+    const normalizedAccessCode = accessCode.trim().toUpperCase();
+    const normalizedSuffix = suffix?.trim();
+    const isValidAdminCode = await getAdminAccessCodeStatus(normalizedAccessCode);
+    if (isValidAdminCode) {
+
+      const cred = await createUserWithEmailAndPassword(auth, normalizedEmail, password);
+      await cred.user.getIdToken(true);
+      const newUser: AppUser = {
+        uid: cred.user.uid,
+        email: normalizedEmail,
+        displayName: normalizedDisplayName,
+        privacyConsentVersion,
+        privacyConsentAt: Date.now(),
+        role: "admin",
+        createdAt: Date.now(),
+      };
+
+      savePendingSignup(newUser);
+      try {
+        await createAdminSignupToken(cred.user.uid, normalizedAccessCode);
+        await createUserDoc(newUser);
+        await deleteAdminSignupToken(cred.user.uid);
+      } catch (err) {
+        console.error("Failed to create admin user profile:", err);
+        await deleteAdminSignupToken(cred.user.uid).catch(() => undefined);
+        await cred.user.delete().catch(() => firebaseSignOut(auth));
+        clearPendingSignup();
+        throw new Error("Your auth account was created, but the app profile could not be saved. Please contact support before trying again.");
+      }
+      clearPendingSignup();
+      setAppUser(newUser);
+      return;
+    }
+
+    const school = await getSchoolByAccessCode(normalizedAccessCode);
     if (!school) {
       throw new Error("Invalid access code. Please check the code and try again.");
     }
 
-    const cred = await createUserWithEmailAndPassword(auth, email, password);
+    const cred = await createUserWithEmailAndPassword(auth, normalizedEmail, password);
+    await cred.user.getIdToken(true);
     const newUser: AppUser = {
       uid: cred.user.uid,
-      email,
-      displayName,
+      email: normalizedEmail,
+      displayName: normalizedDisplayName,
+      ...(normalizedSuffix ? { suffix: normalizedSuffix } : {}),
       privacyConsentVersion,
       privacyConsentAt: Date.now(),
-      role,
+      role: "teacher",
       schoolId: school.id,
       createdAt: Date.now(),
     };
     savePendingSignup(newUser);
-    await createUserDoc(newUser);
-    await initializeSchoolCampaignStart(school.id, newUser.createdAt);
+    try {
+      await createUserDoc(newUser);
+    } catch (err) {
+      console.error("Failed to create teacher user profile:", err);
+      await cred.user.delete().catch(() => firebaseSignOut(auth));
+      clearPendingSignup();
+      throw new Error("Your auth account was created, but the app profile could not be saved. Please contact support before trying again.");
+    }
+    await initializeSchoolCampaignStart(school.id, newUser.createdAt).catch((err) => {
+      console.error("Failed to initialize school campaign start:", err);
+    });
     clearPendingSignup();
     setAppUser(newUser);
   }

@@ -13,10 +13,11 @@ import {
   arrayRemove,
   writeBatch,
   deleteField,
+  deleteDoc,
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "./firebase";
-import type { AppUser, School, SchoolAccessCode, Class, Result } from "../types";
+import type { AppUser, School, SchoolAccessCode, SchoolType, Class, Result } from "../types";
 
 // ─── Schools ──────────────────────────────────────────────────────────────────
 
@@ -30,6 +31,10 @@ function generateAccessCode() {
 }
 
 function accessCodeDocId(accessCode: string) {
+  return accessCode.trim().toUpperCase();
+}
+
+function adminAccessCodeDocId(accessCode: string) {
   return accessCode.trim().toUpperCase();
 }
 
@@ -48,18 +53,41 @@ async function saveSchoolAccessCodeIndex(
 
 export async function createSchool(
   name: string,
+  schoolType: SchoolType,
   address?: string
 ): Promise<{ id: string; accessCode: string }> {
   const accessCode = generateAccessCode();
   const createdAt = Date.now();
   const ref = await addDoc(collection(db, "schools"), {
     name,
+    schoolType,
     address,
     accessCode,
     createdAt,
   });
   await saveSchoolAccessCodeIndex(ref.id, accessCode, name, createdAt);
   return { id: ref.id, accessCode };
+}
+
+export async function deleteSchool(schoolId: string): Promise<void> {
+  const school = await getSchoolById(schoolId);
+  if (!school) return;
+
+  await deleteDoc(doc(db, "schools", schoolId));
+  await deleteDoc(doc(db, "schoolAccessCodes", accessCodeDocId(school.accessCode)));
+}
+
+export async function updateSchool(
+  schoolId: string,
+  name: string,
+  schoolType: SchoolType,
+  address?: string
+): Promise<void> {
+  await updateDoc(doc(db, "schools", schoolId), {
+    name,
+    schoolType,
+    address: address || deleteField(),
+  });
 }
 
 export async function getSchoolById(schoolId: string): Promise<School | null> {
@@ -76,6 +104,29 @@ export async function getSchoolByAccessCode(accessCode: string): Promise<School 
 
   const codeData = codeSnap.data() as Omit<SchoolAccessCode, "id">;
   return getSchoolById(codeData.schoolId);
+}
+
+export async function getAdminAccessCodeStatus(accessCode: string): Promise<boolean> {
+  const normalizedCode = adminAccessCodeDocId(accessCode);
+  if (!normalizedCode) return false;
+
+  const snap = await getDoc(doc(db, "adminAccessCodes", normalizedCode));
+  if (!snap.exists()) return false;
+
+  const data = snap.data() as { active?: boolean };
+  return data.active !== false;
+}
+
+export async function createAdminSignupToken(uid: string, accessCode: string): Promise<void> {
+  await setDoc(doc(db, "adminSignupTokens", uid), {
+    uid,
+    accessCode: adminAccessCodeDocId(accessCode),
+    createdAt: Date.now(),
+  });
+}
+
+export async function deleteAdminSignupToken(uid: string): Promise<void> {
+  await deleteDoc(doc(db, "adminSignupTokens", uid));
 }
 
 export async function getAllSchools(): Promise<School[]> {

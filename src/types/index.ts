@@ -1,10 +1,12 @@
 // ─── Firestore Document Types ───────────────────────────────────────────────
 
 export type UserRole = "teacher" | "student" | "admin";
+export type SchoolType = "Primary School" | "Secondary School";
 
 export interface School {
   id: string;
   name: string;
+  schoolType?: SchoolType;
   address?: string;
   accessCode: string;
   logoUrl?: string;
@@ -23,6 +25,7 @@ export interface AppUser {
   uid: string;
   email: string;
   displayName: string;
+  suffix?: string;
   romanNickname?: string;
   privacyConsentVersion?: string;
   privacyConsentAt?: number;

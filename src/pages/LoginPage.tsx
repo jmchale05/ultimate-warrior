@@ -2,9 +2,10 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { ButtonSpinner } from "../components/LoadingSpinner";
-import { getSchoolByAccessCode } from "../lib/firestore";
+import { getAdminAccessCodeStatus, getSchoolByAccessCode } from "../lib/firestore";
 
 type Mode = "signin" | "signup";
+type ConfirmedSignupRole = "teacher" | "admin";
 const PRIVACY_POLICY_VERSION = "2026-05";
 
 export default function LoginPage() {
@@ -15,8 +16,10 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [suffix, setSuffix] = useState("Mr");
   const [accessCode, setAccessCode] = useState("");
   const [signupConsentChecked, setSignupConsentChecked] = useState(false);
+  const [confirmedSignupRole, setConfirmedSignupRole] = useState<ConfirmedSignupRole | null>(null);
   const [confirmedSchoolName, setConfirmedSchoolName] = useState<string | null>(null);
   const [accessCodeConfirmed, setAccessCodeConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +47,7 @@ export default function LoginPage() {
       return;
     }
 
-    if (mode === "signup" && !signupConsentChecked) {
+    if (mode === "signup" && confirmedSignupRole === "teacher" && !signupConsentChecked) {
       setError("Please confirm you have authority and consent to manage student data.");
       return;
     }
@@ -64,10 +67,21 @@ export default function LoginPage() {
       if (mode === "signin") {
         await signIn(email, password);
       } else {
-        await signUp(email, password, displayName, "teacher", accessCode, PRIVACY_POLICY_VERSION);
+        await signUp(email, password, displayName, accessCode, PRIVACY_POLICY_VERSION, confirmedSignupRole === "teacher" ? suffix : undefined);
       }
       // Navigation happens via the useEffect above when currentUser updates
     } catch (err: unknown) {
+      if (err instanceof Error && err.message) {
+        const normalizedMessage = err.message.toLowerCase();
+        if (
+          normalizedMessage.includes("invalid access code") ||
+          normalizedMessage.includes("invalid admin access code") ||
+          normalizedMessage.includes("app profile could not be saved")
+        ) {
+          setError(err.message);
+          return;
+        }
+      }
       const code = (err as { code?: string }).code;
       if (code === "auth/invalid-credential" || code === "auth/wrong-password" || code === "auth/user-not-found") {
         setError("Incorrect email or password. Please try again.");
@@ -95,18 +109,28 @@ export default function LoginPage() {
     setError(null);
     setConfirmingCode(true);
     try {
-      const school = await getSchoolByAccessCode(accessCode);
-      if (!school) {
-        setAccessCodeConfirmed(false);
-        setConfirmedSchoolName(null);
-        setError("That access code is not valid. Please check it and try again.");
-        return;
-      }
+      const isValidAdminCode = await getAdminAccessCodeStatus(accessCode);
+      if (isValidAdminCode) {
+        setAccessCodeConfirmed(true);
+        setConfirmedSignupRole("admin");
+        setConfirmedSchoolName("Administrator Account");
+      } else {
+        const school = await getSchoolByAccessCode(accessCode);
+        if (!school) {
+          setAccessCodeConfirmed(false);
+          setConfirmedSignupRole(null);
+          setConfirmedSchoolName(null);
+          setError("That access code is not valid. Please check it and try again.");
+          return;
+        }
 
-      setAccessCodeConfirmed(true);
-      setConfirmedSchoolName(school.name);
+        setAccessCodeConfirmed(true);
+        setConfirmedSignupRole("teacher");
+        setConfirmedSchoolName(school.name);
+      }
     } catch {
       setAccessCodeConfirmed(false);
+      setConfirmedSignupRole(null);
       setConfirmedSchoolName(null);
       setError("Unable to verify the access code right now. Please try again.");
     } finally {
@@ -205,6 +229,7 @@ export default function LoginPage() {
                   if (accessCodeConfirmed) return;
                   setAccessCode(e.target.value.toUpperCase());
                   setAccessCodeConfirmed(false);
+                  setConfirmedSignupRole(null);
                   setConfirmedSchoolName(null);
                 }}
                 disabled={accessCodeConfirmed}
@@ -223,23 +248,45 @@ export default function LoginPage() {
               )}
               {accessCodeConfirmed && confirmedSchoolName && (
                 <p className="mt-2 text-xs text-roman-gold/80 uppercase tracking-widest">
-                  Access code confirmed for {confirmedSchoolName}
+                  {confirmedSignupRole === "admin"
+                    ? "Admin access code confirmed"
+                    : `Access code confirmed for ${confirmedSchoolName}`}
                 </p>
               )}
+            </div>
+          )}
+
+          {mode === "signup" && accessCodeConfirmed && confirmedSignupRole === "teacher" && (
+            <div>
+              <label className="block text-roman-gold/70 text-xs uppercase tracking-wider mb-1.5 font-semibold">
+                ◆ Title / Suffix
+              </label>
+              <select
+                value={suffix}
+                onChange={(e) => setSuffix(e.target.value)}
+                className="roman-input"
+              >
+                <option value="Mr">Mr</option>
+                <option value="Mrs">Mrs</option>
+                <option value="Miss">Miss</option>
+                <option value="Ms">Ms</option>
+                <option value="Dr">Dr</option>
+                <option value="Prof">Prof</option>
+              </select>
             </div>
           )}
 
           {mode === "signup" && accessCodeConfirmed && (
             <div>
               <label className="block text-roman-gold/70 text-xs uppercase tracking-wider mb-1.5 font-semibold">
-                ◆ Full Name
+                ◆ {confirmedSignupRole === "teacher" ? "Last Name" : "Full Name"}
               </label>
               <input
                 type="text"
                 required
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Marcus Aurelius"
+                placeholder={confirmedSignupRole === "teacher" ? "Smith" : "Marcus Aurelius"}
                 className="roman-input"
               />
             </div>
@@ -317,7 +364,7 @@ export default function LoginPage() {
             </button>
           )}
 
-          {mode === "signup" && accessCodeConfirmed && (
+          {mode === "signup" && confirmedSignupRole === "teacher" && accessCodeConfirmed && (
             <label className="flex items-start gap-2.5 text-stone-400 text-xs leading-relaxed border border-stone-700/60 rounded-lg px-3 py-2.5">
               <input
                 type="checkbox"
@@ -345,7 +392,15 @@ export default function LoginPage() {
               New to the Legion?{" "}
               <button
                 type="button"
-                onClick={() => { setMode("signup"); setError(null); setAccessCode(""); setSignupConsentChecked(false); setAccessCodeConfirmed(false); setConfirmedSchoolName(null); }}
+                onClick={() => {
+                  setMode("signup");
+                  setError(null);
+                  setAccessCode("");
+                  setSignupConsentChecked(false);
+                  setAccessCodeConfirmed(false);
+                  setConfirmedSignupRole(null);
+                  setConfirmedSchoolName(null);
+                }}
                 className="text-roman-gold hover:text-roman-gold-light hover:underline transition-colors"
               >
                 Register
@@ -356,7 +411,10 @@ export default function LoginPage() {
               Already a Commander?{" "}
               <button
                 type="button"
-                onClick={() => { setMode("signin"); setError(null); }}
+                onClick={() => {
+                  setMode("signin");
+                  setError(null);
+                }}
                 className="text-roman-gold hover:text-roman-gold-light hover:underline transition-colors"
               >
                 Sign In

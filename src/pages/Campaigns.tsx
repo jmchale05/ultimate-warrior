@@ -8,6 +8,7 @@ import {
   getClassesBySchool,
   getUsersByIds,
   getResultsByClass,
+  getSchoolById,
   createUserDoc,
   createClass,
   addStudentToClass,
@@ -17,7 +18,7 @@ import {
   updateUserPhoto,
   recordStudentAuthorityConsent,
 } from "../lib/firestore";
-import type { AppUser, Class, Result } from "../types";
+import type { AppUser, Class, Result, SchoolType } from "../types";
 
 const STUDENT_AUTHORITY_CONSENT_VERSION = "2026-05";
 
@@ -36,7 +37,12 @@ const CAMPAIGNS = [
   { number: 12, name: "The Voice of Rome",         minMiles: 66 },
 ];
 
-const YEAR_OPTIONS = ["Year 7", "Year 8", "Year 9", "Year 10", "Year 11"];
+const PRIMARY_YEAR_OPTIONS = ["Year 1", "Year 2", "Year 3", "Year 4", "Year 5", "Year 6"];
+const SECONDARY_YEAR_OPTIONS = ["Year 7", "Year 8", "Year 9", "Year 10", "Year 11"];
+
+function getYearOptions(schoolType: SchoolType | null): string[] {
+  return schoolType === "Primary School" ? PRIMARY_YEAR_OPTIONS : SECONDARY_YEAR_OPTIONS;
+}
 
 function getCampaignInfo(miles: number) {
   let current = CAMPAIGNS[0];
@@ -105,6 +111,9 @@ export default function Campaigns() {
   const [className, setClassName] = useState("");
   const [classSaving, setClassSaving] = useState(false);
   const [classError, setClassError] = useState("");
+  const [schoolType, setSchoolType] = useState<SchoolType | null>(null);
+
+  const yearOptions = getYearOptions(schoolType);
 
   async function handleAddClass() {
     if (!appUser?.schoolId) {
@@ -239,8 +248,33 @@ export default function Campaigns() {
   // logo upload removed
 
   useEffect(() => {
+    if (!showAddModal) return;
+    if (formClassId && !yearOptions.includes(formClassId)) {
+      setFormClassId("");
+    }
+  }, [showAddModal, formClassId, yearOptions]);
+
+  useEffect(() => {
+    if (!showEditStudentModal) return;
+    if (editYear && !yearOptions.includes(editYear)) {
+      setEditYear("");
+    }
+  }, [showEditStudentModal, editYear, yearOptions]);
+
+  useEffect(() => {
     if (!appUser) return;
     setHasAuthorityConsent(Boolean(appUser.studentAuthorityConsentAt));
+    if (appUser.schoolId) {
+      void getSchoolById(appUser.schoolId)
+        .then((school) => {
+          setSchoolType((school?.schoolType ?? "Secondary School") as SchoolType);
+        })
+        .catch(() => {
+          setSchoolType("Secondary School");
+        });
+    } else {
+      setSchoolType(null);
+    }
     loadData();
   }, [appUser]);
 
@@ -846,7 +880,7 @@ export default function Campaigns() {
                     className="w-full bg-stone-800 border border-stone-700 rounded-lg px-4 py-3 text-stone-100 focus:outline-none focus:border-roman-gold/60 transition-colors"
                   >
                     <option value="">Select year...</option>
-                    {YEAR_OPTIONS.map((year) => (
+                    {yearOptions.map((year) => (
                       <option key={year} value={year}>{year}</option>
                     ))}
                   </select>
@@ -966,7 +1000,7 @@ export default function Campaigns() {
                     className="w-full bg-stone-800 border border-stone-700 rounded-lg px-4 py-3 text-stone-100 focus:outline-none focus:border-roman-gold/60 transition-colors"
                   >
                     <option value="">Select year...</option>
-                    {YEAR_OPTIONS.map((year) => (
+                    {yearOptions.map((year) => (
                       <option key={year} value={year}>{year}</option>
                     ))}
                   </select>
