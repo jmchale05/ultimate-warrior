@@ -25,7 +25,7 @@ This checklist summarizes the GDPR compliance status of Ultimate Warrior Challen
 - [x] Data export functionality implemented ("Download my data")
 - [x] Consent recording (teacher authority consent, student data consent)
 - [x] Student deletion workflow with admin review
-- [x] Deletion request audit trail maintained for 24 months
+- [x] Deletion request audit trail minimized after review
 - [x] Built-in data subject rights request guide
 
 ### ⚠️ In Progress / Blocked
@@ -70,7 +70,7 @@ This checklist summarizes the GDPR compliance status of Ultimate Warrior Challen
   - [x] DATA_RETENTION_POLICY.md – How long data is kept
   - [x] DATA_SUBJECT_RIGHTS_GUIDE.md – How users can request access/deletion
   - [x] BREACH_RESPONSE_PLAN.md – What to do if there's an incident
-- [ ] Customize organization name and email in each document (search for `[Your Organization Name]`, `support@tuwc.online`)
+- [ ] Confirm the responsible legal entity/controller name and contact details in each document
 - [ ] Confirm all contact details and procedures match your organization's structure
 
 **Admin Test**
@@ -151,7 +151,7 @@ This checklist summarizes the GDPR compliance status of Ultimate Warrior Challen
   - Reviews breach reports and incident response.
 - [ ] Establish a data governance committee (or working group):
   - App admin, school safeguarding lead, data lead, legal (if available).
-  - Meets quarterly to review compliance, breaches, and data-subject requests.
+  - Meets periodically to review compliance, breaches, and data-subject requests.
 
 **Process Documentation**
 
@@ -164,9 +164,9 @@ This checklist summarizes the GDPR compliance status of Ultimate Warrior Challen
 
 ---
 
-### Phase 4: Ongoing (Quarterly and Annual)
+### Phase 4: Ongoing
 
-**Quarterly Reviews**
+**Periodic Reviews**
 
 - [ ] Review deletion request logs
   - Are requests being processed within timelines?
@@ -176,7 +176,7 @@ This checklist summarizes the GDPR compliance status of Ultimate Warrior Challen
   - Any failed login attempts or suspicious activity?
 - [ ] Update incident register (if any breaches occurred)
 
-**Annual Audit**
+**Periodic Audit and Legal Review**
 
 - [ ] Review and update all GDPR policies (or every 2 years, minimum)
 - [ ] Re-run DPIA if functionality changes
@@ -248,7 +248,7 @@ Rate your current status (1 = not started, 5 = fully implemented):
    - **Timeline:** Within 3 months.
 
 2. **Limited Audit Trail:** Access logs are retained but not regularly reviewed.
-   - **Mitigation:** Establish a quarterly audit schedule.
+  - **Mitigation:** Establish a documented recurring audit and review schedule.
    - **Timeline:** Ongoing.
 
 ---

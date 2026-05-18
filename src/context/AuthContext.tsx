@@ -84,6 +84,20 @@ function getPasswordResetActionSettings(): ActionCodeSettings {
   };
 }
 
+async function createUserDocWithRetry(profile: AppUser, authUser: User): Promise<void> {
+  try {
+    await createUserDoc(profile);
+  } catch (err) {
+    const code = (err as { code?: string }).code;
+    if (code !== "permission-denied") {
+      throw err;
+    }
+
+    await authUser.getIdToken(true);
+    await createUserDoc(profile);
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [appUser, setAppUser] = useState<AppUser | null>(null);
@@ -105,6 +119,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               setAppUser(pendingUser);
               clearPendingSignup();
             } else {
+              // Keep auth session intact here; signing out immediately can race with
+              // signup profile creation and cause permission-denied on createUserDoc.
+              // Route guards already redirect when appUser is missing, so no infinite loader.
               setAppUser(null);
             }
           }
@@ -156,7 +173,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       savePendingSignup(newUser);
       try {
         await createAdminSignupToken(cred.user.uid, normalizedAccessCode);
-        await createUserDoc(newUser);
+        await createUserDocWithRetry(newUser, cred.user);
         await deleteAdminSignupToken(cred.user.uid);
       } catch (err) {
         console.error("Failed to create admin user profile:", err);
@@ -190,9 +207,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     savePendingSignup(newUser);
     try {
-      await createUserDoc(newUser);
+      await createUserDocWithRetry(newUser, cred.user);
     } catch (err) {
-      console.error("Failed to create teacher user profile:", err);
+      console.error("Failed to create teacher user profile:", {
+        error: err,
+        schoolId: school.id,
+        accessCode: normalizedAccessCode,
+      });
       await cred.user.delete().catch(() => firebaseSignOut(auth));
       clearPendingSignup();
       throw new Error("Your auth account was created, but the app profile could not be saved. Please contact support before trying again.");

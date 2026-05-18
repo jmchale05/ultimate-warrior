@@ -26,17 +26,17 @@ This policy defines how long personal data is retained by Ultimate Warrior Chall
 
 | Data Element | Retention | Reason |
 |---|---|---|
-| Student name, age, year group | During enrollment + 12 months | Campaign completion, safeguarding records |
-| Student profile photo | During enrollment + 12 months | Identity and progress documentation |
-| Campaign results (miles, dates) | During enrollment + 12 months | Progress tracking, achievement records |
-| Student authority consent record | During enrollment + 24 months | Lawful-basis evidence |
-| Deletion requests (pending/approved) | 24 months after closure | Audit trail, safeguarding |
+| Student name, age, year group | During enrollment | Campaign completion and active administration |
+| Student profile photo | During enrollment | Identity and progress administration |
+| Campaign results (miles, dates) | During enrollment | Progress tracking and achievement |
+| Student authority consent record | As required for lawful-basis evidence | Lawful-basis evidence |
+| Deletion audit log (minimal pseudonymized metadata) | As required for safeguarding and audit | Audit trail, safeguarding |
 
 **Trigger for Deletion:**
 - Teacher requests student deletion in the App.
 - Admin reviews and approves the deletion request.
-- Deletion is executed immediately; data is permanently removed within 7 days.
-- Deletion request record is retained for 24 months.
+- Student profile and campaign results are permanently deleted immediately when approval is processed.
+- A minimal audit log is retained only as long as necessary for safeguarding and audit purposes (request ID, pseudonymized student reference, requester/reviewer IDs, decision, timestamps, and reason-provided flag).
 
 **Exception:** If a safeguarding investigation is ongoing, data may be retained beyond the standard period per school's safeguarding policy.
 
@@ -46,17 +46,16 @@ This policy defines how long personal data is retained by Ultimate Warrior Chall
 
 | Data Element | Retention | Reason |
 |---|---|---|
-| Email, name, role | While active + 24 months | Access logs, audit trails, accountability |
-| Privacy consent record | While active + 24 months | Lawful-basis evidence |
-| Student authority consent (on behalf of students) | While active + 24 months | Evidence of authority over student data |
-| Profile photo | While active + 24 months | Identity and communications |
-| Classes, challenges, results created by teacher | While active + 24 months | Historical records, audit |
+| Email, name, role | While active, then as required | Access logs, audit trails, accountability |
+| Privacy consent record | As required for lawful-basis evidence | Lawful-basis evidence |
+| Student authority consent (on behalf of students) | As required for lawful-basis evidence | Evidence of authority over student data |
+| Profile photo | While active, then as required | Identity and communications |
+| Classes, challenges, results created by teacher | While active, then as required | Historical records, audit |
 
 **Trigger for Deletion:**
 - Teacher leaves school or opts out of the App.
 - School admin or the data subject requests account deletion.
-- Account is marked inactive; data is retained for 24 months.
-- After 24 months, account and associated metadata are permanently deleted.
+- Staff-account retention and deletion are handled manually outside the App according to school instructions and applicable safeguarding, legal, and audit obligations.
 
 **Exception:** If the teacher is involved in a data-related investigation or safeguarding matter, retention may be extended per school directive.
 
@@ -66,15 +65,14 @@ This policy defines how long personal data is retained by Ultimate Warrior Chall
 
 | Data Element | Retention | Reason |
 |---|---|---|
-| Email, name, admin credentials | While active + 24 months | Access logs, audit trails, accountability |
-| Privacy consent record | While active + 24 months | Lawful-basis evidence |
-| Deletion request approvals (reviewer name, timestamp, decision) | 24 months | Audit trail, evidence of review |
-| Data access logs (if audited) | While active + 24 months | Compliance verification |
+| Email, name, admin credentials | While active, then as required | Access logs, audit trails, accountability |
+| Privacy consent record | As required for lawful-basis evidence | Lawful-basis evidence |
+| Deletion request approvals (reviewer ID, timestamp, decision) | As required for accountability and audit | Audit trail, evidence of review |
+| Data access logs (if audited) | As required for compliance verification | Compliance verification |
 
 **Trigger for Deletion:**
 - Admin leaves organization or role.
-- Data is retained for 24 months per organizational policy.
-- After 24 months, admin account is permanently deleted.
+- Staff-account retention and deletion are handled manually outside the App according to applicable safeguarding, legal, and audit obligations.
 
 ---
 
@@ -97,10 +95,10 @@ This policy defines how long personal data is retained by Ultimate Warrior Chall
 
 | Data Element | Retention | Reason |
 |---|---|---|
-| Signup consent (version, timestamp) | 24 months post-account closure | Lawful-basis evidence, regulatory proof |
-| Student authority consent (version, timestamp) | 24 months post-account closure | Evidence of authority, GDPR compliance |
-| Deletion request records | 24 months | Safeguarding investigation trail |
-| Admin review logs | 24 months | Accountability and audit |
+| Signup consent (version, timestamp) | As required for lawful-basis evidence | Regulatory proof |
+| Student authority consent (version, timestamp) | As required for lawful-basis evidence | Evidence of authority, GDPR compliance |
+| Deletion request records | As required for safeguarding and audit | Safeguarding investigation trail |
+| Admin review logs | As required for accountability and audit | Accountability and audit |
 
 ---
 
@@ -110,7 +108,7 @@ This policy defines how long personal data is retained by Ultimate Warrior Chall
 |---|---|---|
 | Firebase access logs | 90 days (Google default) | Security monitoring |
 | Incremental backups | 30 days | Disaster recovery |
-| Full database backups | 24 months | Legal hold, compliance, recovery |
+| Full database backups | As required for disaster recovery and legal hold | Legal hold, compliance, recovery |
 
 ---
 
@@ -124,17 +122,17 @@ This policy defines how long personal data is retained by Ultimate Warrior Chall
 4. **Notification:** An email is sent to all App admins notifying them of the pending request.
 5. **Admin Review:** Admin opens the Admin Dashboard, reviews the pending request (student name, reason, requesting teacher), and clicks "Approve" or "Decline."
 6. **Execution:** 
-   - If approved: `deleteStudentWithCleanup()` is called, which removes the student profile and all associated results within 7 days.
+   - If approved: `deleteStudentWithCleanup()` is called, which permanently deletes the student profile and associated results.
    - If declined: Request status is marked "rejected" and the teacher is notified.
-7. **Record Retention:** The deletion request record is retained for 24 months for audit.
+7. **Record Retention:** A minimal deletion audit log is retained only as long as necessary for safeguarding and audit purposes.
 
 ### 4.2 Teacher Account Deletion
 
 1. **Request:** Teacher contacts support@tuwc.online requesting account closure.
 2. **Verification:** Support verifies teacher identity and school authorization.
-3. **Notification:** Admin is notified; App admins are responsible for deciding whether to delete associated student data or archive it.
-4. **Execution:** Teacher account is marked inactive. Associated data is retained for 24 months, then automatically deleted (or archived per school policy).
-5. **Record:** Deletion is logged with timestamp and approver identity.
+3. **Handling:** Teacher-account retention and deletion are handled manually outside the App by the school and app provider.
+4. **Execution:** Any deletion or anonymization action is carried out according to school instructions and applicable safeguarding, legal, and audit obligations.
+5. **Record:** Manual decisions should be documented by the responsible controller or processor.
 
 ### 4.3 Data Subject Rights Requests (GDPR)
 
@@ -170,7 +168,7 @@ Data may be retained beyond the standard period if:
 ## 6. Backup and Disaster Recovery
 
 - **Incremental backups** are retained for 30 days for disaster recovery.
-- **Full backups** are retained for 24 months in case of catastrophic data loss or legal hold.
+- **Full backups** are retained only as long as required for catastrophic data recovery or legal hold.
 - Backups are encrypted and stored in Google Cloud secure storage.
 - Restore from backup must be justified (e.g., ransomware attack, accidental deletion) and approved by App admins.
 
@@ -178,9 +176,8 @@ Data may be retained beyond the standard period if:
 
 ## 7. Compliance Monitoring
 
-- **Quarterly Review:** App admins review deletion request logs and pending data to ensure retention periods are being followed.
-- **Annual Audit:** The data retention policy is audited annually to ensure continued compliance with GDPR, UK DPA 2018, and school policies.
-- **Breach Response:** If unauthorized deletion or data loss is discovered, the incident is logged, investigated, and reported per the [Data Breach Response Plan](BREACH_RESPONSE.md).
+- This policy should be reviewed periodically by the responsible controller and app provider.
+- If unauthorized deletion or data loss is discovered, the incident should be logged, investigated, and handled under the applicable breach-response process.
 
 ---
 
@@ -218,12 +215,8 @@ Changes are communicated to all data subjects via email and in-App notification.
 
 ---
 
-## Appendix: Automated Deletion Schedule
+## Appendix: Operational Notes
 
-The following automated processes run on the App:
-
-- **Weekly Check:** Checks for deletion requests approved more than 7 days ago and removes data.
-- **Monthly Check:** Checks for accounts marked inactive more than 24 months ago and removes metadata (except audit logs).
-- **Quarterly Backup Cleanup:** Removes incremental backups older than 30 days.
-
-All automated deletions are logged with timestamp and reason.
+- Student profile/results deletion occurs when an approved deletion request is processed.
+- Staff-account retention and deletion are handled manually outside the App.
+- Manual deletion decisions should be documented by the responsible organization.

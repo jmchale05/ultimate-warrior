@@ -8,19 +8,7 @@ const downloads = [
     name: "Windows",
     label: "Download for Windows",
     assetPattern: /\.(exe|msi)$/i,
-    hint: "Recommended for most desktop users.",
-  },
-  {
-    name: "macOS",
-    label: "Download for Mac",
-    assetPattern: /\.dmg$/i,
-    hint: "Signed build and notarization ready when you publish it.",
-  },
-  {
-    name: "Linux",
-    label: "Download for Linux",
-    assetPattern: /\.AppImage$/i,
-    hint: "AppImage works well for direct installs.",
+    hint: "The only supported platform.",
   },
 ];
 
@@ -130,12 +118,6 @@ export default function DownloadPage() {
                 >
                   {downloadLinks[0].available ? "Download for Windows" : "View releases"}
                 </a>
-                <a
-                  href="#downloads"
-                  className="inline-flex items-center justify-center rounded-xl border border-roman-gold/35 bg-stone-950/60 px-6 py-4 text-sm font-bold uppercase tracking-[0.2em] text-stone-100 transition hover:border-roman-gold hover:bg-stone-900/80"
-                >
-                  Choose a platform
-                </a>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-3">
@@ -161,29 +143,26 @@ export default function DownloadPage() {
                 />
                 <div>
                   <p className="text-sm uppercase tracking-[0.22em] text-roman-gold/80">Download Center</p>
-                  <h2 className="mt-1 text-2xl font-bold text-stone-50">Choose your installer</h2>
+                  <h2 className="mt-1 text-2xl font-bold text-stone-50">Windows Installer</h2>
                 </div>
               </div>
 
               <div id="downloads" className="mt-6 space-y-4">
-                {downloadLinks.map((download) => (
-                  <a
-                    key={download.name}
-                    href={download.href}
-                    className="block rounded-2xl border border-stone-700/80 bg-stone-950/70 p-5 transition hover:border-roman-gold/60 hover:bg-stone-900/80"
-                  >
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <div className="text-xs uppercase tracking-[0.25em] text-roman-gold/75">{download.name}</div>
-                        <div className="mt-1 text-lg font-semibold text-stone-50">{download.label}</div>
-                      </div>
-                      <div className="rounded-full border border-roman-gold/25 px-3 py-1 text-xs uppercase tracking-[0.2em] text-roman-gold">
-                        {download.available ? "Installer" : "Releases"}
-                      </div>
+                <a
+                  href={downloadLinks[0].href}
+                  className="block rounded-2xl border border-stone-700/80 bg-stone-950/70 p-5 transition hover:border-roman-gold/60 hover:bg-stone-900/80"
+                >
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <div className="text-xs uppercase tracking-[0.25em] text-roman-gold/75">Windows</div>
+                      <div className="mt-1 text-lg font-semibold text-stone-50">{downloadLinks[0].label}</div>
                     </div>
-                    <p className="mt-3 text-sm leading-6 text-stone-400">{download.hint}</p>
-                  </a>
-                ))}
+                    <div className="rounded-full border border-roman-gold/25 px-3 py-1 text-xs uppercase tracking-[0.2em] text-roman-gold">
+                      {downloadLinks[0].available ? "Installer" : "Releases"}
+                    </div>
+                  </div>
+                  <p className="mt-3 text-sm leading-6 text-stone-400">{downloadLinks[0].hint}</p>
+                </a>
               </div>
 
               <div className="mt-6 rounded-2xl border border-roman-gold/20 bg-roman-red/10 p-5">

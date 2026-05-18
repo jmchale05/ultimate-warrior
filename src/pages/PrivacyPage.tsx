@@ -48,85 +48,109 @@ export default function PrivacyPage() {
   }
 
   return (
-    <div className="min-h-screen bg-stone-950 text-stone-100 px-6 py-10 md:px-10">
-      <div className="mx-auto max-w-4xl rounded-3xl border border-roman-gold/20 bg-stone-900/80 shadow-2xl overflow-hidden">
-        <div className="h-1 w-full bg-linear-to-r from-transparent via-roman-gold to-transparent" />
-        <div className="px-8 py-8 md:px-12 md:py-10">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-roman-gold/70 text-xs uppercase tracking-[0.35em] font-semibold">Privacy Notice</p>
-              <h1 className="text-3xl md:text-4xl font-serif text-roman-gold font-bold mt-2">Data protection and your rights</h1>
-            </div>
+    <div className="min-h-screen bg-gray-100 px-6 py-8 md:px-10" style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}>
+      <div className="mx-auto max-w-5xl">
+        <header className="bg-white border border-gray-300 shadow-sm px-6 py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-xs text-gray-400 uppercase tracking-widest" style={{ fontFamily: "system-ui, sans-serif" }}>Legal Document</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 leading-tight mt-1">Privacy Notice</h1>
+          </div>
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => navigate(appUser ? (appUser.role === "admin" ? "/admin" : "/campaigns") : "/login")}
-              className="px-4 py-2 rounded-lg border border-roman-gold/40 text-roman-gold text-sm uppercase tracking-wider font-semibold hover:bg-roman-gold/10 transition-colors"
+              className="px-4 py-2 border border-gray-300 text-gray-700 text-sm hover:text-gray-900 hover:border-gray-500 transition-colors"
+              style={{ fontFamily: "system-ui, sans-serif" }}
             >
               {appUser ? "Back to App" : "Back to Login"}
             </button>
+            <button
+              type="button"
+              onClick={() => navigate("/terms")}
+              className="px-4 py-2 border border-gray-300 text-gray-700 text-sm hover:text-gray-900 hover:border-gray-500 transition-colors"
+              style={{ fontFamily: "system-ui, sans-serif" }}
+            >
+              Terms and Conditions
+            </button>
+          </div>
+        </header>
+
+        <main className="mt-6 bg-white border border-gray-300 shadow-md px-8 py-10 md:px-12 md:py-12">
+          <div className="border-b border-gray-200 pb-7 mb-8">
+            <h2 className="text-3xl font-bold text-gray-900">Data Protection and Your Rights</h2>
+            <p className="mt-3 text-sm text-gray-500" style={{ fontFamily: "system-ui, sans-serif" }}>
+              Ultimate Warrior Challenges · Effective Date: May 2026
+            </p>
           </div>
 
-          <p className="mt-6 text-stone-300 leading-relaxed">
-            Ultimate Warrior Challenges processes teacher and student data to administer school fitness campaigns, track progress, and manage access.
-            Teachers must confirm they have lawful authority and any required school or parental permissions before entering student data.
-          </p>
+          <section className="mb-8">
+            <p className="text-gray-700 leading-relaxed text-[15px]">
+              Ultimate Warrior Challenges processes teacher and student data to administer school fitness campaigns, track progress, and manage access.
+              Teachers must confirm they have lawful authority and any required school or parental permissions before entering student data.
+            </p>
+          </section>
 
-          <div className="grid gap-4 mt-8 md:grid-cols-2">
-            <section className="rounded-2xl border border-stone-700/60 bg-stone-950/60 p-5">
-              <h2 className="text-roman-gold font-semibold text-lg mb-3">What we store</h2>
-              <p className="text-stone-300 text-sm leading-relaxed">
+          <section className="space-y-8 text-[15px] leading-relaxed text-gray-700">
+            <div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">1. What We Store</h3>
+              <p>
                 Account details such as email, display name, role, school membership, consent timestamps, student profile details entered by teachers,
                 student progress results, and school branding assets.
               </p>
-            </section>
-            <section className="rounded-2xl border border-stone-700/60 bg-stone-950/60 p-5">
-              <h2 className="text-roman-gold font-semibold text-lg mb-3">Why we process it</h2>
-              <p className="text-stone-300 text-sm leading-relaxed">
+            </div>
+
+            <div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">2. Why We Process It</h3>
+              <p>
                 To provide account access, assign schools and year groups, run campaigns, measure progress, review deletion requests, and support safeguarding and audit needs.
               </p>
-            </section>
-            <section className="rounded-2xl border border-stone-700/60 bg-stone-950/60 p-5">
-              <h2 className="text-roman-gold font-semibold text-lg mb-3">Retention and deletion</h2>
-              <p className="text-stone-300 text-sm leading-relaxed">
-                Student deletion requests are reviewed by an admin before permanent removal. Once approved, the app removes the student profile and related results from Firebase.
+            </div>
+
+            <div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">3. Retention and Deletion</h3>
+              <p>
+                Student deletion requests are reviewed by an admin. Once approved, the app permanently deletes the student profile and related results, while keeping a minimal audit log for safeguarding and compliance.
               </p>
-            </section>
-            <section className="rounded-2xl border border-stone-700/60 bg-stone-950/60 p-5">
-              <h2 className="text-roman-gold font-semibold text-lg mb-3">Your rights</h2>
-              <p className="text-stone-300 text-sm leading-relaxed">
+            </div>
+
+            <div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">4. Your Rights</h3>
+              <p>
                 You can request access to your data, correction of inaccurate details, deletion where applicable, and restriction of processing by contacting support.
               </p>
-            </section>
-          </div>
+            </div>
+          </section>
 
-          <div className="mt-8 rounded-2xl border border-roman-gold/20 bg-roman-gold/10 p-5">
-            <h2 className="text-roman-gold font-semibold text-lg mb-3">Contact and requests</h2>
-            <p className="text-stone-200 text-sm leading-relaxed">
+          <section className="mt-10 border-t border-gray-200 pt-7">
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Contact and Requests</h3>
+            <p className="text-gray-700 text-[15px] leading-relaxed">
               For privacy requests, deletion issues, or data correction, contact support@tuwc.online. Teachers should only upload student information they are authorised to manage.
             </p>
-            <div className="mt-4 flex flex-wrap gap-3">
+            <div className="mt-5 flex flex-wrap gap-3">
               <a
                 href="mailto:support@tuwc.online?subject=Privacy%20Request"
-                className="px-4 py-2 rounded-lg border border-roman-gold/40 text-roman-gold text-xs uppercase tracking-wider font-semibold hover:bg-roman-gold/10 transition-colors"
+                className="px-4 py-2 border border-gray-300 text-gray-700 text-sm hover:text-gray-900 hover:border-gray-500 transition-colors"
+                style={{ fontFamily: "system-ui, sans-serif" }}
               >
-                Email privacy support
+                Email Privacy Support
               </a>
               {appUser && (
                 <button
                   type="button"
                   onClick={handleExportMyData}
                   disabled={exporting}
-                  className="px-4 py-2 rounded-lg bg-roman-gold text-stone-950 text-xs uppercase tracking-wider font-bold hover:bg-roman-gold-light transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="px-4 py-2 border border-gray-700 bg-gray-800 text-white text-sm hover:bg-black transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                  style={{ fontFamily: "system-ui, sans-serif" }}
                 >
-                  {exporting ? "Preparing export..." : "Download my data"}
+                  {exporting ? "Preparing Export..." : "Download My Data"}
                 </button>
               )}
             </div>
             {exportError && (
-              <p className="mt-3 text-red-300 text-sm">{exportError}</p>
+              <p className="mt-3 text-sm text-red-700" style={{ fontFamily: "system-ui, sans-serif" }}>{exportError}</p>
             )}
-          </div>
-        </div>
+          </section>
+        </main>
       </div>
     </div>
   );

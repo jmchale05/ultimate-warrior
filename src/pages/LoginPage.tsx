@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { ButtonSpinner } from "../components/LoadingSpinner";
 import { getAdminAccessCodeStatus, getSchoolByAccessCode } from "../lib/firestore";
+import TeacherSupportModal from "../components/TeacherSupportModal";
 
 type Mode = "signin" | "signup";
 type ConfirmedSignupRole = "teacher" | "admin";
@@ -11,10 +12,12 @@ const PRIVACY_POLICY_VERSION = "2026-05";
 export default function LoginPage() {
   const { signIn, signUp, forgotPassword, currentUser, appUser } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [suffix, setSuffix] = useState("Mr");
   const [accessCode, setAccessCode] = useState("");
@@ -23,6 +26,11 @@ export default function LoginPage() {
   const [confirmedSchoolName, setConfirmedSchoolName] = useState<string | null>(null);
   const [accessCodeConfirmed, setAccessCodeConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [accessCodeError, setAccessCodeError] = useState<string | null>(null);
+  const [displayNameError, setDisplayNameError] = useState<string | null>(null);
+  const [signupConsentError, setSignupConsentError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [confirmingCode, setConfirmingCode] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
@@ -30,6 +38,21 @@ export default function LoginPage() {
   const [resetLoading, setResetLoading] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
   const [resetMessage, setResetMessage] = useState<string | null>(null);
+  const [logoutMessage, setLogoutMessage] = useState<string | null>(null);
+  const [showSupportModal, setShowSupportModal] = useState(false);
+
+  useEffect(() => {
+    const state = location.state as { loggedOut?: boolean } | null;
+    if (!state?.loggedOut) return;
+
+    setLogoutMessage("Signed out successfully.");
+    const clearTimer = window.setTimeout(() => {
+      setLogoutMessage(null);
+    }, 2200);
+
+    navigate(location.pathname, { replace: true, state: null });
+    return () => window.clearTimeout(clearTimer);
+  }, [location.pathname, location.state, navigate]);
 
   // Navigate once Firebase Auth and the Firestore user profile are both ready.
   useEffect(() => {
@@ -41,33 +64,70 @@ export default function LoginPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setEmailError(null);
+    setPasswordError(null);
+    setAccessCodeError(null);
+    setDisplayNameError(null);
+    setSignupConsentError(null);
+
+    const normalizedEmail = email.trim();
+    const normalizedPassword = password.trim();
+    const isEmailFormatValid = /^\S+@\S+\.\S+$/.test(normalizedEmail);
+
+    if (mode === "signup" && !accessCode.trim()) {
+      setAccessCodeError("Access code is required.");
+      setError("Please correct the highlighted fields.");
+      return;
+    }
 
     if (mode === "signup" && !accessCodeConfirmed) {
+      setAccessCodeError("Please confirm your access code before signing up.");
       setError("Please confirm your access code before signing up.");
       return;
     }
 
+    if (mode === "signup" && accessCodeConfirmed && !displayName.trim()) {
+      setDisplayNameError(confirmedSignupRole === "teacher" ? "Last name is required." : "Full name is required.");
+      setError("Please correct the highlighted fields.");
+      return;
+    }
+
     if (mode === "signup" && confirmedSignupRole === "teacher" && !signupConsentChecked) {
+      setSignupConsentError("You must confirm authority and consent to continue.");
       setError("Please confirm you have authority and consent to manage student data.");
       return;
     }
 
-    if (!email.trim()) {
-      setError("Please enter your email address.");
+    if (!normalizedEmail) {
+      setEmailError("Email is required.");
+      setError("Please correct the highlighted fields.");
       return;
     }
 
-    if (!password.trim()) {
-      setError("Please enter your password.");
+    if (!isEmailFormatValid) {
+      setEmailError("Enter a valid email address.");
+      setError("Please correct the highlighted fields.");
+      return;
+    }
+
+    if (!normalizedPassword) {
+      setPasswordError("Password is required.");
+      setError("Please correct the highlighted fields.");
+      return;
+    }
+
+    if (normalizedPassword.length < 6) {
+      setPasswordError("Password must be at least 6 characters.");
+      setError("Please correct the highlighted fields.");
       return;
     }
 
     setLoading(true);
     try {
       if (mode === "signin") {
-        await signIn(email, password);
+        await signIn(normalizedEmail, normalizedPassword);
       } else {
-        await signUp(email, password, displayName, accessCode, PRIVACY_POLICY_VERSION, confirmedSignupRole === "teacher" ? suffix : undefined);
+        await signUp(normalizedEmail, normalizedPassword, displayName, accessCode, PRIVACY_POLICY_VERSION, confirmedSignupRole === "teacher" ? suffix : undefined);
       }
       // Navigation happens via the useEffect above when currentUser updates
     } catch (err: unknown) {
@@ -169,8 +229,20 @@ export default function LoginPage() {
     }
   }
 
+  function openSupportModal() {
+    setShowSupportModal(true);
+  }
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 relative overflow-hidden">
+      {logoutMessage && (
+        <div className="fixed top-5 right-5 z-50 pointer-events-none">
+          <div className="rounded-lg border border-emerald-300/40 bg-emerald-500/15 text-emerald-100 px-4 py-3 shadow-lg backdrop-blur-sm text-sm font-semibold tracking-wide">
+            {logoutMessage}
+          </div>
+        </div>
+      )}
+
       {/* Background image */}
       <div className="absolute inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/BACKGROUND-login.png')" }} />
       {/* Atmospheric corner glows */}
@@ -212,7 +284,7 @@ export default function LoginPage() {
           {mode === "signup" && (
             <div>
               <label className="block text-roman-gold/70 text-xs uppercase tracking-wider mb-1.5 font-semibold">
-                ◆ Access Code
+                ◆ Access Code *
               </label>
               <input
                 type="text"
@@ -228,14 +300,18 @@ export default function LoginPage() {
                 onChange={(e) => {
                   if (accessCodeConfirmed) return;
                   setAccessCode(e.target.value.toUpperCase());
+                  if (accessCodeError) setAccessCodeError(null);
                   setAccessCodeConfirmed(false);
                   setConfirmedSignupRole(null);
                   setConfirmedSchoolName(null);
                 }}
                 disabled={accessCodeConfirmed}
                 placeholder="ABC123"
-                className="roman-input uppercase tracking-[0.3em] disabled:cursor-not-allowed disabled:opacity-70"
+                className={`roman-input uppercase tracking-[0.3em] disabled:cursor-not-allowed disabled:opacity-70 ${accessCodeError ? "border-red-400 focus:border-red-300 focus:ring-red-300/30" : ""}`}
               />
+              {accessCodeError && (
+                <p className="mt-1.5 text-red-400 text-xs">{accessCodeError}</p>
+              )}
               {!accessCodeConfirmed && (
                 <button
                   type="button"
@@ -279,51 +355,91 @@ export default function LoginPage() {
           {mode === "signup" && accessCodeConfirmed && (
             <div>
               <label className="block text-roman-gold/70 text-xs uppercase tracking-wider mb-1.5 font-semibold">
-                ◆ {confirmedSignupRole === "teacher" ? "Last Name" : "Full Name"}
+                ◆ {confirmedSignupRole === "teacher" ? "Last Name" : "Full Name"} *
               </label>
               <input
                 type="text"
                 required
                 value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
+                onChange={(e) => {
+                  setDisplayName(e.target.value);
+                  if (displayNameError) setDisplayNameError(null);
+                }}
                 placeholder={confirmedSignupRole === "teacher" ? "Smith" : "Marcus Aurelius"}
-                className="roman-input"
+                className={`roman-input ${displayNameError ? "border-red-400 focus:border-red-300 focus:ring-red-300/30" : ""}`}
               />
+              {displayNameError && (
+                <p className="mt-1.5 text-red-400 text-xs">{displayNameError}</p>
+              )}
             </div>
           )}
 
           {(mode === "signin" || accessCodeConfirmed) && (
             <div>
               <label className="block text-roman-gold/70 text-xs uppercase tracking-wider mb-1.5 font-semibold">
-                ◆ Email
+                ◆ Email *
               </label>
               <input
                 type="email"
                 required
                 autoComplete="off"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (emailError) setEmailError(null);
+                }}
                 placeholder="your@email.com"
-                className="roman-input"
+                className={`roman-input ${emailError ? "border-red-400 focus:border-red-300 focus:ring-red-300/30" : ""}`}
               />
+              {emailError && (
+                <p className="mt-1.5 text-red-400 text-xs">{emailError}</p>
+              )}
             </div>
           )}
 
           {(mode === "signin" || accessCodeConfirmed) && (
             <div>
               <label className="block text-roman-gold/70 text-xs uppercase tracking-wider mb-1.5 font-semibold">
-                ◆ Password
+                ◆ Password *
               </label>
-              <input
-                type="password"
-                required
-                minLength={6}
-                autoComplete="off"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="roman-input"
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  minLength={6}
+                  autoComplete="off"
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (passwordError) setPasswordError(null);
+                  }}
+                  placeholder="••••••••"
+                  className={`roman-input pr-12 ${passwordError ? "border-red-400 focus:border-red-300 focus:ring-red-300/30" : ""}`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-roman-gold transition-colors"
+                >
+                  {showPassword ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M3 3l18 18" />
+                      <path d="M10.58 10.58a2 2 0 102.83 2.83" />
+                      <path d="M9.88 5.09A9.77 9.77 0 0112 5c5 0 9.27 3.11 11 7-1.05 2.38-2.96 4.31-5.34 5.39" />
+                      <path d="M6.61 6.61C4.62 7.95 3.07 9.82 2 12c1.73 3.89 6 7 10 7 1.49 0 2.93-.33 4.23-.92" />
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+              {passwordError && (
+                <p className="mt-1.5 text-red-400 text-xs">{passwordError}</p>
+              )}
             </div>
           )}
 
@@ -365,22 +481,36 @@ export default function LoginPage() {
           )}
 
           {mode === "signup" && confirmedSignupRole === "teacher" && accessCodeConfirmed && (
-            <label className="flex items-start gap-2.5 text-stone-400 text-xs leading-relaxed border border-stone-700/60 rounded-lg px-3 py-2.5">
+            <label className={`flex items-start gap-2.5 text-stone-400 text-xs leading-relaxed border rounded-lg px-3 py-2.5 ${signupConsentError ? "border-red-400/70" : "border-stone-700/60"}`}>
               <input
                 type="checkbox"
                 checked={signupConsentChecked}
-                onChange={(e) => setSignupConsentChecked(e.target.checked)}
+                onChange={(e) => {
+                  setSignupConsentChecked(e.target.checked);
+                  if (signupConsentError) setSignupConsentError(null);
+                }}
                 className="mt-0.5 accent-roman-gold"
               />
               <span>
-                I confirm I am a staff member with lawful authority to manage student data and have obtained required school/parental consent where needed.
+                <span className="text-roman-gold/80 font-semibold mr-1">*</span>
+                I confirm I am a staff member with lawful authority to manage student data, and I have read and agree to the
+                {" "}
+                <a href="/terms" className="text-roman-gold hover:underline">
+                  Terms and Conditions
+                </a>
+                {" "}
+                and
                 {" "}
                 <a href="/privacy" className="text-roman-gold hover:underline">
-                  Read the privacy notice
+                  Privacy Notice
                 </a>
-                .
+                , including obtaining required school/parental consent where needed.
               </span>
             </label>
+          )}
+
+          {signupConsentError && mode === "signup" && confirmedSignupRole === "teacher" && accessCodeConfirmed && (
+            <p className="text-red-400 text-xs -mt-2">{signupConsentError}</p>
           )}
         </form>
 
@@ -395,7 +525,15 @@ export default function LoginPage() {
                 onClick={() => {
                   setMode("signup");
                   setError(null);
+                  setEmailError(null);
+                  setPasswordError(null);
+                  setAccessCodeError(null);
+                  setDisplayNameError(null);
+                  setSignupConsentError(null);
                   setAccessCode("");
+                  setDisplayName("");
+                  setEmail("");
+                  setPassword("");
                   setSignupConsentChecked(false);
                   setAccessCodeConfirmed(false);
                   setConfirmedSignupRole(null);
@@ -414,6 +552,11 @@ export default function LoginPage() {
                 onClick={() => {
                   setMode("signin");
                   setError(null);
+                  setEmailError(null);
+                  setPasswordError(null);
+                  setAccessCodeError(null);
+                  setDisplayNameError(null);
+                  setSignupConsentError(null);
                 }}
                 className="text-roman-gold hover:text-roman-gold-light hover:underline transition-colors"
               >
@@ -428,6 +571,28 @@ export default function LoginPage() {
           </a>
         </p>
       </div>
+
+      {/* Support Button (Floating) */}
+      <button
+        type="button"
+        onClick={openSupportModal}
+        className="absolute bottom-6 right-6 z-20 flex items-center justify-center gap-2 rounded-full border border-roman-gold/30 bg-stone-900/80 px-4 py-2.5 text-roman-gold text-xs font-semibold uppercase tracking-widest backdrop-blur-sm shadow-[0_0_15px_rgba(212,175,55,0.15)] hover:bg-roman-gold/20 hover:border-roman-gold/60 transition-all hover:scale-105"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+          <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>
+        </svg>
+        Support
+      </button>
+
+      {showSupportModal && (
+        <TeacherSupportModal
+          onClose={() => setShowSupportModal(false)}
+          onOpenTerms={() => {
+            setShowSupportModal(false);
+            navigate("/terms");
+          }}
+        />
+      )}
 
       {showForgotPassword && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

@@ -7,7 +7,7 @@
 
 Ultimate Warrior Challenges ("the App") is a web-based fitness campaign platform for schools. The App processes personal data belonging to teachers and students to administer fitness campaigns, track student progress, manage school access, and handle administrative requests.
 
-**Data Controller:** [Your Organization Name]  
+**Data Controller:** Ultimate Warrior Challenges, pending confirmation of the responsible legal entity  
 **Contact Email:** support@tuwc.online
 
 ---
@@ -70,18 +70,18 @@ We process personal data under the following legal bases:
 
 ### Student Data
 - **Active Students:** Retained while the student is enrolled in the school and actively participating in campaigns.
-- **Inactive Students:** After a student is removed via the App or leaves the school, their profile and results may be retained for up to **12 months** for audit purposes, unless a parent or guardian requests immediate deletion.
-- **Deletion Requests:** When a teacher requests student deletion, an admin must review and approve the request. Once approved, the student profile, results, and associated data are **permanently deleted** within 7 days.
+- **Inactive Students:** After a student is removed via the App or leaves the school, their profile and results are permanently deleted once an approved deletion request is processed.
+- **Deletion Requests:** When a teacher requests student deletion, an admin must review and approve the request. Once approved, the student profile and results are permanently deleted. A minimal audit record of the request and decision is retained only as long as necessary for safeguarding and audit purposes.
 
 ### Teacher/Admin Data
 - **Active Accounts:** Retained while the teacher or admin is employed and using the App.
-- **Inactive Accounts:** After an employee leaves, their account may be retained for up to **24 months** for audit, safeguarding, and regulatory compliance purposes.
+- **Inactive Accounts:** After an employee leaves, any remaining account records are handled manually outside the App in line with safeguarding, audit, and legal obligations.
 
 ### Consent Records
-- Consent timestamps and versions are retained for the duration of the data subject's involvement with the App, plus **24 months** after account closure for regulatory evidence.
+- Consent timestamps and versions are retained for the duration of the data subject's involvement with the App and for an additional period where required for regulatory evidence.
 
 ### Deletion Requests and Admin Notes
-- Deletion request records (including reason, approval status, and reviewer notes) are retained for **24 months** for safeguarding and audit purposes.
+- Minimal deletion audit records (request ID, pseudonymized student reference, requester/reviewer IDs, decision, and timestamps) are retained only as long as necessary for safeguarding and audit purposes.
 
 ---
 
@@ -194,12 +194,12 @@ Contact your school's designated safeguarding lead immediately.
 
 | Data Type | Retention Period | Notes |
 |-----------|------------------|-------|
-| Student Profile | 12 months post-deletion | After approval of deletion request |
-| Student Results | 12 months post-deletion | Deleted with student profile |
-| Teacher Account | 24 months post-termination | For audit and safeguarding |
-| Admin Account | 24 months post-termination | For audit and safeguarding |
-| Consent Records | 24 months post-termination | Evidence of consent |
-| Deletion Requests | 24 months from closure | Safeguarding and audit trail |
+| Student Profile | Immediate deletion on approval | Removed when deletion request is approved |
+| Student Results | Immediate deletion on approval | Deleted with student profile |
+| Teacher Account | Managed manually outside the App | Based on safeguarding, audit, and legal obligations |
+| Admin Account | Managed manually outside the App | Based on safeguarding, audit, and legal obligations |
+| Consent Records | As required for regulatory evidence | Retained only as necessary |
+| Deletion Audit Log | As required for safeguarding and audit | Minimal pseudonymized metadata only |
 | School Record | Indefinite | Schools are not deleted |
 | Access Codes | Indefinite | For account recovery and audit |
 | Campaign Metadata | Indefinite | Campaign progress history |

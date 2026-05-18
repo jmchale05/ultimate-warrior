@@ -47,12 +47,12 @@ This folder contains all the documentation needed for Ultimate Warrior Challenge
 - Retention schedule for each data type (students, teachers, admins, consent records, etc.)
 - Deletion procedures (student-initiated, teacher-initiated, data-subject requests)
 - Backup and disaster recovery retention
-- Compliance monitoring and audit schedule
+- Guidance on retention, deletion, and supporting operational controls
 
-**Automated processes:**
-- Deletion requests approved >7 days ago are automatically executed
-- Accounts inactive >24 months are automatically deleted
-- Deletion request records and consent records are retained for audit
+**Operational processes:**
+- Approved student deletion requests permanently delete student profiles and results when processed
+- Account and audit records are reviewed periodically and removed or anonymized when no longer required
+- Deletion request records are minimized after review and retained only as long as necessary for safeguarding and audit
 
 ---
 
@@ -103,7 +103,7 @@ This folder contains all the documentation needed for Ultimate Warrior Challenge
 
 **Key timelines:**
 - Detect and classify: Immediately
-- Notify internally: Within 24 hours
+- Notify internally: Follow your agreed breach-response process
 - Notify ICO: Within 72 hours
 - Notify data subjects: Without undue delay (72 hours if high risk)
 - Document incident: Within 10 days
@@ -119,13 +119,13 @@ This folder contains all the documentation needed for Ultimate Warrior Challenge
 - Print and track progress
 - Assign owners to each task
 - Use as a project plan for the next 3 months
-- Review quarterly
+- Review periodically
 
 **Key phases:**
 - **Phase 1 (This Week):** Set up Firebase Storage, test the app, finalize documentation
 - **Phase 2 (This Month):** Publish privacy notice, sign school agreements, train staff, document lawful basis
 - **Phase 3 (3 Months):** Formal audit, DPIA, appoint DPO, establish governance committee
-- **Phase 4 (Ongoing):** Quarterly reviews, annual audits, regulatory monitoring
+- **Phase 4 (Ongoing):** Periodic policy review and regulatory monitoring
 
 **Compliance scorecard:**
 - Current status: 3/5 (code complete; organizational/legal pieces pending)
@@ -195,9 +195,9 @@ This folder contains all the documentation needed for Ultimate Warrior Challenge
    - [ ] Document lawful basis for each data type
    - [ ] Establish a governance committee and review schedule
 
-### For Ongoing Compliance (Quarterly and Annual)
+### For Ongoing Compliance
 
-- **Quarterly:** Review deletion request logs, check access logs, update incident register
+- Review deletion request logs and incident records periodically under your internal process
 - **Annual:** Re-run DPIA, update policies if GDPR guidance changes, conduct staff training, test breach response
 
 ### If a Data Breach Occurs

@@ -24,7 +24,13 @@ import type { StudentDeletionRequest } from "../lib/firestore";
 
 const TOTAL_MILES = 78;
 const STUDENT_AUTHORITY_CONSENT_VERSION = "2026-05";
-const YEAR_OPTIONS = ["Year 7", "Year 8", "Year 9", "Year 10", "Year 11"];
+const PRIMARY_YEAR_OPTIONS = ["Year 1", "Year 2", "Year 3", "Year 4", "Year 5", "Year 6"];
+const SECONDARY_YEAR_OPTIONS = ["Year 7", "Year 8", "Year 9", "Year 10", "Year 11"];
+const MAX_SCHOOL_ADDRESS_LENGTH = 120;
+
+function getYearOptionsForSchoolType(schoolType: SchoolType | undefined): string[] {
+  return schoolType === "Primary School" ? PRIMARY_YEAR_OPTIONS : SECONDARY_YEAR_OPTIONS;
+}
 
 interface SchoolStats {
   school: School;
@@ -81,8 +87,10 @@ export default function AdminDashboard() {
   // Delete School modal
   const [showDeleteSchoolModal, setShowDeleteSchoolModal] = useState(false);
   const [schoolToDelete, setSchoolToDelete] = useState<School | null>(null);
+  const [deleteSchoolConfirmText, setDeleteSchoolConfirmText] = useState("");
   const [schoolDeleting, setSchoolDeleting] = useState(false);
   const [openActionsForSchool, setOpenActionsForSchool] = useState<string | null>(null);
+  const [desktopSchoolActionsAnchor, setDesktopSchoolActionsAnchor] = useState<{ top: number; left: number; openUp: boolean } | null>(null);
   const actionsMenuRef = useRef<HTMLDivElement>(null);
 
   // Add Student modal
@@ -192,6 +200,46 @@ export default function AdminDashboard() {
   }, [openActionsForSchool]);
 
   useEffect(() => {
+    if (!openActionsForSchool || !desktopSchoolActionsAnchor) return;
+
+    const handleViewportChange = () => {
+      setOpenActionsForSchool(null);
+      setDesktopSchoolActionsAnchor(null);
+    };
+
+    window.addEventListener("resize", handleViewportChange);
+    window.addEventListener("scroll", handleViewportChange, true);
+    return () => {
+      window.removeEventListener("resize", handleViewportChange);
+      window.removeEventListener("scroll", handleViewportChange, true);
+    };
+  }, [openActionsForSchool, desktopSchoolActionsAnchor]);
+
+  function toggleDesktopSchoolActions(
+    event: React.MouseEvent<HTMLButtonElement>,
+    schoolId: string
+  ) {
+    event.stopPropagation();
+    if (openActionsForSchool === schoolId) {
+      setOpenActionsForSchool(null);
+      setDesktopSchoolActionsAnchor(null);
+      return;
+    }
+
+    const triggerRect = event.currentTarget.getBoundingClientRect();
+    const menuEstimatedHeight = 180;
+    const spacing = 8;
+    const shouldOpenUp = window.innerHeight - triggerRect.bottom < menuEstimatedHeight && triggerRect.top > menuEstimatedHeight;
+
+    setDesktopSchoolActionsAnchor({
+      top: shouldOpenUp ? triggerRect.top - spacing : triggerRect.bottom + spacing,
+      left: triggerRect.right,
+      openUp: shouldOpenUp,
+    });
+    setOpenActionsForSchool(schoolId);
+  }
+
+  useEffect(() => {
     if (!openActionsForSchool) return;
 
     const handleEscape = (event: KeyboardEvent) => {
@@ -206,6 +254,11 @@ export default function AdminDashboard() {
 
   async function handleAddSchool() {
     if (!schoolName.trim()) { setSchoolError("School name is required."); return; }
+    const normalizedAddress = schoolAddress.trim();
+    if (normalizedAddress.length > MAX_SCHOOL_ADDRESS_LENGTH) {
+      setSchoolError(`Address must be ${MAX_SCHOOL_ADDRESS_LENGTH} characters or fewer.`);
+      return;
+    }
     setSchoolSaving(true);
     setSchoolError("");
     try {
@@ -214,13 +267,13 @@ export default function AdminDashboard() {
           schoolToEdit.id,
           schoolName.trim(),
           schoolType,
-          schoolAddress.trim() || undefined
+          normalizedAddress || undefined
         );
       } else {
         await createSchool(
           schoolName.trim(),
           schoolType,
-          schoolAddress.trim() || undefined
+          normalizedAddress || undefined
         );
       }
       setSchoolName("");
@@ -237,6 +290,25 @@ export default function AdminDashboard() {
     }
   }
 
+  function resetSchoolFormState() {
+    setSchoolName("");
+    setSchoolType("Primary School");
+    setSchoolAddress("");
+    setSchoolError("");
+    setIsEditingSchool(false);
+    setSchoolToEdit(null);
+  }
+
+  function handleOpenAddSchool() {
+    resetSchoolFormState();
+    setShowAddSchool(true);
+  }
+
+  function handleCloseAddSchool() {
+    resetSchoolFormState();
+    setShowAddSchool(false);
+  }
+
   function handleOpenEditSchool(school: School) {
     setSchoolName(school.name);
     setSchoolType(school.schoolType || "Secondary School");
@@ -248,13 +320,26 @@ export default function AdminDashboard() {
     setOpenActionsForSchool(null);
   }
 
+  function handleOpenDeleteSchoolModal(school: School) {
+    setSchoolToDelete(school);
+    setDeleteSchoolConfirmText("");
+    setShowDeleteSchoolModal(true);
+    setOpenActionsForSchool(null);
+  }
+
+  function handleCloseDeleteSchoolModal() {
+    if (schoolDeleting) return;
+    setShowDeleteSchoolModal(false);
+    setSchoolToDelete(null);
+    setDeleteSchoolConfirmText("");
+  }
+
   async function handleDeleteSchool() {
-    if (!schoolToDelete) return;
+    if (!schoolToDelete || deleteSchoolConfirmText.trim() !== "DELETE") return;
     setSchoolDeleting(true);
     try {
       await deleteSchool(schoolToDelete.id);
-      setShowDeleteSchoolModal(false);
-      setSchoolToDelete(null);
+      handleCloseDeleteSchoolModal();
       await loadData();
     } catch {
       alert("Failed to delete school. Try again.");
@@ -267,6 +352,13 @@ export default function AdminDashboard() {
     if (!studentName.trim()) { setStudentError("Name is required."); return; }
     if (!studentSchoolId) { setStudentError("Select a school."); return; }
     if (!studentClassId) { setStudentError("Select a year."); return; }
+
+    const selectedSchool = schoolStats.find((s) => s.school.id === studentSchoolId)?.school;
+    const validYearsForSchool = getYearOptionsForSchoolType(selectedSchool?.schoolType);
+    if (!validYearsForSchool.includes(studentClassId)) {
+      setStudentError("Select a valid year for this school type.");
+      return;
+    }
 
     const schoolStat = schoolStats.find((s) => s.school.id === studentSchoolId);
     const selectedYear = studentClassId;
@@ -302,8 +394,8 @@ export default function AdminDashboard() {
       const createdStudentName = studentName.trim();
       setStudentName(""); setStudentRomanNickname(""); setStudentAge(""); setStudentSchoolId(""); setStudentClassId("");
       setShowAddStudent(false);
-      setStudentSuccessToast(`${createdStudentName} added successfully.`);
       await loadData();
+      setStudentSuccessToast(`${createdStudentName} added successfully.`);
     } catch {
       setStudentError("Failed to add student. Try again.");
     } finally {
@@ -329,7 +421,8 @@ export default function AdminDashboard() {
     try {
       await approveStudentDeletionRequest(requestId, appUser?.uid);
       setStudentSuccessToast("Deletion request approved.");
-      await loadData();
+      // Dynamically remove the approved request from the UI
+      setDeletionRequests((prev) => prev.filter((req) => req.id !== requestId));
     } catch (err) {
       console.error("Failed to approve deletion request:", err);
       setDeletionRequestError("Failed to approve request. Please try again.");
@@ -385,6 +478,8 @@ export default function AdminDashboard() {
   const totalMilesAll = allResults.reduce((s, r) => s + r.distanceMiles, 0);
   const totalSchools = schoolStats.length;
   const totalPendingDeletionRequests = deletionRequests.length;
+  const selectedStudentSchool = schoolStats.find((s) => s.school.id === studentSchoolId)?.school;
+  const selectedStudentYearOptions = getYearOptionsForSchoolType(selectedStudentSchool?.schoolType);
 
   const deletionRequestsWithContext = useMemo(() => {
     return [...deletionRequests]
@@ -457,9 +552,9 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      <div className="flex-1 min-h-0 w-full px-12 py-14 overflow-y-auto overflow-x-hidden">
+      <div className="flex-1 min-h-0 w-full px-4 py-8 overflow-y-auto overflow-x-hidden sm:px-6 lg:px-10 xl:px-12 xl:py-14">
         {/* Global stat cards */}
-        <div className="grid grid-cols-4 gap-4 mb-10">
+        <div className="grid grid-cols-1 gap-4 mb-10 sm:grid-cols-2 xl:grid-cols-4">
           {[
             { label: "Schools", value: totalSchools, icon: "🏛" },
             { label: "Teachers", value: totalTeachers, icon: "⚔" },
@@ -560,15 +655,40 @@ export default function AdminDashboard() {
             <h2 className="text-roman-gold/70 text-base uppercase tracking-[0.2em] font-semibold mb-4">
               Schools
             </h2>
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <input
-                  type="text"
-                  value={schoolSearch}
-                  onChange={(e) => setSchoolSearch(e.target.value)}
-                  placeholder="Search school name or address"
-                  className="min-w-[18rem] flex-1 max-w-md bg-stone-800 border border-stone-700 rounded-lg px-5 py-3.5 text-base text-stone-100 placeholder-stone-500 focus:outline-none focus:border-roman-gold/60 transition-colors"
-                />
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="relative w-full sm:min-w-72 sm:flex-1 sm:max-w-md">
+                  <input
+                    type="text"
+                    value={schoolSearch}
+                    onChange={(e) => setSchoolSearch(e.target.value)}
+                    placeholder="Search school name or address"
+                    className="w-full bg-stone-800 border border-stone-700 rounded-lg px-5 py-3.5 pr-12 text-base text-stone-100 placeholder-stone-500 focus:outline-none focus:border-roman-gold/60 transition-colors"
+                  />
+                  {schoolSearch.trim() && (
+                    <button
+                      type="button"
+                      onClick={() => setSchoolSearch("")}
+                      aria-label="Clear school search"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-md text-stone-400 hover:text-roman-gold hover:bg-stone-700/50 transition-colors flex items-center justify-center"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="w-4 h-4"
+                        aria-hidden="true"
+                      >
+                        <path d="M18 6 6 18" />
+                        <path d="m6 6 12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
                 <select
                   value={schoolSort}
                   onChange={(e) => setSchoolSort(e.target.value as "miles" | "name" | "students")}
@@ -579,7 +699,7 @@ export default function AdminDashboard() {
                   <option value="name">Sort: School Name</option>
                 </select>
               </div>
-              <div className="flex gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:flex">
                 <button
                   onClick={handleOpenAddStudent}
                   className="px-5 py-3 rounded-lg border border-roman-gold/40 text-roman-gold text-sm uppercase tracking-wider font-semibold hover:bg-roman-gold/10 transition-colors"
@@ -587,7 +707,7 @@ export default function AdminDashboard() {
                   + Add Student
                 </button>
                 <button
-                  onClick={() => { setShowAddSchool(true); setSchoolError(""); }}
+                  onClick={handleOpenAddSchool}
                   className="px-5 py-3 rounded-lg bg-roman-gold/20 border border-roman-gold/50 text-roman-gold text-sm uppercase tracking-wider font-semibold hover:bg-roman-gold/30 transition-colors"
                 >
                   + Add School
@@ -595,27 +715,185 @@ export default function AdminDashboard() {
               </div>
             </div>
           </div>
-          <div className="rounded-xl border border-stone-700/50">
-            <table className="w-full table-fixed text-left">
+          <div className="space-y-4 xl:hidden">
+            {filteredSchoolStats.length === 0 ? (
+              <div className="rounded-xl border border-stone-700/50 bg-stone-900/50 px-6 py-12 text-center text-stone-500 text-lg">
+                <p>{schoolStats.length === 0 ? "No schools found." : "No schools match your search."}</p>
+                {schoolStats.length === 0 && (
+                  <button
+                    type="button"
+                    onClick={handleOpenAddSchool}
+                    className="mt-5 px-5 py-3 rounded-lg bg-roman-gold/20 border border-roman-gold/50 text-roman-gold text-sm uppercase tracking-wider font-semibold hover:bg-roman-gold/30 transition-colors"
+                  >
+                    + Add School
+                  </button>
+                )}
+              </div>
+            ) : (
+              filteredSchoolStats.map((s) => {
+                const teacherStartCandidates = s.teachers
+                  .map((t) => t.createdAt)
+                  .filter((ts) => Number.isFinite(ts));
+                const firstTeacherStart = teacherStartCandidates.length > 0
+                  ? Math.min(...teacherStartCandidates)
+                  : undefined;
+                const campaignStart = s.school.campaignStartAt ?? firstTeacherStart ?? s.school.createdAt;
+                const dayCount = Math.min(200, calculateBusinessDays(campaignStart));
+
+                return (
+                  <div key={s.school.id} className="rounded-xl border border-stone-700/50 bg-stone-900/50 p-4 shadow-[0_8px_32px_rgba(0,0,0,0.25)] sm:p-5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h3 className="wrap-break-word text-xl font-semibold text-stone-100">{s.school.name}</h3>
+                        <p className="text-roman-gold/75 text-xs mt-1 uppercase tracking-wider font-semibold">
+                          {s.school.schoolType ?? "School Type Not Set"}
+                        </p>
+                        {s.school.address && (
+                          <p className="mt-2 wrap-break-word text-stone-500 text-sm leading-snug">{s.school.address}</p>
+                        )}
+                      </div>
+                      <div className="relative shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenActionsForSchool((current) => current === s.school.id ? null : s.school.id);
+                          }}
+                          className={`w-10 h-10 rounded-lg border text-xl leading-none transition-colors ${openActionsForSchool === s.school.id ? "border-roman-gold bg-roman-gold/15 text-roman-gold" : "border-roman-gold/40 text-roman-gold hover:bg-roman-gold/10"}`}
+                          aria-label="Open school actions"
+                          aria-haspopup="menu"
+                          aria-expanded={openActionsForSchool === s.school.id}
+                          aria-controls={`school-card-actions-${s.school.id}`}
+                        >
+                          ⋮
+                        </button>
+                        {openActionsForSchool === s.school.id && (
+                          <div
+                            ref={actionsMenuRef}
+                            id={`school-card-actions-${s.school.id}`}
+                            role="menu"
+                            className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-44 rounded-xl border border-roman-gold/25 bg-stone-950/95 shadow-[0_16px_40px_rgba(0,0,0,0.55)] backdrop-blur-md overflow-hidden origin-top-right"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div className="px-3 py-2 border-b border-stone-800/80 text-[11px] uppercase tracking-wider text-stone-500 text-left">
+                              School Actions
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleOpenEditSchool(s.school);
+                              }}
+                              role="menuitem"
+                              className="w-full text-left px-3 py-2.5 text-stone-200 text-sm hover:bg-stone-800/80 transition-colors flex items-center justify-between"
+                            >
+                              <span>Edit</span>
+                              <span className="text-stone-500">✎</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleOpenDeleteSchoolModal(s.school);
+                              }}
+                              role="menuitem"
+                              className="w-full text-left px-3 py-2.5 text-red-400 text-sm hover:bg-red-500/10 transition-colors flex items-center justify-between"
+                            >
+                              <span>Delete</span>
+                              <span className="text-stone-500">✕</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      <div className="rounded-lg border border-stone-800 bg-stone-950/50 px-3 py-2">
+                        <p className="text-[11px] uppercase tracking-wider text-stone-500">Access Code</p>
+                        <button
+                          type="button"
+                          onClick={() => void handleCopyAccessCode(s.school.id, s.school.accessCode)}
+                          className="mt-1 font-mono text-base tracking-wider text-stone-200 hover:text-roman-gold transition-colors"
+                          title="Click to copy access code"
+                        >
+                          {s.school.accessCode}
+                        </button>
+                      </div>
+                      <div className="rounded-lg border border-stone-800 bg-stone-950/50 px-3 py-2">
+                        <p className="text-[11px] uppercase tracking-wider text-stone-500">Days</p>
+                        <p className="mt-1 text-base font-semibold text-roman-gold">{dayCount}/200</p>
+                      </div>
+                      <div className="rounded-lg border border-stone-800 bg-stone-950/50 px-3 py-2">
+                        <p className="text-[11px] uppercase tracking-wider text-stone-500">People</p>
+                        <p className="mt-1 text-base text-stone-300">{s.teachers.length}T / {s.students.length}S</p>
+                      </div>
+                      <div className="rounded-lg border border-stone-800 bg-stone-950/50 px-3 py-2">
+                        <p className="text-[11px] uppercase tracking-wider text-stone-500">Miles</p>
+                        <p className="mt-1 text-base font-semibold text-roman-gold">{s.totalMiles.toFixed(1)}</p>
+                      </div>
+                      <div className="rounded-lg border border-stone-800 bg-stone-950/50 px-3 py-2">
+                        <p className="text-[11px] uppercase tracking-wider text-stone-500">Classes</p>
+                        <p className="mt-1 text-base text-stone-300">{s.classes.length}</p>
+                      </div>
+                      <div className="rounded-lg border border-stone-800 bg-stone-950/50 px-3 py-2">
+                        <p className="text-[11px] uppercase tracking-wider text-stone-500">Avg Miles</p>
+                        <p className="mt-1 text-base text-stone-300">{s.avgMiles.toFixed(1)}</p>
+                      </div>
+                      <div className="rounded-lg border border-stone-800 bg-stone-950/50 px-3 py-2 sm:col-span-2">
+                        <p className="text-[11px] uppercase tracking-wider text-stone-500">Completed</p>
+                        <p className="mt-1 text-base text-stone-300">
+                          <span className="font-semibold text-roman-gold">{s.completedStudents}</span>
+                          <span className="text-stone-500"> / {s.students.length}</span>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          <div className="hidden overflow-visible rounded-xl border border-stone-700/50 xl:block">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-336 table-fixed text-left">
+              <colgroup>
+                <col className="w-[24%]" />
+                <col className="w-[12%]" />
+                <col className="w-[8%]" />
+                <col className="w-[7%]" />
+                <col className="w-[8%]" />
+                <col className="w-[8%]" />
+                <col className="w-[10%]" />
+                <col className="w-[9%]" />
+                <col className="w-[7%]" />
+                <col className="w-[7%]" />
+              </colgroup>
               <thead>
                 <tr className="bg-stone-800/80 border-b border-stone-700/50">
-                  <th className="px-6 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold w-[20%]">School</th>
-                  <th className="px-6 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold w-[12%]">Access Code</th>
-                  <th className="px-6 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold w-[8%] text-center">Days</th>
-                  <th className="px-6 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold w-[7%] text-center">Classes</th>
-                  <th className="px-6 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold w-[8%] text-center">Teachers</th>
-                  <th className="px-6 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold w-[8%] text-center">Students</th>
-                  <th className="px-6 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold w-[10%] text-center">Total Miles</th>
-                  <th className="px-6 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold w-[10%] text-center">Avg Miles</th>
-                  <th className="px-6 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold w-[7%] text-center">Completed</th>
-                  <th className="px-6 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold w-[6%] text-center">Actions</th>
+                  <th className="px-6 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold">School</th>
+                  <th className="px-6 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold">Access Code</th>
+                  <th className="px-6 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold text-center">Days</th>
+                  <th className="px-6 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold text-center">Classes</th>
+                  <th className="px-6 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold text-center">Teachers</th>
+                  <th className="px-6 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold text-center">Students</th>
+                  <th className="px-6 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold text-center">Total Miles</th>
+                  <th className="px-6 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold text-center">Avg Miles</th>
+                  <th className="px-6 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold text-center">Completed</th>
+                  <th className="px-6 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold text-center">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredSchoolStats.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-6 py-12 text-center text-stone-500 text-lg">
-                      {schoolStats.length === 0 ? "No schools found." : "No schools match your search."}
+                    <td colSpan={10} className="px-6 py-12 text-center text-stone-500 text-lg">
+                      <p>{schoolStats.length === 0 ? "No schools found." : "No schools match your search."}</p>
+                      {schoolStats.length === 0 && (
+                        <button
+                          type="button"
+                          onClick={handleOpenAddSchool}
+                          className="mt-5 px-5 py-3 rounded-lg bg-roman-gold/20 border border-roman-gold/50 text-roman-gold text-sm uppercase tracking-wider font-semibold hover:bg-roman-gold/30 transition-colors"
+                        >
+                          + Add School
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ) : (
@@ -635,8 +913,11 @@ export default function AdminDashboard() {
                       >
                         <td className="px-6 py-6 font-medium text-stone-100 text-xl">
                           {s.school.name}
+                          <p className="text-roman-gold/75 text-xs mt-1 uppercase tracking-wider font-semibold">
+                            {s.school.schoolType ?? "School Type Not Set"}
+                          </p>
                           {s.school.address && (
-                            <p className="text-stone-500 text-sm mt-1">{s.school.address}</p>
+                            <p className="mt-1 max-w-full wrap-break-word text-stone-500 text-sm leading-snug">{s.school.address}</p>
                           )}
                         </td>
                         <td className="px-6 py-6">
@@ -670,13 +951,10 @@ export default function AdminDashboard() {
                           <span className="text-stone-500 text-sm ml-1">/ {s.students.length}</span>
                         </td>
                         <td className="px-6 py-6 text-center">
-                          <div className="relative inline-flex">
+                          <div className={`relative inline-flex ${openActionsForSchool === s.school.id ? "z-50" : "z-0"}`}>
                             <button
                               type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setOpenActionsForSchool((current) => current === s.school.id ? null : s.school.id);
-                              }}
+                              onClick={(e) => toggleDesktopSchoolActions(e, s.school.id)}
                               className={`w-10 h-10 rounded-lg border text-xl leading-none transition-colors ${openActionsForSchool === s.school.id ? "border-roman-gold bg-roman-gold/15 text-roman-gold" : "border-roman-gold/40 text-roman-gold hover:bg-roman-gold/10"}`}
                               aria-label="Open school actions"
                               aria-haspopup="menu"
@@ -685,12 +963,13 @@ export default function AdminDashboard() {
                             >
                               ⋮
                             </button>
-                            {openActionsForSchool === s.school.id && (
+                            {openActionsForSchool === s.school.id && desktopSchoolActionsAnchor && (
                               <div
                                 ref={actionsMenuRef}
                                 id={`school-actions-${s.school.id}`}
                                 role="menu"
-                                className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-44 rounded-xl border border-roman-gold/25 bg-stone-950/95 shadow-[0_16px_40px_rgba(0,0,0,0.55)] backdrop-blur-md overflow-hidden origin-top-right"
+                                className={`fixed z-[70] w-44 rounded-xl border border-roman-gold/25 bg-stone-950/95 shadow-[0_16px_40px_rgba(0,0,0,0.55)] backdrop-blur-md overflow-hidden -translate-x-full ${desktopSchoolActionsAnchor.openUp ? "-translate-y-full origin-bottom-right" : "origin-top-right"}`}
+                                style={{ top: `${desktopSchoolActionsAnchor.top}px`, left: `${desktopSchoolActionsAnchor.left}px` }}
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 <div className="px-3 py-2 border-b border-stone-800/80 text-[11px] uppercase tracking-wider text-stone-500 text-left">
@@ -710,9 +989,7 @@ export default function AdminDashboard() {
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    setSchoolToDelete(s.school);
-                                    setShowDeleteSchoolModal(true);
-                                    setOpenActionsForSchool(null);
+                                    handleOpenDeleteSchoolModal(s.school);
                                   }}
                                   role="menuitem"
                                   className="w-full text-left px-3 py-2.5 text-red-400 text-sm hover:bg-red-500/10 transition-colors flex items-center justify-between"
@@ -730,6 +1007,7 @@ export default function AdminDashboard() {
                 )}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       </div>
@@ -737,7 +1015,7 @@ export default function AdminDashboard() {
       {/* Add School Modal */}
       {showAddSchool && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-stone-950/80 backdrop-blur-sm" onClick={() => setShowAddSchool(false)} />
+          <div className="absolute inset-0 bg-stone-950/80 backdrop-blur-sm" onClick={handleCloseAddSchool} />
           <div className="relative bg-stone-900 border border-roman-gold/20 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
             <div className="h-px w-full bg-linear-to-r from-transparent via-roman-gold/50 to-transparent" />
             <div className="px-8 py-8">
@@ -770,15 +1048,19 @@ export default function AdminDashboard() {
                     type="text"
                     value={schoolAddress}
                     onChange={(e) => setSchoolAddress(e.target.value)}
+                    maxLength={MAX_SCHOOL_ADDRESS_LENGTH}
                     placeholder="e.g. 123 Main St, Dublin"
                     className="w-full bg-stone-800 border border-stone-700 rounded-lg px-4 py-3 text-stone-100 placeholder-stone-600 focus:outline-none focus:border-roman-gold/60 transition-colors"
                   />
+                  <p className="mt-1 text-right text-[11px] text-stone-500">
+                    {schoolAddress.length}/{MAX_SCHOOL_ADDRESS_LENGTH}
+                  </p>
                 </div>
                 {schoolError && <p className="text-red-400 text-sm">{schoolError}</p>}
               </div>
               <div className="flex gap-3 mt-8">
                 <button
-                  onClick={() => { setShowAddSchool(false); setSchoolError(""); setIsEditingSchool(false); setSchoolToEdit(null); }}
+                  onClick={handleCloseAddSchool}
                   className="flex-1 py-3 rounded-xl border border-stone-700 text-stone-400 hover:text-stone-200 hover:border-stone-500 transition-all"
                 >
                   Cancel
@@ -799,22 +1081,39 @@ export default function AdminDashboard() {
       {/* Delete School Modal */}
       {showDeleteSchoolModal && schoolToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-stone-950/80 backdrop-blur-sm" onClick={() => setShowDeleteSchoolModal(false)} />
+          <div className="absolute inset-0 bg-stone-950/80 backdrop-blur-sm" onClick={handleCloseDeleteSchoolModal} />
           <div className="relative bg-stone-900 border border-red-500/30 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
             <div className="h-px w-full bg-linear-to-r from-transparent via-red-500/50 to-transparent" />
             <div className="px-8 py-8">
               <h2 className="text-red-400 font-serif text-2xl font-bold mb-4 tracking-wide">Delete School?</h2>
-              <p className="text-stone-300 mb-6">Are you sure you want to delete <span className="font-semibold text-stone-100">{schoolToDelete.name}</span>? This action cannot be undone.</p>
+              <p className="text-stone-300 mb-3">
+                You are about to permanently delete <span className="font-semibold text-stone-100">{schoolToDelete.name}</span>.
+              </p>
+              <p className="text-stone-400 text-sm leading-relaxed mb-6">
+                This will also remove all linked classes, users, student results, and deletion requests for this school. This action cannot be undone.
+              </p>
+
+              <div className="mb-6">
+                <label className="block text-stone-400 text-xs uppercase tracking-widest mb-2">Type DELETE to confirm</label>
+                <input
+                  type="text"
+                  value={deleteSchoolConfirmText}
+                  onChange={(e) => setDeleteSchoolConfirmText(e.target.value.toUpperCase())}
+                  placeholder="DELETE"
+                  className="w-full bg-stone-800 border border-stone-700 rounded-lg px-4 py-3 text-stone-100 placeholder-stone-600 focus:outline-none focus:border-red-400/70 transition-colors"
+                />
+              </div>
+
               <div className="flex gap-3 mt-8">
                 <button
-                  onClick={() => { setShowDeleteSchoolModal(false); setSchoolToDelete(null); }}
+                  onClick={handleCloseDeleteSchoolModal}
                   className="flex-1 py-3 rounded-xl border border-stone-700 text-stone-400 hover:text-stone-200 hover:border-stone-500 transition-all"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleDeleteSchool}
-                  disabled={schoolDeleting}
+                  disabled={schoolDeleting || deleteSchoolConfirmText.trim() !== "DELETE"}
                   className="flex-1 py-3 rounded-xl bg-red-500/20 border border-red-500/50 text-red-400 font-semibold hover:bg-red-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {schoolDeleting ? "Deleting..." : "Delete School"}
@@ -888,7 +1187,7 @@ export default function AdminDashboard() {
                       className="w-full bg-stone-800 border border-stone-700 rounded-lg px-4 py-3 text-stone-100 focus:outline-none focus:border-roman-gold/60 transition-colors"
                     >
                       <option value="">Select year...</option>
-                      {YEAR_OPTIONS.map((year) => (
+                      {selectedStudentYearOptions.map((year) => (
                         <option key={year} value={year}>{year}</option>
                       ))}
                     </select>

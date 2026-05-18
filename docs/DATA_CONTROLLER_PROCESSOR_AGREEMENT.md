@@ -15,7 +15,7 @@ Contact: ___________________________________
 Role: School (responsible for lawful basis and parental consent)
 
 **Data Processor (App Provider):**  
-Name: [Your Organization Name]  
+Name: Ultimate Warrior Challenges, pending confirmation of the responsible legal entity  
 Address: [Your Address]  
 Contact: support@tuwc.online  
 Role: App provider (executes deletion and data handling on school direction)
@@ -57,7 +57,7 @@ This agreement clarifies roles and responsibilities between the school (data con
 ### Frequency and Duration
 
 - **Frequency:** Continuous (students/teachers log data daily during school year)
-- **Duration:** While enrolled/employed + 12–24 months post-termination (per data retention policy)
+- **Duration:** While enrolled/employed and then only as long as required by safeguarding, legal, audit, or regulatory obligations (per data retention policy)
 
 ---
 
@@ -100,7 +100,7 @@ The school processes personal data for the following purposes:
 - [ ] Store data in encrypted form on Firebase infrastructure
 - [ ] Restrict data access by role (teachers see school data only; admins see all; students see own data)
 - [ ] Execute deletion requests only upon school authorization
-- [ ] Maintain deletion request audit trail for 24 months
+- [ ] Minimize deletion request records after review and retain audit metadata only as long as necessary
 - [ ] Provide data export on request (for subject-access requests)
 - [ ] Notify school of suspected breaches within 24 hours
 - [ ] Respond to data-subject requests within 30 days of school referral
@@ -131,12 +131,12 @@ Both parties commit to supporting data-subject rights under GDPR:
 - **Process:** 
   1. Data subject emails school or uses app's "Download my data" feature
   2. If email request, school forwards to app provider
-  3. App provider compiles and exports within 5 days
+  3. App provider compiles and exports within the timeframe agreed with the school
   4. School delivers to data subject within 30 days
 
 ### Right of Rectification (Correction)
 
-- **Timeline:** School authorizes correction; app provider updates within 5 days
+- **Timeline:** School authorizes correction; app provider updates within the timeframe agreed with the school
 - **Process:**
   1. Data subject or teacher requests correction
   2. School authorizes the correction
@@ -150,12 +150,12 @@ Both parties commit to supporting data-subject rights under GDPR:
   1. Teacher/school initiates deletion request in app
   2. Admin (school representative) reviews and approves/rejects
   3. If approved, app provider executes deletion within 7 days
-  4. Deletion request record retained for 24 months for safeguarding
+  4. Deletion request record is minimized after review and retained only as long as necessary for safeguarding and audit
 - **Exceptions:** Data may not be deleted if required by law, ongoing investigation, or safeguarding hold
 
 ### Right to Restrict Processing
 
-- **Timeline:** School authorizes; app provider implements within 5 days
+- **Timeline:** School authorizes; app provider implements within the timeframe agreed with the school
 - **Process:**
   1. Data subject requests restriction
   2. School authorizes restriction
@@ -179,11 +179,11 @@ The parties agree to the following retention schedule:
 | Data Type | Retention Period | Deletion Trigger |
 |---|---|---|
 | Active student profile | During enrollment | School requests deletion via app; admin approves |
-| Student results | 12 months post-deletion | Automatic deletion after 12 months |
-| Teacher account | 24 months post-termination | Automatic deletion after 24 months |
-| Admin account | 24 months post-termination | Automatic deletion after 24 months |
-| Deletion request records | 24 months | Automatic deletion after 24 months |
-| Consent records | 24 months post-termination | Automatic deletion after 24 months |
+| Student results | During enrollment | Deleted when approved deletion request is processed |
+| Teacher account | Managed manually outside the App | According to controller instructions and legal obligations |
+| Admin account | Managed manually outside the App | According to controller instructions and legal obligations |
+| Deletion request records | As required for safeguarding and audit | Minimized after review |
+| Consent records | As required for lawful-basis evidence | Managed according to controller instructions |
 | School record | Indefinite | Unless school closure (rare, requires written authorization) |
 
 **Important:** School may request early deletion of data at any time. App provider will honor requests within 7 days (unless a legal hold or safeguarding investigation prevents deletion).
@@ -199,11 +199,11 @@ The app provider commits to:
 - **Access Control:** 
   - Teachers access only their school's data
   - Students access only their own data
-  - Admins access all data with audit logging
+  - Admins access all data under role-based permissions
   - Role-based security rules enforced in Firestore
 - **Authentication:** Multi-factor authentication (MFA) recommended for admins
-- **Backup:** Encrypted backups retained for 30 days (incremental) and 24 months (full)
-- **Monitoring:** Access logs reviewed for suspicious activity
+- **Backup:** Encrypted backups retained according to the agreed backup and disaster recovery policy
+- **Monitoring:** Monitoring and log review are handled according to the agreed operational security process
 - **Updates:** Firebase, dependencies, and security patches updated regularly
 
 The school commits to:
@@ -307,7 +307,7 @@ App provider may terminate if:
 
 ### Data After Termination
 
-- Deletion request records, audit logs, and consent records are retained for 24 months
+- Deletion request records, audit logs, and consent records are minimized and retained only as long as necessary
 - School may request export of remaining data within 30 days of termination
 - Remaining data is deleted per the retention schedule
 
@@ -373,7 +373,7 @@ Signature: ___________________________________
 **Authorized Signatory:**  
 Name: ___________________________________  
 Title: ___________________________________  
-Organization: [Your Organization Name]  
+Organization: Ultimate Warrior Challenges, pending confirmation of the responsible legal entity  
 Date: ___________________________________  
 Signature: ___________________________________
 

@@ -1,11 +1,9 @@
-import { useEffect, useState } from "react";
 import {
   BrowserRouter,
   Routes,
   Route,
   Navigate,
   Outlet,
-  useLocation,
 } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { FullPageLoader } from "./components/LoadingSpinner";
@@ -16,17 +14,20 @@ import Oracle from "./pages/Oracle";
 import StudentCampaign from "./pages/StudentCampaign";
 import AdminDashboard from "./pages/AdminDashboard";
 import PrivacyPage from "./pages/PrivacyPage";
+import DownloadPage from "./pages/DownloadPage";
+import TermsConditionsPage from "./pages/TermsConditionsPage";
 
-const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+
 
 function RootRedirect() {
   return <Navigate to="/login" replace />;
 }
 
 function FallbackRoute() {
-  if (isTauri) return <Navigate to="/login" replace />;
-  return <Navigate to="/" replace />;
+  return <Navigate to="/login" replace />;
 }
+
+
 
 function PrivateRoute() {
   const { currentUser, appUser, loading } = useAuth();
@@ -36,7 +37,7 @@ function PrivateRoute() {
   }
 
   if (!currentUser) return <Navigate to="/login" replace />;
-  if (!appUser) return <FullPageLoader />;
+  if (!appUser) return <Navigate to="/login" replace />;
   return <Outlet />;
 }
 
@@ -52,66 +53,37 @@ function CampaignsRoute() {
   const { appUser, loading } = useAuth();
 
   if (loading) return <FullPageLoader />;
-  if (!appUser) return <FullPageLoader />;
+  if (!appUser) return <Navigate to="/login" replace />;
   if (appUser.role === "admin") return <Navigate to="/admin" replace />;
   return <Outlet />;
 }
 
-function MobileBlock() {
-  const location = useLocation();
-  const [isMobile, setIsMobile] = useState(false);
-  const isPublicLanding = location.pathname === "/";
 
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 1024);
-    check();
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
-  }, []);
-
-  if (!isMobile || isPublicLanding) return null;
-
-  return (
-    <div className="fixed inset-0 z-9999 bg-stone-950 flex flex-col items-center justify-center text-center px-8 gap-6">
-      <img
-        src="/ultimate-warrior.png"
-        alt="Ultimate Warrior"
-        className="w-28 h-28 object-contain drop-shadow-lg"
-      />
-      <h1 className="text-3xl font-bold text-roman-gold" style={{ fontFamily: "serif" }}>
-        Desktop Only
-      </h1>
-      <p className="text-stone-300 text-lg leading-relaxed max-w-xs">
-        Ultimate Warrior Challenges is designed for desktop use only. Please open this site on a computer or laptop.
-      </p>
-      <div className="text-4xl">🖥️⚔️</div>
-    </div>
-  );
-}
 
 export default function App() {
   return (
     <BrowserRouter>
-      <MobileBlock />
       <AuthProvider>
-          <Routes>
-            <Route path="/" element={<RootRedirect />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/privacy" element={<PrivacyPage />} />
-            <Route path="/mobile-login" element={<Navigate to="/login" replace />} />
-            <Route path="/mobile-campaigns" element={<MobileCampaigns />} />
-            <Route element={<PrivateRoute />}>
-              <Route element={<CampaignsRoute />}>
-                <Route path="/campaigns" element={<Campaigns />} />
-                <Route path="/campaigns/:uid" element={<StudentCampaign />} />
-              </Route>
-              <Route path="/oracle" element={<Oracle />} />
-              <Route element={<AdminRoute />}>
-                <Route path="/admin" element={<AdminDashboard />} />
-              </Route>
+        <Routes>
+          <Route path="/" element={<RootRedirect />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/terms" element={<TermsConditionsPage />} />
+          <Route path="/download" element={<DownloadPage />} />
+          <Route path="/mobile-login" element={<Navigate to="/login" replace />} />
+          <Route path="/mobile-campaigns" element={<MobileCampaigns />} />
+          <Route element={<PrivateRoute />}>
+            <Route element={<CampaignsRoute />}>
+              <Route path="/campaigns" element={<Campaigns />} />
+              <Route path="/campaigns/:uid" element={<StudentCampaign />} />
             </Route>
-            <Route path="*" element={<FallbackRoute />} />
-          </Routes>
+            <Route path="/oracle" element={<Oracle />} />
+            <Route element={<AdminRoute />}>
+              <Route path="/admin" element={<AdminDashboard />} />
+            </Route>
+          </Route>
+          <Route path="*" element={<FallbackRoute />} />
+        </Routes>
       </AuthProvider>
     </BrowserRouter>
   );

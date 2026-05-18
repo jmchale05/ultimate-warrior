@@ -15,6 +15,7 @@ import {
   updateStudentProfileAndClass,
   createStudentDeletionRequestAndNotifyAdmins,
   getPendingStudentDeletionRequestIds,
+  removePendingStudentDeletionRequest,
   updateUserPhoto,
   recordStudentAuthorityConsent,
 } from "../lib/firestore";
@@ -50,8 +51,22 @@ function getCampaignInfo(miles: number) {
     if (miles >= c.minMiles) current = c;
     else break;
   }
+
+  let completedCampaigns = 0;
+  for (let index = 0; index < CAMPAIGNS.length; index += 1) {
+    const completionMiles = index < CAMPAIGNS.length - 1 ? CAMPAIGNS[index + 1].minMiles : 78;
+    if (miles >= completionMiles) {
+      completedCampaigns += 1;
+    }
+  }
+
   const totalProgress = Math.min(100, Math.round((miles / 78) * 100));
-  return { campaignNumber: current.number, campaignName: current.name, campaignProgress: totalProgress };
+  return {
+    campaignNumber: current.number,
+    campaignName: current.name,
+    campaignProgress: totalProgress,
+    completedCampaigns,
+  };
 }
 
 interface StudentRow {
@@ -67,6 +82,16 @@ interface StudentRow {
   campaignNumber: number;
   campaignName: string;
   campaignProgress: number;
+  completedCampaigns: number;
+}
+
+function sortStudentRows(rows: StudentRow[]): StudentRow[] {
+  return [...rows].sort((a, b) => {
+    if (a.hasPendingDeletionRequest !== b.hasPendingDeletionRequest) {
+      return a.hasPendingDeletionRequest ? 1 : -1;
+    }
+    return b.campaignNumber - a.campaignNumber;
+  });
 }
 
 export default function Campaigns() {
@@ -84,7 +109,6 @@ export default function Campaigns() {
   const [showAddClassModal, setShowAddClassModal] = useState(false);
   const [formName, setFormName] = useState("");
   const [formRomanNickname, setFormRomanNickname] = useState("");
-  const [formAge, setFormAge] = useState("");
   const [formClassId, setFormClassId] = useState("");
   const [formSaving, setFormSaving] = useState(false);
   const [formError, setFormError] = useState("");
@@ -95,18 +119,26 @@ export default function Campaigns() {
   const [selectedStudentForEdit, setSelectedStudentForEdit] = useState<StudentRow | null>(null);
   const [editName, setEditName] = useState("");
   const [editRomanNickname, setEditRomanNickname] = useState("");
-  const [editAge, setEditAge] = useState("");
   const [editYear, setEditYear] = useState("");
+  const [editPhoto, setEditPhoto] = useState<File | null>(null);
+  const [editPhotoPreview, setEditPhotoPreview] = useState<string | null>(null);
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState("");
   const [showDeleteRequestModal, setShowDeleteRequestModal] = useState(false);
   const [selectedStudentForDeleteRequest, setSelectedStudentForDeleteRequest] = useState<StudentRow | null>(null);
+  const [showCancelDeleteRequestModal, setShowCancelDeleteRequestModal] = useState(false);
+  const [selectedStudentForCancelDeleteRequest, setSelectedStudentForCancelDeleteRequest] = useState<StudentRow | null>(null);
   const [deleteReason, setDeleteReason] = useState("");
   const [deleteRequestError, setDeleteRequestError] = useState("");
   const [submittingDeleteRequest, setSubmittingDeleteRequest] = useState(false);
+  const [removingDeleteRequestForStudentId, setRemovingDeleteRequestForStudentId] = useState<string | null>(null);
+  const [quickUploadStudentId, setQuickUploadStudentId] = useState<string | null>(null);
+  const [quickUploadingStudentId, setQuickUploadingStudentId] = useState<string | null>(null);
   const [formPhoto, setFormPhoto] = useState<File | null>(null);
   const [formPhotoPreview, setFormPhotoPreview] = useState<string | null>(null);
   const formPhotoRef = useRef<HTMLInputElement>(null);
+  const quickUploadPhotoRef = useRef<HTMLInputElement>(null);
+  const editPhotoRef = useRef<HTMLInputElement>(null);
   const actionsMenuRef = useRef<HTMLDivElement>(null);
   const [className, setClassName] = useState("");
   const [classSaving, setClassSaving] = useState(false);
@@ -191,7 +223,6 @@ export default function Campaigns() {
         role: "student",
         schoolId: appUser.schoolId,
         classId,
-        age: formAge ? parseInt(formAge) : undefined,
         createdAt: Date.now(),
       };
       await createUserDoc(newUser);
@@ -202,7 +233,6 @@ export default function Campaigns() {
       const studentDisplayName = formName.trim();
       setFormName("");
       setFormRomanNickname("");
-      setFormAge("");
       setFormClassId("");
       setFormPhoto(null);
       setFormPhotoPreview(null);
@@ -333,8 +363,9 @@ export default function Campaigns() {
     setSelectedStudentForEdit(student);
     setEditName(student.name);
     setEditRomanNickname(student.romanNickname ?? "");
-    setEditAge(student.age != null ? String(student.age) : "");
     setEditYear(student.className);
+    setEditPhoto(null);
+    setEditPhotoPreview(student.photoUrl ?? null);
     setEditError("");
     setOpenActionsForStudent(null);
     setShowEditStudentModal(true);
@@ -357,6 +388,11 @@ export default function Campaigns() {
     setEditSaving(true);
     setEditError("");
     try {
+      const targetStudent = selectedStudentForEdit;
+      const trimmedName = editName.trim();
+      const trimmedRomanNickname = editRomanNickname.trim();
+      let updatedPhotoUrl = targetStudent.photoUrl;
+
       let targetClassId = classes.find((c) => c.name === editYear)?.id;
       if (!targetClassId) {
         targetClassId = await createClass(editYear, appUser.schoolId, appUser.uid);
@@ -379,18 +415,40 @@ export default function Campaigns() {
       }
 
       await updateStudentProfileAndClass({
-        studentId: selectedStudentForEdit.uid,
-        displayName: editName.trim(),
-        romanNickname: editRomanNickname.trim() || undefined,
-        age: editAge ? parseInt(editAge, 10) : undefined,
-        currentClassId: selectedStudentForEdit.classId,
+        studentId: targetStudent.uid,
+        displayName: trimmedName,
+        romanNickname: trimmedRomanNickname || undefined,
+        currentClassId: targetStudent.classId,
         targetClassId,
       });
 
+      if (editPhoto) {
+        updatedPhotoUrl = await updateUserPhoto(targetStudent.uid, editPhoto);
+      }
+
+      setStudents((prev) =>
+        sortStudentRows(
+          prev.map((student) =>
+            student.uid === targetStudent.uid
+              ? {
+                  ...student,
+                  name: trimmedName,
+                  romanNickname: trimmedRomanNickname || undefined,
+                  classId: targetClassId,
+                  className: editYear,
+                  photoUrl: updatedPhotoUrl,
+                }
+              : student
+          )
+        )
+      );
+
       setShowEditStudentModal(false);
       setSelectedStudentForEdit(null);
+      setEditPhoto(null);
+      setEditPhotoPreview(null);
       setSuccessToast("Student updated successfully.");
-      await loadData();
+      void loadData(1, false);
     } catch (err) {
       console.error("Failed to update student:", err);
       setEditError("Failed to update student. Please try again.");
@@ -412,8 +470,10 @@ export default function Campaigns() {
     setDeleteRequestError("");
     setSubmittingDeleteRequest(true);
     try {
-      const { queuedEmails } = await createStudentDeletionRequestAndNotifyAdmins({
-        studentId: selectedStudentForDeleteRequest.uid,
+      const pendingStudentId = selectedStudentForDeleteRequest.uid;
+
+      await createStudentDeletionRequestAndNotifyAdmins({
+        studentId: pendingStudentId,
         studentName: selectedStudentForDeleteRequest.name,
         studentRomanNickname: selectedStudentForDeleteRequest.romanNickname,
         schoolId: appUser.schoolId,
@@ -424,14 +484,20 @@ export default function Campaigns() {
         reason: deleteReason.trim(),
       });
 
+      setStudents((prev) =>
+        sortStudentRows(
+          prev.map((student) =>
+            student.uid === pendingStudentId
+              ? { ...student, hasPendingDeletionRequest: true }
+              : student
+          )
+        )
+      );
+
       setShowDeleteRequestModal(false);
       setSelectedStudentForDeleteRequest(null);
       setDeleteReason("");
-      setSuccessToast(
-        queuedEmails > 0
-          ? "Deletion request sent to admin for review."
-          : "Deletion request saved, but no admin email was available."
-      );
+      setSuccessToast("Deletion request sent to admin for review.");
     } catch (err) {
       console.error("Failed to create deletion request:", err);
       setDeleteRequestError("Failed to submit request. Please try again.");
@@ -440,9 +506,103 @@ export default function Campaigns() {
     }
   }
 
-  async function loadData(retryCount = 1) {
+  function handleOpenCancelDeleteRequest(student: StudentRow) {
+    setSelectedStudentForCancelDeleteRequest(student);
+    setOpenActionsForStudent(null);
+    setShowCancelDeleteRequestModal(true);
+  }
+
+  async function handleRemoveDeleteRequest(student: StudentRow): Promise<boolean> {
+    if (!appUser?.schoolId) {
+      setErrorToast("Could not remove deletion request. Please try again.");
+      return false;
+    }
+
+    setRemovingDeleteRequestForStudentId(student.uid);
+
+    try {
+      const { removedCount } = await removePendingStudentDeletionRequest({
+        studentId: student.uid,
+        schoolId: appUser.schoolId,
+      });
+
+      if (removedCount === 0) {
+        setErrorToast("No pending deletion request found for this student.");
+        return false;
+      }
+
+      setStudents((prev) =>
+        sortStudentRows(
+          prev.map((currentStudent) =>
+            currentStudent.uid === student.uid
+              ? { ...currentStudent, hasPendingDeletionRequest: false }
+              : currentStudent
+          )
+        )
+      );
+      setSuccessToast("Deletion request canceled.");
+      return true;
+    } catch (err) {
+      console.error("Failed to remove deletion request:", err);
+      setErrorToast("Failed to remove deletion request. Please try again.");
+      return false;
+    } finally {
+      setRemovingDeleteRequestForStudentId(null);
+    }
+  }
+
+  async function handleConfirmCancelDeleteRequest() {
+    if (!selectedStudentForCancelDeleteRequest) return;
+    const wasRemoved = await handleRemoveDeleteRequest(selectedStudentForCancelDeleteRequest);
+    if (!wasRemoved) return;
+
+    setShowCancelDeleteRequestModal(false);
+    setSelectedStudentForCancelDeleteRequest(null);
+  }
+
+  function handleOpenQuickPhotoUpload(student: StudentRow) {
+    if (quickUploadingStudentId) return;
+    setQuickUploadStudentId(student.uid);
+    quickUploadPhotoRef.current?.click();
+  }
+
+  async function handleQuickPhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null;
+    const studentId = quickUploadStudentId;
+
+    if (!file || !studentId) {
+      e.target.value = "";
+      return;
+    }
+
+    setQuickUploadingStudentId(studentId);
+    try {
+      const photoUrl = await updateUserPhoto(studentId, file);
+      setStudents((prev) =>
+        sortStudentRows(
+          prev.map((student) =>
+            student.uid === studentId
+              ? { ...student, photoUrl }
+              : student
+          )
+        )
+      );
+      setSuccessToast("Profile photo updated.");
+    } catch (err) {
+      console.error("Failed to upload student photo:", err);
+      setErrorToast("Failed to upload profile photo. Please try again.");
+    } finally {
+      setQuickUploadingStudentId(null);
+      setQuickUploadStudentId(null);
+      e.target.value = "";
+    }
+  }
+
+  async function loadData(retryCount = 1, showLoadingState = true) {
       let keepLoadingForRetry = false;
-      setLoading(true);
+      if (showLoadingState) {
+        setLoading(true);
+      }
       setLoadError("");
       try {
         // Load all year groups in the school if schoolId exists, otherwise just teacher's groups
@@ -494,14 +654,7 @@ export default function Campaigns() {
           }
         }
 
-        rows.sort((a, b) => {
-          if (a.hasPendingDeletionRequest !== b.hasPendingDeletionRequest) {
-            return a.hasPendingDeletionRequest ? 1 : -1;
-          }
-          return b.campaignNumber - a.campaignNumber;
-        });
-
-        setStudents(rows);
+        setStudents(sortStudentRows(rows));
       } catch (err) {
         console.error("Failed to load campaign data:", err);
         if (retryCount > 0) {
@@ -566,24 +719,41 @@ export default function Campaigns() {
             </button>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="text-center text-stone-500 py-20 flex flex-col items-center gap-4">
-            <div>
-              <p className="text-lg mb-2">No students found</p>
-              <p className="text-sm">Add students to a year group to see their progress here.</p>
+          <div className="w-full max-w-2xl mx-auto rounded-3xl border border-roman-gold/20 bg-stone-900/60 backdrop-blur-md shadow-[0_8px_60px_rgba(0,0,0,0.5)] flex flex-col items-center py-20 px-8 text-center my-12 relative overflow-hidden">
+            {/* Subtle background glow */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-roman-gold/20 blur-[100px] rounded-full pointer-events-none"></div>
+            {/* Warrior/Shield Icon */}
+            <div className="w-24 h-24 mb-6 rounded-full bg-gradient-to-br from-stone-900/90 to-stone-800/80 flex items-center justify-center border-4 border-roman-gold/40 shadow-[0_0_40px_rgba(235,191,90,0.18)] relative">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-14 w-14 text-roman-gold drop-shadow-[0_2px_8px_rgba(235,191,90,0.5)]" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2c-.28 0-.56.06-.82.18l-7 3.11A2 2 0 0 0 3 7.09V12c0 5.25 6.13 8.69 8.22 9.74.5.25 1.06.25 1.56 0C14.87 20.69 21 17.25 21 12V7.09a2 2 0 0 0-1.18-1.8l-7-3.11A2 2 0 0 0 12 2zm0 2.18 7 3.11V12c0 4.13-4.81 7.06-7 8.11C9.81 19.06 5 16.13 5 12V7.29l7-3.11z" />
+                <path d="M12 8a1 1 0 0 1 1 1v3.5a1 1 0 0 1-2 0V9a1 1 0 0 1 1-1zm0 7a1.25 1.25 0 1 1 0-2.5A1.25 1.25 0 0 1 12 15z" />
+              </svg>
             </div>
-            {/* actions removed */}
+            <h3 className="text-3xl font-bold text-roman-gold mb-4 tracking-wide font-serif drop-shadow-[0_2px_8px_rgba(235,191,90,0.3)]">Awaiting Warriors</h3>
+            <p className="text-yellow-100/90 mb-10 max-w-md mx-auto text-lg leading-relaxed font-medium drop-shadow-[0_2px_8px_rgba(235,191,90,0.2)]">
+              Your campaign board is currently empty.<br className="hidden sm:inline" /> Add students to a year group to start tracking their progress through the challenges.
+            </p>
+            <button
+              type="button"
+              onClick={handleOpenAddStudent}
+              className="group relative flex items-center justify-center gap-2 px-8 py-4 rounded-xl font-bold uppercase tracking-widest text-base transition-all overflow-hidden border-2 border-roman-gold text-stone-950 bg-roman-gold hover:bg-yellow-400 shadow-[0_0_20px_rgba(235,191,90,0.2)] hover:shadow-[0_0_30px_rgba(235,191,90,0.4)]"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 transition-transform group-hover:scale-110" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+              </svg>
+              Add Student
+            </button>
           </div>
         ) : (
-          <div className="rounded-2xl border border-roman-gold/15 overflow-hidden bg-stone-950/60 backdrop-blur-md shadow-[0_8px_60px_rgba(0,0,0,0.5)]">
+          <div className="rounded-2xl border border-roman-gold/15 overflow-visible bg-stone-950/60 backdrop-blur-md shadow-[0_8px_60px_rgba(0,0,0,0.5)]">
             <table className="w-full text-left">
               <thead>
-                <tr className="bg-stone-900/50 border-b border-roman-gold/10">
-                  <th className="pl-8 pr-10 py-5 text-lg uppercase tracking-wider text-roman-gold/50 font-semibold w-[34rem]">Name</th>
-                  <th className="px-8 py-5 text-lg uppercase tracking-wider text-roman-gold/50 font-semibold w-24">Age</th>
-                  <th className="px-8 py-5 text-lg uppercase tracking-wider text-roman-gold/50 font-semibold w-40">Year</th>
-                  <th className="px-8 py-5 text-lg uppercase tracking-wider text-roman-gold/50 font-semibold w-44">Campaign</th>
-                  <th className="px-8 py-5 text-lg uppercase tracking-wider text-roman-gold/50 font-semibold w-96">Progress</th>
-                  <th className="px-8 py-5 text-lg uppercase tracking-wider text-roman-gold/50 font-semibold w-40 text-center">Actions</th>
+                <tr className="border-b border-roman-gold/20">
+                  <th className="pl-8 pr-10 py-5 text-lg uppercase tracking-wider text-roman-gold/90 font-bold w-[34rem] bg-stone-900/60 rounded-tl-2xl">Name</th>
+                  <th className="px-8 py-5 text-lg uppercase tracking-wider text-roman-gold/90 font-bold w-40 bg-stone-900/60">Year</th>
+                  <th className="px-8 py-5 text-lg uppercase tracking-wider text-roman-gold/90 font-bold w-56 bg-stone-900/60">Campaign</th>
+                  <th className="px-8 py-5 text-lg uppercase tracking-wider text-roman-gold/90 font-bold w-96 bg-stone-900/60">Progress</th>
+                  <th className="px-8 py-5 text-lg uppercase tracking-wider text-roman-gold/90 font-bold w-40 text-center bg-stone-900/60 rounded-tr-2xl">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -591,28 +761,55 @@ export default function Campaigns() {
                   <tr
                     key={`${s.uid}-${s.className}`}
                     onClick={() => navigate(`/campaigns/${s.uid}`)}
-                    className={`border-b border-stone-700/20 cursor-pointer transition-colors ${s.hasPendingDeletionRequest ? "bg-stone-900/60 opacity-55 hover:bg-stone-900/70" : "hover:bg-stone-800/30"}`}
+                    className={`border-b border-stone-700/20 cursor-pointer transition-colors ${s.hasPendingDeletionRequest ? "bg-stone-900/60 hover:bg-stone-900/70" : "hover:bg-stone-800/30"}`}
                   >
                     <td className="pl-8 pr-12 py-6">
                       <div className="flex items-center gap-4">
-                        <div className="w-20 h-20 rounded-full border border-roman-gold/20 overflow-hidden bg-stone-800 flex items-center justify-center shrink-0">
+                        <div className="group relative w-20 h-20 rounded-full border border-roman-gold/20 overflow-hidden bg-stone-800 flex items-center justify-center shrink-0">
                           {s.photoUrl
                             ? <img src={s.photoUrl} alt={s.name} className="w-full h-full object-cover" />
-                            : <img src="/warrior.png" alt={s.name} className="w-full h-full object-cover opacity-60" />
+                            : <img src="/profile-pics.png" alt={s.name} className="w-full h-full object-cover opacity-60" />
                           }
+                          {!s.photoUrl && !s.hasPendingDeletionRequest && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenQuickPhotoUpload(s);
+                              }}
+                              title="Upload photo"
+                              aria-label={`Upload photo for ${s.name}`}
+                              className="absolute inset-0 flex items-center justify-center bg-stone-950/70 text-roman-gold opacity-0 transition-opacity group-hover:opacity-100"
+                            >
+                              {quickUploadingStudentId === s.uid ? (
+                                <svg className="roman-btn-spinner w-7 h-7 drop-shadow-[0_0_10px_rgba(212,175,55,0.35)]" viewBox="0 0 24 24" fill="none">
+                                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeDasharray="50 20" />
+                                </svg>
+                              ) : (
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7 drop-shadow-[0_0_10px_rgba(212,175,55,0.35)]">
+                                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                  <path d="M17 8l-5-5-5 5" />
+                                  <path d="M12 3v12" />
+                                </svg>
+                              )}
+                            </button>
+                          )}
                         </div>
                         <div className="min-w-0">
                           <p className="font-medium text-stone-100 text-3xl leading-tight">{s.name}</p>
                           {s.romanNickname && (
-                            <p className="text-roman-gold/80 text-sm uppercase tracking-wider mt-1">{s.romanNickname}</p>
+                            <div className="mt-2.5">
+                              <span className="inline-block px-3 py-1 rounded-full border border-roman-gold/30 bg-roman-gold/10 text-roman-gold/90 text-xs font-bold uppercase tracking-[0.2em] shadow-[0_2px_10px_rgba(235,191,90,0.15)] flex-none">
+                                {s.romanNickname}
+                              </span>
+                            </div>
                           )}
                           {s.hasPendingDeletionRequest && (
-                            <p className="text-amber-300/90 text-xs uppercase tracking-wider mt-1.5">Deletion requested - awaiting admin review</p>
+                            <p className="text-amber-300/90 text-xs uppercase tracking-wider mt-2">Deletion requested - awaiting admin review</p>
                           )}
                         </div>
                       </div>
                     </td>
-                    <td className="px-8 py-6 text-stone-400 text-xl">{s.age ?? "—"}</td>
                     <td className="px-8 py-6">
                       <span className="text-stone-300 text-lg">
                         {s.className}
@@ -643,17 +840,17 @@ export default function Campaigns() {
                           <div className="flex-1 h-2 rounded-full bg-stone-700/30 overflow-hidden border border-stone-600/10">
                             <div
                               className="h-full bg-linear-to-r from-roman-red/60 to-roman-red rounded-full transition-all duration-500"
-                              style={{ width: `${Math.round((s.campaignNumber / CAMPAIGNS.length) * 100)}%` }}
+                              style={{ width: `${Math.round((s.completedCampaigns / CAMPAIGNS.length) * 100)}%` }}
                             />
                           </div>
                           <span className="text-stone-500 text-sm font-mono w-12 text-right">
-                            {s.campaignNumber}/{CAMPAIGNS.length}
+                            {s.completedCampaigns}/{CAMPAIGNS.length}
                           </span>
                         </div>
                       </div>
                     </td>
                     <td className="px-8 py-6 text-center">
-                      <div className="relative inline-flex">
+                      <div className={`relative inline-flex ${openActionsForStudent === s.uid ? "z-50" : "z-0"}`}>
                         <button
                           type="button"
                           onClick={(e) => {
@@ -673,32 +870,50 @@ export default function Campaigns() {
                             ref={actionsMenuRef}
                             id={`student-actions-${s.uid}`}
                             role="menu"
-                            className="absolute right-0 top-[calc(100%+0.5rem)] z-30 w-44 rounded-xl border border-roman-gold/25 bg-stone-950/95 shadow-[0_16px_40px_rgba(0,0,0,0.55)] backdrop-blur-md overflow-hidden origin-top-right"
+                            className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-48 rounded-2xl border border-roman-gold/25 bg-stone-900/95 shadow-[0_16px_40px_rgba(0,0,0,0.7)] backdrop-blur-xl overflow-hidden origin-top-right ring-1 ring-white/5"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            <div className="px-3 py-2 border-b border-stone-800/80 text-[11px] uppercase tracking-wider text-stone-500 text-left">
-                              Student Actions
+                            <div className="px-4 py-3 border-b border-stone-700/50 bg-stone-950/40 text-[10px] font-bold uppercase tracking-widest text-roman-gold/70 text-left">
+                              Options
                             </div>
+                            {!s.hasPendingDeletionRequest && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleOpenEditStudent(s);
+                                }}
+                                role="menuitem"
+                                className="group w-full text-left px-4 py-3 text-stone-200 text-sm font-medium hover:bg-roman-gold/10 hover:text-roman-gold transition-colors flex items-center justify-between"
+                              >
+                                <span>Edit Student</span>
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-stone-500 group-hover:text-roman-gold/80 transition-colors" viewBox="0 0 20 20" fill="currentColor">
+                                  <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                                </svg>
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={() => {
-                                handleOpenEditStudent(s);
+                                if (s.hasPendingDeletionRequest) {
+                                  handleOpenCancelDeleteRequest(s);
+                                  return;
+                                }
+                                handleOpenDeleteRequest(s);
                               }}
+                              disabled={removingDeleteRequestForStudentId === s.uid}
                               role="menuitem"
-                              className="w-full text-left px-3 py-2.5 text-stone-200 text-sm hover:bg-stone-800/80 transition-colors flex items-center justify-between"
+                              className={`group w-full text-left px-4 py-3 text-sm font-medium transition-colors flex items-center justify-between border-t border-stone-800/80 disabled:opacity-50 disabled:cursor-not-allowed ${s.hasPendingDeletionRequest ? "text-amber-400 hover:bg-amber-400/10" : "text-red-400 hover:bg-red-500/10"}`}
                             >
-                              <span>Edit</span>
-                              <span className="text-stone-500">✎</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleOpenDeleteRequest(s)}
-                              disabled={s.hasPendingDeletionRequest}
-                              role="menuitem"
-                              className="w-full text-left px-3 py-2.5 text-red-300 text-sm hover:bg-red-500/15 transition-colors flex items-center justify-between border-t border-stone-800/80 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              <span>{s.hasPendingDeletionRequest ? "Delete Pending" : "Delete"}</span>
-                              <span className="text-red-400/70">🗑</span>
+                              <span>
+                                {removingDeleteRequestForStudentId === s.uid
+                                  ? "Removing..."
+                                  : s.hasPendingDeletionRequest
+                                  ? "Cancel Request"
+                                  : "Delete Student"}
+                              </span>
+                              <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 transition-colors ${s.hasPendingDeletionRequest ? "text-amber-400/70 group-hover:text-amber-400" : "text-red-400/70 group-hover:text-red-400"}`} viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                              </svg>
                             </button>
                           </div>
                         )}
@@ -711,7 +926,7 @@ export default function Campaigns() {
                     onClick={handleOpenAddStudent}
                     className="hover:bg-stone-800/30 transition-colors cursor-pointer"
                   >
-                    <td colSpan={6} className="px-8 py-6 text-center">
+                    <td colSpan={5} className="px-8 py-6 text-center">
                       <div className="flex items-center justify-center gap-2 w-full text-roman-gold/60 hover:text-roman-gold transition-colors">
                         <span className="text-2xl">+</span>
                         <span className="text-base uppercase tracking-wider font-semibold">Add Student</span>
@@ -739,6 +954,13 @@ export default function Campaigns() {
           </div>
         )}
           </div>{/* end max-w-5xl */}
+          <input
+            ref={quickUploadPhotoRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => void handleQuickPhotoUpload(e)}
+          />
       </div>
 
 
@@ -769,7 +991,7 @@ export default function Campaigns() {
                 <p className="text-stone-300 text-sm">
                   Student: <span className="text-stone-100 font-semibold">{selectedStudentForDeleteRequest.name}</span>
                 </p>
-                <p className="text-stone-500 text-xs mt-1">Year: {selectedStudentForDeleteRequest.className}</p>
+                <p className="text-stone-500 text-xs mt-1">{selectedStudentForDeleteRequest.className}</p>
               </div>
 
               <div>
@@ -782,9 +1004,9 @@ export default function Campaigns() {
                   className="w-full bg-stone-800 border border-stone-700 rounded-lg px-4 py-3 text-stone-100 placeholder-stone-600 focus:outline-none focus:border-red-300/60 transition-colors resize-none"
                 />
                 <div className="mt-2 flex items-center justify-between text-xs">
-                  <span className="text-stone-500">Minimum 10 characters</span>
-                  <span className={deleteReason.trim().length >= 10 ? "text-emerald-300" : "text-stone-500"}>
-                    {deleteReason.trim().length}/10
+                    <span className="text-stone-500">Maximum 500 characters</span>
+                    <span className={deleteReason.trim().length <= 500 ? "text-emerald-300" : "text-red-500"}>
+                      {deleteReason.trim().length}/500
                   </span>
                 </div>
               </div>
@@ -819,6 +1041,56 @@ export default function Campaigns() {
         </div>
       )}
 
+      {/* Cancel Delete Request Confirmation Modal */}
+      {showCancelDeleteRequestModal && selectedStudentForCancelDeleteRequest && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-stone-950/80 backdrop-blur-sm"
+            onClick={() => {
+              if (removingDeleteRequestForStudentId === selectedStudentForCancelDeleteRequest.uid) return;
+              setShowCancelDeleteRequestModal(false);
+              setSelectedStudentForCancelDeleteRequest(null);
+            }}
+          />
+          <div className="relative bg-stone-900 border border-amber-300/20 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+            <div className="h-px w-full bg-linear-to-r from-transparent via-amber-300/40 to-transparent" />
+            <div className="px-8 py-8">
+              <h2 className="text-amber-200 font-serif text-2xl font-bold mb-2 tracking-wide">Cancel Deletion Request</h2>
+              <p className="text-stone-400 text-sm mb-6">
+                Are you sure you want to cancel the deletion request for this student?
+              </p>
+
+              <div className="rounded-lg border border-stone-700/70 bg-stone-800/60 px-4 py-3 mb-5">
+                <p className="text-stone-300 text-sm">
+                  Student: <span className="text-stone-100 font-semibold">{selectedStudentForCancelDeleteRequest.name}</span>
+                </p>
+                <p className="text-stone-500 text-xs mt-1">{selectedStudentForCancelDeleteRequest.className}</p>
+              </div>
+
+              <div className="flex gap-3 mt-7">
+                <button
+                  onClick={() => {
+                    if (removingDeleteRequestForStudentId === selectedStudentForCancelDeleteRequest.uid) return;
+                    setShowCancelDeleteRequestModal(false);
+                    setSelectedStudentForCancelDeleteRequest(null);
+                  }}
+                  className="flex-1 py-3 rounded-xl border border-stone-700 text-stone-400 hover:text-stone-200 hover:border-stone-500 transition-all"
+                >
+                  Keep Request
+                </button>
+                <button
+                  onClick={() => void handleConfirmCancelDeleteRequest()}
+                  disabled={removingDeleteRequestForStudentId === selectedStudentForCancelDeleteRequest.uid}
+                  className="flex-1 py-3 rounded-xl bg-amber-300 text-stone-950 font-semibold hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {removingDeleteRequestForStudentId === selectedStudentForCancelDeleteRequest.uid ? "Canceling..." : "Cancel Request"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Edit Student Modal */}
       {showEditStudentModal && selectedStudentForEdit && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -831,57 +1103,74 @@ export default function Campaigns() {
               setEditError("");
             }}
           />
-          <div className="relative bg-stone-900 border border-roman-gold/20 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
-            <div className="h-px w-full bg-linear-to-r from-transparent via-roman-gold/50 to-transparent" />
-            <div className="px-8 py-8">
-              <h2 className="text-roman-gold font-serif text-2xl font-bold mb-6 tracking-wide">Edit Student</h2>
+          <div className="relative bg-stone-900/90 backdrop-blur-xl border border-roman-gold/20 rounded-3xl w-full max-w-lg shadow-[0_8px_60px_rgba(0,0,0,0.7)] overflow-hidden">
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-32 bg-roman-gold/10 blur-[80px] rounded-full pointer-events-none"></div>
+            
+            <div className="px-8 py-10 relative">
+              <h2 className="text-roman-gold font-serif text-3xl font-bold mb-8 tracking-wide text-center drop-shadow-[0_2px_8px_rgba(235,191,90,0.3)]">Edit Student</h2>
 
-              <div className="space-y-4">
+              <div className="space-y-5">
+                <div className="flex flex-col items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => editPhotoRef.current?.click()}
+                    className="w-24 h-24 rounded-full border-2 border-dashed border-roman-gold/40 hover:border-roman-gold bg-stone-800/80 flex items-center justify-center overflow-hidden transition-all group hover:shadow-[0_0_20px_rgba(235,191,90,0.2)]"
+                  >
+                    {editPhotoPreview
+                      ? <img src={editPhotoPreview} alt="Student preview" className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                      : <img src="/profile-pics.png" alt="Student" className="w-full h-full object-cover opacity-50 group-hover:opacity-80 transition-opacity" />
+                    }
+                  </button>
+                  <span className="text-stone-400 text-xs font-semibold uppercase tracking-wider">{editPhotoPreview ? "Change photo" : "Add photo (optional)"}</span>
+                  <input
+                    ref={editPhotoRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] ?? null;
+                      setEditPhoto(file);
+                      if (file) {
+                        const url = URL.createObjectURL(file);
+                        setEditPhotoPreview(url);
+                      }
+                    }}
+                  />
+                </div>
+
                 <div>
-                  <label className="block text-stone-400 text-xs uppercase tracking-widest mb-2">Full Name *</label>
+                  <label className="block text-stone-400 text-xs font-semibold uppercase tracking-widest mb-2 pl-1">Full Name *</label>
                   <input
                     type="text"
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
                     placeholder="e.g. John Smith"
-                    className="w-full bg-stone-800 border border-stone-700 rounded-lg px-4 py-3 text-stone-100 placeholder-stone-600 focus:outline-none focus:border-roman-gold/60 transition-colors"
+                    className="w-full bg-stone-800/50 border border-stone-700/80 rounded-xl px-4 py-3.5 text-stone-100 placeholder-stone-600 focus:outline-none focus:border-roman-gold focus:ring-1 focus:ring-roman-gold/50 transition-all font-medium shadow-inner"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-stone-400 text-xs uppercase tracking-widest mb-2">Roman Nickname</label>
+                  <label className="block text-stone-400 text-xs font-semibold uppercase tracking-widest mb-2 pl-1">Roman Nickname</label>
                   <input
                     type="text"
                     value={editRomanNickname}
                     onChange={(e) => setEditRomanNickname(e.target.value)}
                     placeholder="e.g. The Brave"
-                    className="w-full bg-stone-800 border border-stone-700 rounded-lg px-4 py-3 text-stone-100 placeholder-stone-600 focus:outline-none focus:border-roman-gold/60 transition-colors"
+                    className="w-full bg-stone-800/50 border border-stone-700/80 rounded-xl px-4 py-3.5 text-stone-100 placeholder-stone-600 focus:outline-none focus:border-roman-gold focus:ring-1 focus:ring-roman-gold/50 transition-all font-medium shadow-inner"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-stone-400 text-xs uppercase tracking-widest mb-2">Age</label>
-                  <input
-                    type="number"
-                    value={editAge}
-                    onChange={(e) => setEditAge(e.target.value)}
-                    placeholder="e.g. 10"
-                    min={5}
-                    max={18}
-                    className="w-full bg-stone-800 border border-stone-700 rounded-lg px-4 py-3 text-stone-100 placeholder-stone-600 focus:outline-none focus:border-roman-gold/60 transition-colors"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-stone-400 text-xs uppercase tracking-widest mb-2">Year *</label>
+                  <label className="block text-stone-400 text-xs font-semibold uppercase tracking-widest mb-2 pl-1">Year *</label>
                   <select
                     value={editYear}
                     onChange={(e) => setEditYear(e.target.value)}
-                    className="w-full bg-stone-800 border border-stone-700 rounded-lg px-4 py-3 text-stone-100 focus:outline-none focus:border-roman-gold/60 transition-colors"
+                    className="w-full bg-stone-800/50 border border-stone-700/80 rounded-xl px-4 py-3.5 text-stone-100 focus:outline-none focus:border-roman-gold focus:ring-1 focus:ring-roman-gold/50 transition-all font-medium shadow-inner appearance-none"
+                    style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23ebbf5a'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundPosition: 'right 1rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em' }}
                   >
-                    <option value="">Select year...</option>
+                    <option value="" className="bg-stone-800">Select year...</option>
                     {yearOptions.map((year) => (
-                      <option key={year} value={year}>{year}</option>
+                      <option key={year} value={year} className="bg-stone-800">{year}</option>
                     ))}
                   </select>
                 </div>
@@ -891,22 +1180,24 @@ export default function Campaigns() {
                 )}
               </div>
 
-              <div className="flex gap-3 mt-8">
+              <div className="flex gap-4 mt-10">
                 <button
                   onClick={() => {
                     if (editSaving) return;
                     setShowEditStudentModal(false);
                     setSelectedStudentForEdit(null);
+                    setEditPhoto(null);
+                    setEditPhotoPreview(null);
                     setEditError("");
                   }}
-                  className="flex-1 py-3 rounded-xl border border-stone-700 text-stone-400 hover:text-stone-200 hover:border-stone-500 transition-all"
+                  className="flex-1 py-3.5 rounded-xl border border-stone-700/50 bg-stone-800/30 text-stone-300 font-bold hover:bg-stone-700/50 hover:text-white transition-all shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={() => void handleSubmitEditStudent()}
                   disabled={editSaving}
-                  className="flex-1 py-3 rounded-xl bg-roman-gold text-stone-950 font-semibold hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 py-3.5 rounded-xl bg-roman-gold text-stone-950 font-semibold hover:brightness-105 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {editSaving ? "Saving..." : "Save Changes"}
                 </button>
@@ -920,25 +1211,26 @@ export default function Campaigns() {
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-stone-950/80 backdrop-blur-sm" onClick={() => setShowAddModal(false)} />
-          <div className="relative bg-stone-900 border border-roman-gold/20 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
-            <div className="h-px w-full bg-linear-to-r from-transparent via-roman-gold/50 to-transparent" />
-            <div className="px-8 py-8">
-              <h2 className="text-roman-gold font-serif text-2xl font-bold mb-6 tracking-wide">Add Student</h2>
+          <div className="relative bg-stone-900/90 backdrop-blur-xl border border-roman-gold/20 rounded-3xl w-full max-w-lg shadow-[0_8px_60px_rgba(0,0,0,0.7)] overflow-hidden">
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-32 bg-roman-gold/10 blur-[80px] rounded-full pointer-events-none"></div>
+            
+            <div className="px-8 py-10 relative">
+              <h2 className="text-roman-gold font-serif text-3xl font-bold mb-8 tracking-wide text-center drop-shadow-[0_2px_8px_rgba(235,191,90,0.3)]">Add Student</h2>
 
-              <div className="space-y-4">
+              <div className="space-y-5">
                 {/* Profile photo picker */}
                 <div className="flex flex-col items-center gap-3">
                   <button
                     type="button"
                     onClick={() => formPhotoRef.current?.click()}
-                    className="w-20 h-20 rounded-full border-2 border-dashed border-roman-gold/40 hover:border-roman-gold/70 bg-stone-800 flex items-center justify-center overflow-hidden transition-colors group"
+                    className="w-24 h-24 rounded-full border-2 border-dashed border-roman-gold/40 hover:border-roman-gold bg-stone-800/80 flex items-center justify-center overflow-hidden transition-all group hover:shadow-[0_0_20px_rgba(235,191,90,0.2)]"
                   >
                     {formPhotoPreview
-                      ? <img src={formPhotoPreview} alt="preview" className="w-full h-full object-cover" />
-                      : <img src="/warrior.png" alt="Warrior" className="w-full h-full object-cover opacity-60" />
+                      ? <img src={formPhotoPreview} alt="preview" className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                      : <img src="/profile-pics.png" alt="Warrior" className="w-full h-full object-cover opacity-50 group-hover:opacity-80 transition-opacity" />
                     }
                   </button>
-                  <span className="text-stone-500 text-xs">{formPhotoPreview ? "Click to change photo" : "Add photo (optional)"}</span>
+                  <span className="text-stone-400 text-xs font-semibold uppercase tracking-wider">{formPhotoPreview ? "Change photo" : "Add photo (optional)"}</span>
                   <input
                     ref={formPhotoRef}
                     type="file"
@@ -958,46 +1250,33 @@ export default function Campaigns() {
                 </div>
 
                 <div>
-                  <label className="block text-stone-400 text-xs uppercase tracking-widest mb-2">Full Name</label>
+                  <label className="block text-stone-400 text-xs font-semibold uppercase tracking-widest mb-2 pl-1">Full Name *</label>
                   <input
                     type="text"
                     value={formName}
                     onChange={(e) => setFormName(e.target.value)}
                     placeholder="e.g. John Smith"
-                    className="w-full bg-stone-800 border border-stone-700 rounded-lg px-4 py-3 text-stone-100 placeholder-stone-600 focus:outline-none focus:border-roman-gold/60 transition-colors"
+                    className="w-full bg-stone-800/50 border border-stone-700/80 rounded-xl px-4 py-3.5 text-stone-100 placeholder-stone-600 focus:outline-none focus:border-roman-gold focus:ring-1 focus:ring-roman-gold/50 transition-all font-medium shadow-inner"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-stone-400 text-xs uppercase tracking-widest mb-2">Roman Nickname</label>
+                  <label className="block text-stone-400 text-xs font-semibold uppercase tracking-widest mb-2 pl-1">Roman Nickname</label>
                   <input
                     type="text"
                     value={formRomanNickname}
                     onChange={(e) => setFormRomanNickname(e.target.value)}
                     placeholder="e.g. The Brave"
-                    className="w-full bg-stone-800 border border-stone-700 rounded-lg px-4 py-3 text-stone-100 placeholder-stone-600 focus:outline-none focus:border-roman-gold/60 transition-colors"
+                    className="w-full bg-stone-800/50 border border-stone-700/80 rounded-xl px-4 py-3.5 text-stone-100 placeholder-stone-600 focus:outline-none focus:border-roman-gold focus:ring-1 focus:ring-roman-gold/50 transition-all font-medium shadow-inner"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-stone-400 text-xs uppercase tracking-widest mb-2">Age</label>
-                  <input
-                    type="number"
-                    value={formAge}
-                    onChange={(e) => setFormAge(e.target.value)}
-                    placeholder="e.g. 10"
-                    min={5}
-                    max={18}
-                    className="w-full bg-stone-800 border border-stone-700 rounded-lg px-4 py-3 text-stone-100 placeholder-stone-600 focus:outline-none focus:border-roman-gold/60 transition-colors"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-stone-400 text-xs uppercase tracking-widest mb-2">Year</label>
+                  <label className="block text-stone-400 text-xs font-semibold uppercase tracking-widest mb-2 pl-1">Year *</label>
                   <select
                     value={formClassId}
                     onChange={(e) => setFormClassId(e.target.value)}
-                    className="w-full bg-stone-800 border border-stone-700 rounded-lg px-4 py-3 text-stone-100 focus:outline-none focus:border-roman-gold/60 transition-colors"
+                    className="w-full bg-stone-800/50 border border-stone-700/80 rounded-xl px-4 py-3.5 text-stone-100 focus:outline-none focus:border-roman-gold focus:ring-1 focus:ring-roman-gold/50 transition-all font-medium shadow-inner appearance-none cursor-pointer"
                   >
                     <option value="">Select year...</option>
                     {yearOptions.map((year) => (
@@ -1007,21 +1286,21 @@ export default function Campaigns() {
                 </div>
 
                 {formError && (
-                  <p className="text-red-400 text-sm">{formError}</p>
+                  <p className="text-red-400 text-sm font-medium mt-2 bg-red-400/10 px-3 py-2 rounded-lg border border-red-400/20">{formError}</p>
                 )}
               </div>
 
-              <div className="flex gap-3 mt-8">
+              <div className="flex gap-4 mt-8">
                 <button
                   onClick={() => { setShowAddModal(false); setFormError(""); setFormRomanNickname(""); setFormPhoto(null); setFormPhotoPreview(null); }}
-                  className="flex-1 py-3 rounded-xl border border-stone-700 text-stone-400 hover:text-stone-200 hover:border-stone-500 transition-all"
+                  className="flex-1 py-3.5 rounded-xl border-2 border-stone-700 text-stone-300 font-semibold uppercase tracking-wider text-sm hover:text-white hover:bg-stone-800 transition-all hover:border-stone-600"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleAddStudent}
                   disabled={formSaving}
-                  className="flex-1 py-3 rounded-xl bg-roman-gold text-stone-950 font-semibold hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 py-3.5 rounded-xl border-2 border-roman-gold bg-roman-gold text-stone-950 font-bold uppercase tracking-wider text-sm hover:bg-yellow-400 hover:border-yellow-400 transition-all shadow-[0_0_15px_rgba(235,191,90,0.15)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-roman-gold disabled:hover:border-roman-gold disabled:shadow-none"
                 >
                   {formSaving ? "Adding..." : "Add Student"}
                 </button>
@@ -1035,37 +1314,49 @@ export default function Campaigns() {
       {showAuthorityConsentModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-stone-950/80 backdrop-blur-sm" onClick={() => setShowAuthorityConsentModal(false)} />
-          <div className="relative bg-stone-900 border border-roman-gold/20 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
-            <div className="h-px w-full bg-linear-to-r from-transparent via-roman-gold/50 to-transparent" />
-            <div className="px-8 py-8">
-              <h2 className="text-roman-gold font-serif text-2xl font-bold mb-3 tracking-wide">Authority Confirmation</h2>
-              <p className="text-stone-400 text-sm mb-5">
-                Confirm once to enable student profile creation for your account.
+          <div className="relative bg-stone-900/90 backdrop-blur-xl border border-roman-gold/20 rounded-3xl w-full max-w-lg shadow-[0_8px_60px_rgba(0,0,0,0.7)] overflow-hidden">
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-32 bg-roman-gold/10 blur-[80px] rounded-full pointer-events-none"></div>
+            
+            <div className="px-8 py-10 relative">
+              <div className="w-16 h-16 mb-5 mx-auto rounded-full bg-gradient-to-br from-stone-800 to-stone-900 flex items-center justify-center border-2 border-roman-gold/30 shadow-[0_0_20px_rgba(235,191,90,0.15)]">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-roman-gold" viewBox="0 0 24 24" fill="currentColor">
+                  <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clipRule="evenodd" />
+                </svg>
+              </div>
+
+              <h2 className="text-roman-gold font-serif text-3xl font-bold mb-3 tracking-wide text-center drop-shadow-[0_2px_8px_rgba(235,191,90,0.3)]">Authority Required</h2>
+              <p className="text-stone-400 text-base mb-8 text-center leading-relaxed max-w-sm mx-auto">
+                Before adding students, please verify that you have the required consent to create their profiles.
               </p>
 
-              <label className="flex items-start gap-2.5 text-stone-300 text-sm leading-relaxed border border-stone-700/60 rounded-lg px-3 py-3 mb-5">
-                <input
-                  type="checkbox"
-                  checked={authorityConsentChecked}
-                  onChange={(e) => setAuthorityConsentChecked(e.target.checked)}
-                  className="mt-0.5 accent-roman-gold"
-                />
-                <span>
-                  I confirm I have school/parental authority and required consent to create student profiles.
+              <label className="flex items-start gap-4 text-stone-200 text-sm leading-relaxed border border-roman-gold/20 bg-stone-950/50 rounded-xl p-5 mb-8 cursor-pointer hover:border-roman-gold/40 transition-colors group">
+                <div className="relative flex items-center justify-center mt-0.5 outline-none">
+                  <input
+                    type="checkbox"
+                    checked={authorityConsentChecked}
+                    onChange={(e) => setAuthorityConsentChecked(e.target.checked)}
+                    className="peer appearance-none w-5 h-5 border-2 border-stone-600 rounded bg-stone-800 checked:bg-roman-gold checked:border-roman-gold transition-all cursor-pointer"
+                  />
+                  <svg xmlns="http://www.w3.org/2000/svg" className="absolute w-3.5 h-3.5 text-stone-900 pointer-events-none opacity-0 peer-checked:opacity-100 transition-opacity" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </div>
+                <span className="group-hover:text-stone-100 transition-colors">
+                  I confirm I have the necessary school/parental authority and consent to process this student's data.
                 </span>
               </label>
 
-              <div className="flex gap-3">
+              <div className="flex gap-4">
                 <button
                   onClick={() => { setShowAuthorityConsentModal(false); setAuthorityConsentChecked(false); }}
-                  className="flex-1 py-3 rounded-xl border border-stone-700 text-stone-400 hover:text-stone-200 hover:border-stone-500 transition-all"
+                  className="flex-1 py-3.5 rounded-xl border-2 border-stone-700 text-stone-300 font-semibold uppercase tracking-wider text-sm hover:text-white hover:bg-stone-800 transition-all hover:border-stone-600"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleConfirmStudentAuthorityConsent}
                   disabled={!authorityConsentChecked || authorityConsentSaving}
-                  className="flex-1 py-3 rounded-xl bg-roman-gold text-stone-950 font-semibold hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 py-3.5 rounded-xl border-2 border-roman-gold bg-roman-gold text-stone-950 font-bold uppercase tracking-wider text-sm hover:bg-yellow-400 hover:border-yellow-400 transition-all shadow-[0_0_15px_rgba(235,191,90,0.15)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-roman-gold disabled:hover:border-roman-gold disabled:shadow-none"
                 >
                   {authorityConsentSaving ? "Saving..." : "Confirm"}
                 </button>

@@ -112,6 +112,11 @@
     transition: background-color 9999s ease-out 0s;
   }
 
+  .roman-input[type="password"]::-ms-reveal,
+  .roman-input[type="password"]::-ms-clear {
+    display: none;
+  }
+
   .roman-glow {
     text-shadow: 0 0 20px rgba(212, 175, 55, 0.3);
   }

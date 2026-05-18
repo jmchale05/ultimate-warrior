@@ -19,6 +19,14 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db, storage } from "./firebase";
 import type { AppUser, School, SchoolAccessCode, SchoolType, Class, Result } from "../types";
 
+async function createAuditReference(value: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const digest = await crypto.subtle.digest("SHA-256", encoder.encode(value));
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 // ─── Schools ──────────────────────────────────────────────────────────────────
 
 function generateAccessCode() {
@@ -51,6 +59,21 @@ async function saveSchoolAccessCodeIndex(
   });
 }
 
+async function deleteDocumentRefsInBatches(docRefs: Array<ReturnType<typeof doc>>): Promise<void> {
+  const batchSize = 400;
+
+  for (let index = 0; index < docRefs.length; index += batchSize) {
+    const batch = writeBatch(db);
+    const chunk = docRefs.slice(index, index + batchSize);
+
+    chunk.forEach((docRef) => {
+      batch.delete(docRef);
+    });
+
+    await batch.commit();
+  }
+}
+
 export async function createSchool(
   name: string,
   schoolType: SchoolType,
@@ -58,10 +81,11 @@ export async function createSchool(
 ): Promise<{ id: string; accessCode: string }> {
   const accessCode = generateAccessCode();
   const createdAt = Date.now();
+  const trimmedAddress = address?.trim();
   const ref = await addDoc(collection(db, "schools"), {
     name,
     schoolType,
-    address,
+    ...(trimmedAddress ? { address: trimmedAddress } : {}),
     accessCode,
     createdAt,
   });
@@ -73,8 +97,23 @@ export async function deleteSchool(schoolId: string): Promise<void> {
   const school = await getSchoolById(schoolId);
   if (!school) return;
 
-  await deleteDoc(doc(db, "schools", schoolId));
-  await deleteDoc(doc(db, "schoolAccessCodes", accessCodeDocId(school.accessCode)));
+  const [classesSnap, usersSnap, resultsSnap, deletionRequestsSnap] = await Promise.all([
+    getDocs(query(collection(db, "classes"), where("schoolId", "==", schoolId))),
+    getDocs(query(collection(db, "users"), where("schoolId", "==", schoolId))),
+    getDocs(query(collection(db, "results"), where("schoolId", "==", schoolId))),
+    getDocs(query(collection(db, "studentDeletionRequests"), where("schoolId", "==", schoolId))),
+  ]);
+
+  const docRefs = [
+    ...classesSnap.docs.map((snapshot) => snapshot.ref),
+    ...usersSnap.docs.map((snapshot) => snapshot.ref),
+    ...resultsSnap.docs.map((snapshot) => snapshot.ref),
+    ...deletionRequestsSnap.docs.map((snapshot) => snapshot.ref),
+    doc(db, "schools", schoolId),
+    doc(db, "schoolAccessCodes", accessCodeDocId(school.accessCode)),
+  ];
+
+  await deleteDocumentRefsInBatches(docRefs);
 }
 
 export async function updateSchool(
@@ -302,16 +341,27 @@ interface StudentDeletionRequestInput {
 export interface StudentDeletionRequest {
   id: string;
   studentId: string;
-  studentName: string;
+  studentName?: string;
   studentRomanNickname?: string;
   schoolId: string;
   classId: string;
-  className: string;
+  className?: string;
   requestedByUid: string;
-  requestedByName: string;
-  reason: string;
+  requestedByName?: string;
+  reason?: string;
   status: "pending" | "approved" | "rejected";
   createdAt: number;
+  reviewedAt?: number;
+  reviewedByUid?: string | null;
+  auditLog?: {
+    studentRef: string;
+    requestedByUid: string;
+    reviewedByUid: string | null;
+    requestedAt: number;
+    reviewedAt: number;
+    decision: "approved" | "rejected";
+    reasonProvided: boolean;
+  };
 }
 
 export async function getPendingStudentDeletionRequestIds(
@@ -328,6 +378,40 @@ export async function getPendingStudentDeletionRequestIds(
   return requestsSnap.docs
     .map((d) => (d.data() as { studentId?: string }).studentId)
     .filter((studentId): studentId is string => Boolean(studentId));
+}
+
+export async function removePendingStudentDeletionRequest(input: {
+  studentId: string;
+  schoolId: string;
+}): Promise<{ removedCount: number }> {
+  const requestsSnap = await getDocs(
+    query(
+      collection(db, "studentDeletionRequests"),
+      where("schoolId", "==", input.schoolId),
+      where("status", "==", "pending")
+    )
+  );
+
+  const matchingDocs = requestsSnap.docs.filter((snapshot) => {
+    const data = snapshot.data() as {
+      studentId?: string;
+    };
+
+    if (data.studentId !== input.studentId) return false;
+    return true;
+  });
+
+  if (matchingDocs.length === 0) {
+    return { removedCount: 0 };
+  }
+
+  const batch = writeBatch(db);
+  matchingDocs.forEach((snapshot) => {
+    batch.delete(snapshot.ref);
+  });
+  await batch.commit();
+
+  return { removedCount: matchingDocs.length };
 }
 
 export async function getStudentDeletionRequests(
@@ -371,6 +455,14 @@ export async function createStudentDeletionRequestAndNotifyAdmins(
   const requestId = await createStudentDeletionRequest(request);
 
   try {
+    const requesterSnap = await getDoc(doc(db, "users", request.requestedByUid));
+    const requester = requesterSnap.exists() ? (requesterSnap.data() as AppUser) : null;
+    const canQueueEmail = requester?.role === "admin";
+
+    if (!canQueueEmail) {
+      return { requestId, queuedEmails: 0 };
+    }
+
     const adminsSnap = await getDocs(
       query(collection(db, "users"), where("role", "==", "admin"))
     );
@@ -438,10 +530,27 @@ export async function approveStudentDeletionRequest(
 
   await deleteStudentWithCleanup(request.studentId, request.classId);
 
+  const reviewedAt = Date.now();
+  const studentRef = await createAuditReference(request.studentId);
+
   await updateDoc(requestRef, {
     status: "approved",
-    reviewedAt: Date.now(),
+    reviewedAt,
     reviewedByUid: reviewedByUid ?? null,
+    auditLog: {
+      studentRef,
+      requestedByUid: request.requestedByUid,
+      reviewedByUid: reviewedByUid ?? null,
+      requestedAt: request.createdAt,
+      reviewedAt,
+      decision: "approved",
+      reasonProvided: Boolean(request.reason?.trim()),
+    },
+    studentName: deleteField(),
+    studentRomanNickname: deleteField(),
+    requestedByName: deleteField(),
+    reason: deleteField(),
+    className: deleteField(),
   });
 }
 
@@ -450,10 +559,37 @@ export async function rejectStudentDeletionRequest(
   reviewedByUid?: string
 ): Promise<void> {
   const requestRef = doc(db, "studentDeletionRequests", requestId);
+  const requestSnap = await getDoc(requestRef);
+  if (!requestSnap.exists()) {
+    throw new Error("Deletion request not found.");
+  }
+
+  const request = requestSnap.data() as StudentDeletionRequest;
+  if (request.status !== "pending") {
+    throw new Error("Deletion request has already been reviewed.");
+  }
+
+  const reviewedAt = Date.now();
+  const studentRef = await createAuditReference(request.studentId);
+
   await updateDoc(requestRef, {
     status: "rejected",
-    reviewedAt: Date.now(),
+    reviewedAt,
     reviewedByUid: reviewedByUid ?? null,
+    auditLog: {
+      studentRef,
+      requestedByUid: request.requestedByUid,
+      reviewedByUid: reviewedByUid ?? null,
+      requestedAt: request.createdAt,
+      reviewedAt,
+      decision: "rejected",
+      reasonProvided: Boolean(request.reason?.trim()),
+    },
+    studentName: deleteField(),
+    studentRomanNickname: deleteField(),
+    requestedByName: deleteField(),
+    reason: deleteField(),
+    className: deleteField(),
   });
 }
 
@@ -511,6 +647,15 @@ export async function updateUserPhoto(uid: string, file: File): Promise<string> 
   const url = await getDownloadURL(storageRef);
   await updateDoc(doc(db, "users", uid), { photoUrl: url });
   return url;
+}
+
+export async function updateUserCampaignVideoProgress(
+  uid: string,
+  input: { campaignNumber: number; isEnd?: boolean }
+): Promise<void> {
+  await updateDoc(doc(db, "users", uid), {
+    [input.isEnd ? "watchedCampaignEndVideos" : "watchedCampaignVideos"]: arrayUnion(input.campaignNumber),
+  });
 }
 
 export async function recordStudentAuthorityConsent(

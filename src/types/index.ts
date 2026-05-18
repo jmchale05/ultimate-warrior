@@ -27,6 +27,8 @@ export interface AppUser {
   displayName: string;
   suffix?: string;
   romanNickname?: string;
+  watchedCampaignVideos?: number[];
+  watchedCampaignEndVideos?: number[];
   privacyConsentVersion?: string;
   privacyConsentAt?: number;
   studentAuthorityConsentVersion?: string;

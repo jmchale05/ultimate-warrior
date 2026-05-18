@@ -3,6 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { getSchoolById } from "../lib/firestore";
 import type { School } from "../types";
+import TeacherSupportModal from "./TeacherSupportModal";
 
 function calculateBusinessDays(startTimestamp: number): number {
   const start = new Date(startTimestamp);
@@ -31,6 +32,7 @@ export default function Navbar() {
   const { appUser, signOut } = useAuth();
   const navigate = useNavigate();
   const [showSupport, setShowSupport] = useState(false);
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
   const [school, setSchool] = useState<School | null>(null);
 
   useEffect(() => {
@@ -41,7 +43,7 @@ export default function Navbar() {
 
   async function handleSignOut() {
     await signOut();
-    navigate("/login");
+    navigate("/login", { replace: true, state: { loggedOut: true } });
   }
 
   const campaignStart = school?.campaignStartAt ?? school?.createdAt ?? appUser?.createdAt;
@@ -81,9 +83,14 @@ export default function Navbar() {
                 className="w-12 h-12 rounded-full object-cover border border-roman-gold/30"
               />
               <div className="w-px h-8 bg-roman-gold/20" />
-              <span className="text-stone-300 text-lg tracking-wide font-semibold">
-                {school.name}
-              </span>
+              <div className="leading-tight">
+                <div className="text-stone-300 text-lg tracking-wide font-semibold">
+                  {school.name}
+                </div>
+                <div className="text-roman-gold/70 text-[11px] uppercase tracking-wider font-semibold mt-0.5">
+                  {school.schoolType ?? "School Type Not Set"}
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -93,7 +100,7 @@ export default function Navbar() {
           {appUser && (
             <div className="flex items-center gap-5">
             <div className="text-right">
-              <div className="text-roman-gold font-semibold text-lg tracking-wide">
+              <div className="whitespace-nowrap text-roman-gold font-semibold text-lg tracking-wide">
                 {appUser.suffix ? `${appUser.suffix}. ${appUser.displayName.split(" ").pop()}` : appUser.displayName}
               </div>
               <span className="text-xs bg-roman-gold/15 text-roman-gold/80 px-2 py-0.5 rounded-sm uppercase tracking-widest font-semibold border border-roman-gold/20">
@@ -126,8 +133,8 @@ export default function Navbar() {
               </>
             )}
             <button
-              onClick={handleSignOut}
-              className="text-roman-gold/60 hover:text-roman-gold border border-roman-gold/25 hover:border-roman-gold/60 px-5 py-2.5 rounded-lg transition-all hover:bg-roman-gold/5 uppercase tracking-wider font-semibold text-sm"
+              onClick={() => setShowSignOutConfirm(true)}
+              className="text-roman-gold border border-roman-gold/40 hover:border-roman-gold/70 bg-stone-900/40 px-5 py-2.5 rounded-lg transition-colors hover:bg-roman-gold/10 uppercase tracking-wide font-semibold text-sm"
             >
               Sign Out
             </button>
@@ -150,77 +157,53 @@ export default function Navbar() {
       </div>
     </header>
 
-      {/* Support Modal */}
-      {showSupport && (
-        <div className="fixed inset-0 z-9999 flex items-center justify-center p-6">
+      {/* Sign Out Confirmation Modal */}
+      {showSignOutConfirm && (
+        <div className="fixed inset-0 z-9999 flex items-center justify-center p-4">
           <div
             className="absolute inset-0 bg-stone-950/80 backdrop-blur-sm"
-            onClick={() => setShowSupport(false)}
+            onClick={() => setShowSignOutConfirm(false)}
           />
-          <div className="relative bg-stone-900 border border-roman-gold/20 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
+          <div className="relative w-full max-w-md rounded-2xl border border-roman-gold/20 bg-stone-900 shadow-2xl overflow-hidden">
             <div className="h-px w-full bg-linear-to-r from-transparent via-roman-gold/50 to-transparent" />
             <div className="px-8 py-8">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-roman-gold font-serif text-2xl font-bold tracking-wide">Teacher Support</h2>
+              <h2 className="text-roman-gold font-serif text-2xl font-bold mb-3 tracking-wide">Confirm Sign Out</h2>
+              <p className="text-stone-400 text-sm leading-relaxed">
+                Are you sure you want to sign out?
+              </p>
+
+              <div className="mt-7 flex gap-3">
                 <button
-                  onClick={() => setShowSupport(false)}
-                  className="text-stone-500 hover:text-stone-300 transition-colors text-sm uppercase tracking-wider"
+                  type="button"
+                  onClick={() => setShowSignOutConfirm(false)}
+                  className="flex-1 py-3 rounded-xl border border-stone-700 text-stone-400 hover:text-stone-200 hover:border-stone-500 transition-all"
                 >
-                  Close
+                  Cancel
                 </button>
-              </div>
-
-              {/* FAQ */}
-              <div className="space-y-4 mb-8">
-                {[
-                  {
-                    q: "How do I add a student?",
-                    a: "On the Campaigns page, scroll to the bottom of the student table and click '+ Add Student'. Fill in their name, age, and class.",
-                  },
-                  {
-                    q: "How do students log miles?",
-                    a: "Open a student's campaign page, click 'Begin Campaign' on their active campaign to watch the intro video, then enter miles in the log field and click 'Log Miles'.",
-                  },
-                  {
-                    q: "What are the 12 campaigns?",
-                    a: "Each campaign requires a set number of miles (1 mi for Campaign 1, up to 12 mi for Campaign 12). Students must watch the intro video before logging miles and the end video before unlocking the next campaign.",
-                  },
-                  {
-                    q: "How are ranks determined?",
-                    a: "Ranks are based on total miles completed across all campaigns. The further a student progresses, the higher their Roman rank.",
-                  },
-                  {
-                    q: "Want to remove a student?",
-                    a: "Contact our support email at support@tuwc.online and we will try to sort that out for you.",
-                  },
-                  {
-                    q: "How do I contact support?",
-                    a: "Email us at support@tuwc.online and we'll get back to you within one business day.",
-                  },
-                ].map(({ q, a }) => (
-                  <div key={q} className="border border-stone-700/50 rounded-xl px-5 py-4">
-                    <p className="text-roman-gold font-semibold text-sm mb-1">◆ {q}</p>
-                    <p className="text-stone-400 text-sm leading-relaxed">{a}</p>
-                  </div>
-                ))}
-              </div>
-
-              {/* Contact */}
-              <div className="border-t border-stone-700/40 pt-5 flex items-center justify-between">
-                <div>
-                  <p className="text-stone-500 text-xs uppercase tracking-widest font-semibold mb-1">Email Support</p>
-                  <p className="text-roman-gold text-sm font-semibold">support@tuwc.online</p>
-                </div>
-                <a
-                  href="mailto:support@tuwc.online"
-                  className="px-4 py-2 rounded-lg border border-roman-gold/40 text-roman-gold text-xs uppercase tracking-wider font-semibold hover:bg-roman-gold/10 transition-colors"
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSignOutConfirm(false);
+                    void handleSignOut();
+                  }}
+                  className="flex-1 py-3 rounded-xl bg-roman-gold text-stone-950 font-semibold hover:brightness-110 transition-all"
                 >
-                  Send Email
-                </a>
+                  Sign Out
+                </button>
               </div>
             </div>
           </div>
         </div>
+      )}
+
+      {showSupport && (
+        <TeacherSupportModal
+          onClose={() => setShowSupport(false)}
+          onOpenTerms={() => {
+            setShowSupport(false);
+            navigate("/terms");
+          }}
+        />
       )}
     </>
   );

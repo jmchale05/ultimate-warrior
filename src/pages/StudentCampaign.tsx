@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import confetti from "canvas-confetti";
 import Navbar from "../components/Navbar";
 import { StudentCampaignSkeleton } from "../components/LoadingSpinner";
-import { getUserDoc, getResultsByStudent, submitResult, updateUserPhoto } from "../lib/firestore";
+import { getUserDoc, getResultsByStudent, submitResult, updateUserCampaignVideoProgress, updateUserPhoto } from "../lib/firestore";
 import { useAuth } from "../context/AuthContext";
 import type { AppUser, Result } from "../types";
 
@@ -175,6 +175,8 @@ export default function StudentCampaign() {
         ]);
 
         setStudent(user);
+        setWatchedCampaigns(new Set(user?.watchedCampaignVideos ?? []));
+        setWatchedEndVideos(new Set(user?.watchedCampaignEndVideos ?? []));
         const bycampaign: Record<number, number> = {};
         for (const r of results as Result[]) {
           const match = r.challengeId?.match(/^campaign-(\d+)$/);
@@ -185,9 +187,11 @@ export default function StudentCampaign() {
         }
 
         setCampaignMiles(bycampaign);
+        const watchedEndVideoSet = new Set(user?.watchedCampaignEndVideos ?? []);
         let activeCampaign = 1;
         for (const c of CAMPAIGNS) {
-          if ((bycampaign[c.number] ?? 0) >= c.milesRequired) {
+          const isComplete = (bycampaign[c.number] ?? 0) >= c.milesRequired;
+          if (isComplete && (c.number === CAMPAIGNS.length || watchedEndVideoSet.has(c.number))) {
             activeCampaign = Math.min(c.number + 1, 12);
           } else {
             break;
@@ -221,16 +225,41 @@ export default function StudentCampaign() {
     setIsPlayingVideo(false);
   }
 
-  function handleVideoEnded() {
+  async function handleVideoEnded() {
     if (!videoModal) return;
-    if (videoModal.isEnd) {
-      setWatchedEndVideos((prev) => new Set(prev).add(videoModal.campaignNumber));
-      setAwardModalCampaign(videoModal.campaignNumber);
+
+    const completedVideo = videoModal;
+    if (completedVideo.isEnd) {
+      setWatchedEndVideos((prev) => new Set(prev).add(completedVideo.campaignNumber));
+      setStudent((prev) => prev
+        ? {
+            ...prev,
+            watchedCampaignEndVideos: Array.from(new Set([...(prev.watchedCampaignEndVideos ?? []), completedVideo.campaignNumber])),
+          }
+        : prev);
+      setAwardModalCampaign(completedVideo.campaignNumber);
     } else {
-      setWatchedCampaigns((prev) => new Set(prev).add(videoModal.campaignNumber));
+      setWatchedCampaigns((prev) => new Set(prev).add(completedVideo.campaignNumber));
+      setStudent((prev) => prev
+        ? {
+            ...prev,
+            watchedCampaignVideos: Array.from(new Set([...(prev.watchedCampaignVideos ?? []), completedVideo.campaignNumber])),
+          }
+        : prev);
     }
     setVideoModal(null);
     setIsPlayingVideo(false);
+
+    if (!uid) return;
+
+    try {
+      await updateUserCampaignVideoProgress(uid, {
+        campaignNumber: completedVideo.campaignNumber,
+        isEnd: completedVideo.isEnd,
+      });
+    } catch (error) {
+      console.error("Failed to persist campaign video progress:", error);
+    }
   }
 
   const campaign = CAMPAIGNS[selectedCampaign - 1];
@@ -282,7 +311,7 @@ export default function StudentCampaign() {
                       {student?.photoUrl ? (
                         <img src={student.photoUrl} alt={student.displayName} className="w-full h-full object-cover" />
                       ) : (
-                        <img src="/warrior.png" alt="Warrior" className="w-full h-full object-cover opacity-60" />
+                        <img src="/profile-pics.png" alt="Warrior" className="w-full h-full object-cover opacity-60" />
                       )}
                     </div>
                     <button
@@ -613,9 +642,17 @@ export default function StudentCampaign() {
             <div className="mt-8 flex items-center justify-center">
               <button
                 onClick={() => {
-                  const isFinalCampaign = awardModalCampaign === 12;
+                  const completedCampaign = awardModalCampaign;
+                  const isFinalCampaign = completedCampaign === 12;
                   setAwardModalCampaign(null);
-                  if (isFinalCampaign) setShowGrandFinale(true);
+                  if (isFinalCampaign) {
+                    setShowGrandFinale(true);
+                    return;
+                  }
+                  if (completedCampaign !== null) {
+                    setSelectedCampaign(Math.min(completedCampaign + 1, CAMPAIGNS.length));
+                    setMileInput("");
+                  }
                 }}
                 className="px-5 py-3 rounded-xl border border-stone-600 bg-stone-900/70 text-stone-100 text-sm uppercase tracking-[0.18em] font-semibold hover:border-stone-400 hover:bg-stone-800 transition-colors cursor-pointer"
               >
@@ -627,10 +664,11 @@ export default function StudentCampaign() {
       )}
       {/* Grand Finale - Scutum Shield Reveal */}
       {showGrandFinale && (
-        <div className="fixed inset-0 z-70 bg-black flex items-center justify-center overflow-hidden">
+        <div className="fixed inset-0 z-70 bg-black overflow-y-auto">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(212,175,55,0.15),transparent_60%)]" />
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(212,175,55,0.08),transparent_50%)]" />
-          <div className="relative z-10 flex flex-col items-center text-center px-8 max-w-3xl">
+          <div className="relative z-10 min-h-full w-full flex items-center justify-center px-8 py-12">
+            <div className="flex flex-col items-center text-center max-w-3xl w-full">
             <div className="relative mb-8">
               <div className="absolute inset-0 rounded-full bg-roman-gold/20 blur-3xl scale-[2]" />
               <div className="absolute inset-0 rounded-full bg-roman-gold/10 blur-xl scale-[3] animate-pulse" />
@@ -663,11 +701,15 @@ export default function StudentCampaign() {
                 </div>
               </div>
               <button
-                onClick={() => setShowGrandFinale(false)}
+                onClick={() => {
+                  setShowGrandFinale(false);
+                  navigate("/campaigns", { replace: true });
+                }}
                 className="mt-4 px-8 py-3 rounded-xl border border-roman-gold/40 bg-roman-gold/15 text-roman-gold text-sm uppercase tracking-[0.2em] font-bold hover:bg-roman-gold/25 transition-colors cursor-pointer"
               >
                 Glory to Rome
               </button>
+            </div>
             </div>
           </div>
           <GrandFinaleConfetti />

@@ -44,45 +44,82 @@ export function ButtonSpinner() {
 /** Skeleton table rows for the Campaigns page */
 export function CampaignsTableSkeleton({ rows = 6 }: { rows?: number }) {
   return (
-    <div className="rounded-xl border border-stone-700/50 overflow-hidden">
+    <div className="rounded-2xl border border-roman-gold/15 overflow-hidden bg-stone-950/60 backdrop-blur-md shadow-[0_8px_60px_rgba(0,0,0,0.5)]">
+      <div className="flex items-center justify-between border-b border-roman-gold/10 bg-stone-900/35 px-8 py-4">
+        <div>
+          <div className="text-xs uppercase tracking-[0.24em] text-roman-gold/50 font-semibold">Students</div>
+          <div className="mt-2 skeleton-shimmer h-5 w-44 rounded" />
+        </div>
+        <div className="hidden sm:flex items-center gap-3">
+          <div className="skeleton-shimmer h-9 w-28 rounded-lg" />
+          <div className="skeleton-shimmer h-9 w-32 rounded-lg" />
+        </div>
+      </div>
       <table className="w-full text-left">
         <thead>
-          <tr className="bg-stone-800/80 border-b border-stone-700/50">
-            <th className="px-8 py-5 text-base uppercase tracking-wider text-stone-400 font-semibold">Name</th>
-            <th className="px-8 py-5 text-base uppercase tracking-wider text-stone-400 font-semibold w-24">Age</th>
-            <th className="px-8 py-5 text-base uppercase tracking-wider text-stone-400 font-semibold w-40">Class</th>
-            <th className="px-8 py-5 text-base uppercase tracking-wider text-stone-400 font-semibold w-32">Miles</th>
-            <th className="px-8 py-5 text-base uppercase tracking-wider text-stone-400 font-semibold w-44">Campaign</th>
-            <th className="px-8 py-5 text-base uppercase tracking-wider text-stone-400 font-semibold w-96">Progress</th>
+          <tr className="bg-stone-900/50 border-b border-roman-gold/10">
+            <th className="pl-8 pr-10 py-5 text-lg uppercase tracking-wider text-roman-gold/50 font-semibold w-[34rem]">Name</th>
+            <th className="px-8 py-5 text-lg uppercase tracking-wider text-roman-gold/50 font-semibold w-24">Age</th>
+            <th className="px-8 py-5 text-lg uppercase tracking-wider text-roman-gold/50 font-semibold w-40">Year</th>
+            <th className="px-8 py-5 text-lg uppercase tracking-wider text-roman-gold/50 font-semibold w-56">Campaign</th>
+            <th className="px-8 py-5 text-lg uppercase tracking-wider text-roman-gold/50 font-semibold w-96">Progress</th>
+            <th className="px-8 py-5 text-lg uppercase tracking-wider text-roman-gold/50 font-semibold w-40 text-center">Actions</th>
           </tr>
         </thead>
         <tbody>
           {Array.from({ length: rows }).map((_, i) => (
-            <tr key={i} className="border-b border-stone-800/50">
-              <td className="pl-8 py-6">
-                <div className="flex items-center gap-3">
-                  <div className="skeleton-shimmer w-9 h-9 rounded-full shrink-0" />
-                  <div className="skeleton-shimmer h-5 w-32 rounded" />
+            <tr key={i} className="border-b border-stone-700/20">
+              <td className="pl-8 pr-12 py-6">
+                <div className="flex items-center gap-4">
+                  <div className="skeleton-shimmer w-20 h-20 rounded-full shrink-0 border border-roman-gold/10" />
+                  <div className="min-w-0 flex-1">
+                    <div className="skeleton-shimmer h-8 w-56 rounded" />
+                    <div className="mt-3 skeleton-shimmer h-4 w-28 rounded" />
+                    {i % 3 === 0 && <div className="mt-3 skeleton-shimmer h-3 w-52 rounded" />}
+                  </div>
                 </div>
               </td>
-              <td className="px-8 py-6"><div className="skeleton-shimmer h-5 w-8 rounded" /></td>
-              <td className="px-8 py-6"><div className="skeleton-shimmer h-5 w-20 rounded" /></td>
-              <td className="px-8 py-6"><div className="skeleton-shimmer h-5 w-12 rounded" /></td>
-              <td className="px-8 py-6"><div className="skeleton-shimmer h-5 w-28 rounded" /></td>
               <td className="px-8 py-6">
-                <div className="flex flex-col gap-2">
+                <div className="skeleton-shimmer h-7 w-10 rounded" />
+              </td>
+              <td className="px-8 py-6">
+                <div className="skeleton-shimmer h-6 w-24 rounded" />
+              </td>
+              <td className="px-8 py-6">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <div className="skeleton-shimmer h-5 w-10 rounded" />
+                    <div className="skeleton-shimmer h-6 w-32 rounded" />
+                  </div>
+                </div>
+              </td>
+              <td className="px-8 py-6">
+                <div className="flex flex-col gap-3">
                   <div className="flex items-center gap-4">
                     <div className="skeleton-shimmer flex-1 h-4 rounded-full" />
-                    <div className="skeleton-shimmer h-5 w-10 rounded" />
+                    <div className="skeleton-shimmer h-6 w-12 rounded" />
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="skeleton-shimmer flex-1 h-2 rounded-full" />
-                    <div className="skeleton-shimmer h-3 w-10 rounded" />
+                    <div className="skeleton-shimmer h-4 w-12 rounded" />
                   </div>
+                </div>
+              </td>
+              <td className="px-8 py-6 text-center">
+                <div className="inline-flex items-center justify-center">
+                  <div className="skeleton-shimmer h-10 w-10 rounded-lg" />
                 </div>
               </td>
             </tr>
           ))}
+          <tr>
+            <td colSpan={6} className="px-8 py-5 bg-stone-950/30">
+              <div className="flex items-center justify-between gap-4">
+                <div className="skeleton-shimmer h-5 w-28 rounded" />
+                <div className="skeleton-shimmer h-5 w-36 rounded" />
+              </div>
+            </td>
+          </tr>
         </tbody>
       </table>
     </div>

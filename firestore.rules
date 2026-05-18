@@ -124,14 +124,12 @@ service cloud.firestore {
         (
           request.auth.uid == uid &&
           request.resource.data.uid == uid &&
-          request.resource.data.email == request.auth.token.email &&
           request.resource.data.role == 'teacher' &&
           exists(/databases/$(database)/documents/schools/$(request.resource.data.schoolId))
         ) ||
         (
           request.auth.uid == uid &&
           request.resource.data.uid == uid &&
-          request.resource.data.email == request.auth.token.email &&
           request.resource.data.role == 'admin' &&
           exists(/databases/$(database)/documents/adminSignupTokens/$(uid))
         ) ||
@@ -155,7 +153,7 @@ service cloud.firestore {
         isAdmin() ||
         sameSchool(resource.data.schoolId)
       );
-      allow create: if isTeacher() && sameSchool(request.resource.data.schoolId);
+      allow create: if isAdmin() || (isTeacher() && sameSchool(request.resource.data.schoolId));
       allow update: if isAdmin() || (isTeacher() && sameSchool(resource.data.schoolId));
       allow delete: if isAdmin() || (isTeacher() && resource.data.teacherId == request.auth.uid);
     }
@@ -189,13 +187,18 @@ service cloud.firestore {
     match /studentDeletionRequests/{requestId} {
       allow create: if isTeacher() && sameSchool(request.resource.data.schoolId);
       allow read: if isAdmin() || (isTeacher() && sameSchool(resource.data.schoolId));
-      allow update, delete: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin() || (
+        isTeacher() &&
+        sameSchool(resource.data.schoolId) &&
+        resource.data.status == 'pending'
+      );
     }
 
     // ── /mail ───────────────────────────────────────────────────────────────
     // Outbound email queue documents (e.g. Firebase Trigger Email extension).
     match /mail/{mailId} {
-      allow create: if isAdmin() || isTeacher();
+      allow create: if isAdmin();
       allow read, update, delete: if isAdmin();
     }
   }
