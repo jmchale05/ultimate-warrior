@@ -159,26 +159,33 @@ export default function Navbar() {
 
       {/* Sign Out Confirmation Modal */}
       {showSignOutConfirm && (
-        <div className="fixed inset-0 z-9999 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
-            className="absolute inset-0 bg-stone-950/80 backdrop-blur-sm"
+            className="absolute inset-0 bg-stone-950/80 backdrop-blur-md transition-opacity"
             onClick={() => setShowSignOutConfirm(false)}
           />
-          <div className="relative w-full max-w-md rounded-2xl border border-roman-gold/20 bg-stone-900 shadow-2xl overflow-hidden">
-            <div className="h-px w-full bg-linear-to-r from-transparent via-roman-gold/50 to-transparent" />
-            <div className="px-8 py-8">
-              <h2 className="text-roman-gold font-serif text-2xl font-bold mb-3 tracking-wide">Confirm Sign Out</h2>
-              <p className="text-stone-400 text-sm leading-relaxed">
-                Are you sure you want to sign out?
+          <div className="relative w-full max-w-sm rounded-2xl border border-roman-gold/30 bg-stone-950 shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden animate-[addStudentModalZoomIn_180ms_cubic-bezier(0.16,1,0.3,1)]">
+            <div className="h-px w-full bg-linear-to-r from-transparent via-roman-gold/60 to-transparent absolute top-0 left-0" />
+            
+            <div className="p-8 pb-7 flex flex-col items-center text-center">
+              <div className="w-14 h-14 rounded-full border border-roman-gold/30 bg-roman-gold/10 flex flex-col items-center justify-center mb-5 text-roman-gold shadow-[0_0_15px_rgba(235,191,90,0.15)]">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-6 h-6 ml-1">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+                </svg>
+              </div>
+
+              <h2 className="text-roman-gold font-serif text-2xl font-bold mb-2 tracking-wide">Sign Out</h2>
+              <p className="text-stone-400 text-sm leading-relaxed mb-8 px-2 max-w-[260px]">
+                Are you sure you want to end your current session?
               </p>
 
-              <div className="mt-7 flex gap-3">
+              <div className="w-full flex gap-3">
                 <button
                   type="button"
                   onClick={() => setShowSignOutConfirm(false)}
-                  className="flex-1 py-3 rounded-xl border border-stone-700 text-stone-400 hover:text-stone-200 hover:border-stone-500 transition-all"
+                  className="flex-1 py-2.5 rounded-xl border border-stone-800 text-stone-300 font-bold text-sm tracking-widest hover:bg-stone-800 active:scale-[0.97] transition-all"
                 >
-                  Cancel
+                  CANCEL
                 </button>
                 <button
                   type="button"
@@ -186,9 +193,9 @@ export default function Navbar() {
                     setShowSignOutConfirm(false);
                     void handleSignOut();
                   }}
-                  className="flex-1 py-3 rounded-xl bg-roman-gold text-stone-950 font-semibold hover:brightness-110 transition-all"
+                  className="flex-1 py-2.5 rounded-xl bg-roman-gold text-stone-950 font-bold text-sm tracking-widest hover:brightness-110 shadow-[0_4px_15px_rgba(235,191,90,0.2)] active:scale-[0.97] transition-all"
                 >
-                  Sign Out
+                  SIGN OUT
                 </button>
               </div>
             </div>

@@ -140,7 +140,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function signIn(email: string, password: string) {
-    await signInWithEmailAndPassword(auth, email, password);
+    const cred = await signInWithEmailAndPassword(auth, email, password);
+    const profile = await getUserDoc(cred.user.uid);
+
+    if (!profile) {
+      await firebaseSignOut(auth);
+      throw new Error("Could not find your account.");
+    }
+
+    setAppUser(profile);
   }
 
   async function signUp(

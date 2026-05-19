@@ -134,6 +134,7 @@ export default function LoginPage() {
       if (err instanceof Error && err.message) {
         const normalizedMessage = err.message.toLowerCase();
         if (
+          normalizedMessage.includes("could not find your account") ||
           normalizedMessage.includes("invalid access code") ||
           normalizedMessage.includes("invalid admin access code") ||
           normalizedMessage.includes("app profile could not be saved")

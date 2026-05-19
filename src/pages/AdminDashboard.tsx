@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Navbar from "../components/Navbar";
 import { FullPageLoader } from "../components/LoadingSpinner";
 import { useAuth } from "../context/AuthContext";
@@ -38,7 +38,6 @@ interface SchoolStats {
   teachers: AppUser[];
   students: AppUser[];
   totalMiles: number;
-  avgMiles: number;
   completedStudents: number; // reached 78 mi
 }
 
@@ -71,8 +70,14 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [schoolSearch, setSchoolSearch] = useState("");
-  const [schoolSort, setSchoolSort] = useState<"miles" | "name" | "students">("miles");
+  const [schoolSort, setSchoolSort] = useState<"miles" | "name" | "students" | "daysRemaining">("miles");
   const [copiedSchoolId, setCopiedSchoolId] = useState<string | null>(null);
+
+  // Tabs & Pagination
+  const [activeTab, setActiveTab] = useState<"schools" | "requests">("schools");
+  const [schoolsPage, setSchoolsPage] = useState(1);
+  const [expandedSchoolId, setExpandedSchoolId] = useState<string | null>(null);
+  const SCHOOLS_PER_PAGE = 10;
 
   // Add School modal
   const [showAddSchool, setShowAddSchool] = useState(false);
@@ -110,6 +115,7 @@ export default function AdminDashboard() {
   const [deletionRequests, setDeletionRequests] = useState<StudentDeletionRequest[]>([]);
   const [deletionRequestActionId, setDeletionRequestActionId] = useState<string | null>(null);
   const [deletionRequestError, setDeletionRequestError] = useState("");
+  const [deletionConfirm, setDeletionConfirm] = useState<{ requestId: string; studentName: string; action: "approve" | "reject" } | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -152,9 +158,8 @@ export default function AdminDashboard() {
           const students = users.filter((u) => studentIds.includes(u.uid));
           const milesArr = studentIds.map((id) => milesByStudent.get(id) ?? 0);
           const totalMiles = milesArr.reduce((a, b) => a + b, 0);
-          const avgMiles = students.length > 0 ? totalMiles / students.length : 0;
           const completedStudents = milesArr.filter((m) => m >= TOTAL_MILES).length;
-          return { school, classes, teachers, students, totalMiles, avgMiles, completedStudents };
+          return { school, classes, teachers, students, totalMiles, completedStudents };
         })
       );
 
@@ -415,6 +420,25 @@ export default function AdminDashboard() {
     }
   }
 
+  function promptApproveDeletion(requestId: string, studentName: string) {
+    setDeletionConfirm({ requestId, studentName, action: "approve" });
+  }
+
+  function promptRejectDeletion(requestId: string, studentName: string) {
+    setDeletionConfirm({ requestId, studentName, action: "reject" });
+  }
+
+  async function handleConfirmDeletionAction() {
+    if (!deletionConfirm) return;
+    const { requestId, action } = deletionConfirm;
+    setDeletionConfirm(null);
+    if (action === "approve") {
+      await handleApproveDeletionRequest(requestId);
+    } else {
+      await handleRejectDeletionRequest(requestId);
+    }
+  }
+
   async function handleApproveDeletionRequest(requestId: string) {
     setDeletionRequestActionId(requestId);
     setDeletionRequestError("");
@@ -473,6 +497,11 @@ export default function AdminDashboard() {
     setShowAuthorityConsentModal(true);
   }
 
+  function handleOpenAddStudentForSchool(schoolId: string) {
+    setStudentSchoolId(schoolId);
+    handleOpenAddStudent();
+  }
+
   const totalStudents = allUsers.filter((u) => u.role === "student").length;
   const totalTeachers = allUsers.filter((u) => u.role === "teacher").length;
   const totalMilesAll = allResults.reduce((s, r) => s + r.distanceMiles, 0);
@@ -511,6 +540,28 @@ export default function AdminDashboard() {
       sorted.sort((a, b) => a.school.name.localeCompare(b.school.name));
     } else if (schoolSort === "students") {
       sorted.sort((a, b) => b.students.length - a.students.length);
+    } else if (schoolSort === "daysRemaining") {
+      sorted.sort((a, b) => {
+        const teacherStartCandidatesA = a.teachers
+          .map((t) => t.createdAt)
+          .filter((ts) => Number.isFinite(ts));
+        const firstTeacherStartA = teacherStartCandidatesA.length > 0
+          ? Math.min(...teacherStartCandidatesA)
+          : undefined;
+        const campaignStartA = a.school.campaignStartAt ?? firstTeacherStartA ?? a.school.createdAt;
+        const daysRemainingA = Math.max(0, 200 - Math.min(200, calculateBusinessDays(campaignStartA)));
+
+        const teacherStartCandidatesB = b.teachers
+          .map((t) => t.createdAt)
+          .filter((ts) => Number.isFinite(ts));
+        const firstTeacherStartB = teacherStartCandidatesB.length > 0
+          ? Math.min(...teacherStartCandidatesB)
+          : undefined;
+        const campaignStartB = b.school.campaignStartAt ?? firstTeacherStartB ?? b.school.createdAt;
+        const daysRemainingB = Math.max(0, 200 - Math.min(200, calculateBusinessDays(campaignStartB)));
+
+        return daysRemainingA - daysRemainingB;
+      });
     } else {
       sorted.sort((a, b) => b.totalMiles - a.totalMiles);
     }
@@ -518,11 +569,30 @@ export default function AdminDashboard() {
     return sorted;
   }, [schoolStats, schoolSearch, schoolSort]);
 
+  useEffect(() => {
+    setSchoolsPage(1);
+  }, [schoolSearch, schoolSort]);
+
+  const paginatedSchools = useMemo(() => {
+    const start = (schoolsPage - 1) * SCHOOLS_PER_PAGE;
+    return filteredSchoolStats.slice(start, start + SCHOOLS_PER_PAGE);
+  }, [filteredSchoolStats, schoolsPage]);
+
+  const totalPages = Math.ceil(filteredSchoolStats.length / SCHOOLS_PER_PAGE);
+
   if (loading) return <FullPageLoader message="Loading admin data..." />;
 
   if (loadError) {
     return (
-      <div className="h-screen bg-stone-900 text-stone-100 flex flex-col overflow-hidden">
+      <div
+        className="h-screen text-stone-100 flex flex-col overflow-hidden bg-stone-900"
+        style={{
+          backgroundImage: "linear-gradient(rgba(12, 10, 8, 0.5), rgba(12, 10, 8, 0.6)), url('/admin-page.png')",
+          backgroundSize: "cover",
+          backgroundPosition: "center top",
+          backgroundRepeat: "no-repeat",
+        }}
+      >
         <Navbar />
         <div className="flex-1 min-h-0 w-full px-14 py-10 overflow-y-auto overflow-x-hidden flex items-center justify-center">
           <div className="roman-card rounded-2xl px-8 py-8 max-w-lg w-full text-center">
@@ -541,7 +611,15 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="h-screen bg-stone-900 text-stone-100 flex flex-col overflow-hidden">
+    <div
+      className="h-screen text-stone-100 flex flex-col overflow-hidden bg-stone-900"
+      style={{
+        backgroundImage: "linear-gradient(rgba(12, 10, 8, 0.5), rgba(12, 10, 8, 0.6)), url('/admin-page.png')",
+        backgroundSize: "cover",
+        backgroundPosition: "center top",
+        backgroundRepeat: "no-repeat",
+      }}
+    >
       <Navbar />
 
       {studentSuccessToast && (
@@ -556,33 +634,112 @@ export default function AdminDashboard() {
         {/* Global stat cards */}
         <div className="grid grid-cols-1 gap-4 mb-10 sm:grid-cols-2 xl:grid-cols-4">
           {[
-            { label: "Schools", value: totalSchools, icon: "🏛" },
-            { label: "Teachers", value: totalTeachers, icon: "⚔" },
-            { label: "Students", value: totalStudents, icon: "🛡" },
-            { label: "Total Miles", value: totalMilesAll.toFixed(1), icon: "🏃" },
-          ].map(({ label, value, icon }) => (
+            {
+              label: "Schools",
+              value: totalSchools,
+              iconTone: "from-amber-500/20 via-yellow-500/10 to-amber-600/5 text-roman-gold border-roman-gold/30 shadow-[0_0_15px_rgba(212,175,55,0.15)]",
+              icon: (
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5" className="h-6 w-6">
+                  <path strokeLinecap="round" strokeLinejoin="round" fill="currentColor" fillOpacity="0.2" d="M3 21h18M3 10h18M5 6l7-3 7 3v4H5V6zM4 10v11m16-11v11M8 14v4m4-4v4m4-4v4" />
+                </svg>
+              ),
+            },
+            {
+              label: "Teachers",
+              value: totalTeachers,
+              iconTone: "from-purple-500/20 via-fuchsia-500/10 to-purple-600/5 text-purple-400 border-purple-400/30 shadow-[0_0_15px_rgba(168,85,247,0.15)]",
+              icon: (
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5" className="h-6 w-6">
+                  <path strokeLinecap="round" strokeLinejoin="round" fill="currentColor" fillOpacity="0.2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
+              ),
+            },
+            {
+              label: "Students",
+              value: totalStudents,
+              iconTone: "from-red-500/20 via-rose-500/10 to-red-600/5 text-red-400 border-red-400/30 shadow-[0_0_15px_rgba(248,113,113,0.15)]",
+              icon: (
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5" className="h-6 w-6">
+                  <path strokeLinecap="round" strokeLinejoin="round" fill="currentColor" fillOpacity="0.2" d="M12 21s-5-2.5-5-7.5V6.2L12 4l5 2.2v7.3c0 5-5 7.5-5 7.5Z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m9.5 12 1.6 1.6 3.4-3.6" />
+                </svg>
+              ),
+            },
+            {
+              label: "Total Miles",
+              value: totalMilesAll.toFixed(1),
+              iconTone: "from-emerald-500/20 via-teal-500/10 to-emerald-600/5 text-emerald-400 border-emerald-400/30 shadow-[0_0_15px_rgba(52,211,153,0.15)]",
+              icon: (
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5" className="h-6 w-6">
+                  <path strokeLinecap="round" strokeLinejoin="round" fill="currentColor" fillOpacity="0.2" d="M9 6.75V15m6-6v8.25m.503 3.498 4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 0 0-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.715V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0Z" />
+                </svg>
+              ),
+            },
+          ].map(({ label, value, iconTone, icon }) => (
             <div
               key={label}
-              className="roman-card rounded-xl px-6 py-4 flex items-center gap-4"
+              className="roman-card rounded-xl p-5 flex items-center justify-between group transition-colors hover:border-roman-gold/40"
             >
-              <span className="text-3xl">{icon}</span>
               <div>
-                <p className="text-roman-gold font-serif text-3xl font-bold leading-tight">{value}</p>
-                <p className="text-stone-500 text-xs uppercase tracking-widest font-semibold">{label}</p>
+                <p className="text-stone-400 text-[11px] uppercase tracking-[0.2em] font-semibold mb-1.5">{label}</p>
+                <p className="text-roman-gold font-serif text-3xl font-bold leading-none tracking-tight drop-shadow-sm">{value}</p>
+              </div>
+              <div className={`relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border bg-stone-950/80 bg-gradient-to-br ${iconTone} group-hover:scale-110 group-hover:-translate-y-0.5 transition-all duration-300`}>
+                <div className="pointer-events-none absolute inset-0 rounded-xl bg-linear-to-br from-white/5 via-transparent to-black/30" />
+                {icon}
               </div>
             </div>
           ))}
         </div>
 
-        {/* Deletion requests */}
-        {deletionRequestsWithContext.length > 0 && (
-          <div className="mb-12">
+        {/* Tabs */}
+        <div className="flex space-x-1 border-b border-stone-800/80 mb-8 overflow-x-auto hide-scrollbar">
+          <button
+            onClick={() => setActiveTab("schools")}
+            className={`px-6 py-3 text-sm font-semibold uppercase tracking-wider transition-colors z-10 border-b-2 ${
+              activeTab === "schools"
+                ? "border-roman-gold text-roman-gold"
+                : "border-transparent text-stone-400 hover:text-stone-300"
+            }`}
+          >
+            Schools ({totalSchools})
+          </button>
+          <button
+            onClick={() => setActiveTab("requests")}
+            className={`px-6 py-3 text-sm font-semibold uppercase tracking-wider transition-all duration-300 z-10 border-b-2 flex items-center gap-2 ${
+              activeTab === "requests"
+                ? "border-roman-gold text-roman-gold"
+                : totalPendingDeletionRequests > 0
+                  ? "border-red-500/50 text-red-400 bg-red-500/10 hover:bg-red-500/20 hover:text-red-300 shadow-[inset_0_-2px_10px_rgba(239,68,68,0.15)]"
+                  : "border-transparent text-stone-400 hover:text-stone-300"
+            }`}
+          >
+            <span>Deletion Requests</span>
+            {totalPendingDeletionRequests > 0 ? (
+              <span className="flex items-center justify-center bg-red-600 text-white min-w-5 h-5 px-1.5 rounded-full text-[11px] font-bold shadow-[0_0_12px_rgba(220,38,38,0.9)] animate-pulse">
+                {totalPendingDeletionRequests}
+              </span>
+            ) : (
+              <span>({totalPendingDeletionRequests})</span>
+            )}
+          </button>
+        </div>
+
+        {/* Deletion requests Tab */}
+        {activeTab === "requests" && (
+          <div className="mb-12 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            {deletionRequestsWithContext.length > 0 ? (
+              <>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-roman-gold/70 text-base uppercase tracking-[0.2em] font-semibold">
+              <h2 className="text-roman-gold/70 text-base uppercase tracking-[0.2em] font-semibold flex items-center gap-2">
                 Deletion Requests
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                </span>
               </h2>
-              <span className="text-stone-500 text-sm uppercase tracking-wider">
-                Pending: <span className="text-roman-gold font-semibold">{totalPendingDeletionRequests}</span>
+              <span className="text-red-400 font-bold text-sm uppercase tracking-wider bg-red-500/10 border border-red-500/20 px-3 py-1 rounded-full shadow-[0_0_10px_rgba(239,68,68,0.15)]">
+                Pending: <span className="text-red-300">{totalPendingDeletionRequests}</span>
               </span>
             </div>
 
@@ -593,7 +750,7 @@ export default function AdminDashboard() {
             <div className="rounded-xl border border-stone-700/50 overflow-hidden">
               <table className="w-full text-left">
                 <thead>
-                  <tr className="bg-stone-800/80 border-b border-stone-700/50">
+                  <tr className="bg-stone-700/70 border-b border-stone-600/50">
                     <th className="px-6 py-4 text-sm uppercase tracking-wider text-stone-400 font-semibold w-56">Student</th>
                     <th className="px-6 py-4 text-sm uppercase tracking-wider text-stone-400 font-semibold w-40">Year</th>
                     <th className="px-6 py-4 text-sm uppercase tracking-wider text-stone-400 font-semibold w-56">School</th>
@@ -625,7 +782,7 @@ export default function AdminDashboard() {
                         <div className="flex items-center justify-center gap-2">
                           <button
                             type="button"
-                            onClick={() => void handleApproveDeletionRequest(request.id)}
+                            onClick={() => promptApproveDeletion(request.id, request.studentName ?? "this student")}
                             disabled={deletionRequestActionId === request.id}
                             className="px-3 py-1.5 rounded-md bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 text-xs uppercase tracking-wider font-semibold hover:bg-emerald-500/30 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                           >
@@ -633,7 +790,7 @@ export default function AdminDashboard() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => void handleRejectDeletionRequest(request.id)}
+                            onClick={() => promptRejectDeletion(request.id, request.studentName ?? "this student")}
                             disabled={deletionRequestActionId === request.id}
                             className="px-3 py-1.5 rounded-md bg-red-500/15 border border-red-400/40 text-red-200 text-xs uppercase tracking-wider font-semibold hover:bg-red-500/25 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                           >
@@ -646,24 +803,31 @@ export default function AdminDashboard() {
                 </tbody>
               </table>
             </div>
+            </>
+            ) : (
+              <div className="rounded-xl border border-stone-600/50 bg-stone-800/55 px-6 py-12 text-center text-stone-400 text-lg">
+                <p>No pending deletion requests.</p>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Schools table */}
-        <div className="mb-12">
+        {/* Schools table Tab */}
+        {activeTab === "schools" && (
+        <div className="mb-12 animate-in fade-in slide-in-from-bottom-2 duration-300">
           <div className="mb-4">
             <h2 className="text-roman-gold/70 text-base uppercase tracking-[0.2em] font-semibold mb-4">
               Schools
             </h2>
             <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <div className="relative w-full sm:min-w-72 sm:flex-1 sm:max-w-md">
+                <div className="relative w-full sm:min-w-[24rem] sm:flex-1 sm:max-w-xl xl:max-w-2xl">
                   <input
                     type="text"
                     value={schoolSearch}
                     onChange={(e) => setSchoolSearch(e.target.value)}
                     placeholder="Search school name or address"
-                    className="w-full bg-stone-800 border border-stone-700 rounded-lg px-5 py-3.5 pr-12 text-base text-stone-100 placeholder-stone-500 focus:outline-none focus:border-roman-gold/60 transition-colors"
+                    className="w-full bg-stone-700/85 border border-stone-600 rounded-lg px-5 py-3.5 pr-12 text-base text-stone-100 placeholder-stone-400 focus:outline-none focus:border-roman-gold/70 transition-colors"
                   />
                   {schoolSearch.trim() && (
                     <button
@@ -691,10 +855,11 @@ export default function AdminDashboard() {
                 </div>
                 <select
                   value={schoolSort}
-                  onChange={(e) => setSchoolSort(e.target.value as "miles" | "name" | "students")}
-                  className="bg-stone-800 border border-stone-700 rounded-lg px-4 py-3.5 text-base text-stone-100 focus:outline-none focus:border-roman-gold/60 transition-colors"
+                  onChange={(e) => setSchoolSort(e.target.value as "miles" | "name" | "students" | "daysRemaining")}
+                  className="bg-stone-700/85 border border-stone-600 rounded-lg px-4 py-3.5 text-base text-stone-100 focus:outline-none focus:border-roman-gold/70 transition-colors"
                 >
                   <option value="miles">Sort: Total Miles</option>
+                  <option value="daysRemaining">Sort: Days Remaining</option>
                   <option value="students">Sort: Students</option>
                   <option value="name">Sort: School Name</option>
                 </select>
@@ -716,8 +881,8 @@ export default function AdminDashboard() {
             </div>
           </div>
           <div className="space-y-4 xl:hidden">
-            {filteredSchoolStats.length === 0 ? (
-              <div className="rounded-xl border border-stone-700/50 bg-stone-900/50 px-6 py-12 text-center text-stone-500 text-lg">
+            {paginatedSchools.length === 0 ? (
+              <div className="rounded-xl border border-stone-600/50 bg-stone-800/55 px-6 py-12 text-center text-stone-400 text-lg">
                 <p>{schoolStats.length === 0 ? "No schools found." : "No schools match your search."}</p>
                 {schoolStats.length === 0 && (
                   <button
@@ -730,7 +895,7 @@ export default function AdminDashboard() {
                 )}
               </div>
             ) : (
-              filteredSchoolStats.map((s) => {
+              paginatedSchools.map((s) => {
                 const teacherStartCandidates = s.teachers
                   .map((t) => t.createdAt)
                   .filter((ts) => Number.isFinite(ts));
@@ -739,12 +904,18 @@ export default function AdminDashboard() {
                   : undefined;
                 const campaignStart = s.school.campaignStartAt ?? firstTeacherStart ?? s.school.createdAt;
                 const dayCount = Math.min(200, calculateBusinessDays(campaignStart));
+                const isExpanded = expandedSchoolId === s.school.id;
 
                 return (
-                  <div key={s.school.id} className="rounded-xl border border-stone-700/50 bg-stone-900/50 p-4 shadow-[0_8px_32px_rgba(0,0,0,0.25)] sm:p-5">
-                    <div className="flex items-start justify-between gap-3">
+                  <div key={s.school.id} className="rounded-xl border border-stone-600/50 bg-stone-800/55 p-4 shadow-[0_8px_28px_rgba(0,0,0,0.22)] sm:p-5">
+                    <div 
+                      className="flex items-start justify-between gap-3 cursor-pointer"
+                      onClick={() => setExpandedSchoolId(current => current === s.school.id ? null : s.school.id)}
+                    >
                       <div className="min-w-0">
-                        <h3 className="wrap-break-word text-xl font-semibold text-stone-100">{s.school.name}</h3>
+                        <h3 className="wrap-break-word text-xl font-semibold text-stone-100">
+                          {s.school.name}
+                        </h3>
                         <p className="text-roman-gold/75 text-xs mt-1 uppercase tracking-wider font-semibold">
                           {s.school.schoolType ?? "School Type Not Set"}
                         </p>
@@ -833,10 +1004,6 @@ export default function AdminDashboard() {
                         <p className="text-[11px] uppercase tracking-wider text-stone-500">Classes</p>
                         <p className="mt-1 text-base text-stone-300">{s.classes.length}</p>
                       </div>
-                      <div className="rounded-lg border border-stone-800 bg-stone-950/50 px-3 py-2">
-                        <p className="text-[11px] uppercase tracking-wider text-stone-500">Avg Miles</p>
-                        <p className="mt-1 text-base text-stone-300">{s.avgMiles.toFixed(1)}</p>
-                      </div>
                       <div className="rounded-lg border border-stone-800 bg-stone-950/50 px-3 py-2 sm:col-span-2">
                         <p className="text-[11px] uppercase tracking-wider text-stone-500">Completed</p>
                         <p className="mt-1 text-base text-stone-300">
@@ -845,6 +1012,47 @@ export default function AdminDashboard() {
                         </p>
                       </div>
                     </div>
+
+                    {isExpanded && (
+                      <div className="mt-6 border-t border-stone-800 pt-4">
+                        <div className="mb-3 flex items-center justify-between gap-3">
+                          <h4 className="text-roman-gold text-sm font-semibold">Students ({s.students.length})</h4>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenAddStudentForSchool(s.school.id);
+                            }}
+                            className="rounded-lg border border-roman-gold/40 bg-roman-gold/10 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-roman-gold transition-colors hover:bg-roman-gold/20"
+                          >
+                            + Add Student
+                          </button>
+                        </div>
+                        {s.students.length === 0 ? (
+                          <p className="text-stone-500 text-sm">No students added yet.</p>
+                        ) : (
+                          <div className="flex flex-col gap-2 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
+                            {s.students.map((student) => {
+                              const studentMiles = allResults
+                                .filter(r => r.studentId === student.uid)
+                                .reduce((sum, r) => sum + r.distanceMiles, 0);
+                              return (
+                                <div key={student.uid} className="flex items-center justify-between bg-stone-900 border border-stone-800 rounded-lg p-3">
+                                  <div>
+                                    <p className="font-medium text-stone-200 text-sm">{student.displayName}</p>
+                                    {student.romanNickname && <p className="text-xs text-roman-gold/80">{student.romanNickname}</p>}
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-sm font-semibold text-roman-gold">{studentMiles.toFixed(1)} <span className="text-xs text-stone-500 font-normal">mi</span></p>
+                                    <p className="text-xs text-stone-500">{studentMiles >= TOTAL_MILES ? "Completed" : "In Progress"}</p>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })
@@ -858,24 +1066,20 @@ export default function AdminDashboard() {
                 <col className="w-[24%]" />
                 <col className="w-[12%]" />
                 <col className="w-[8%]" />
-                <col className="w-[7%]" />
                 <col className="w-[8%]" />
                 <col className="w-[8%]" />
                 <col className="w-[10%]" />
-                <col className="w-[9%]" />
                 <col className="w-[7%]" />
                 <col className="w-[7%]" />
               </colgroup>
               <thead>
-                <tr className="bg-stone-800/80 border-b border-stone-700/50">
+                <tr className="bg-stone-700/70 border-b border-stone-600/50">
                   <th className="px-6 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold">School</th>
                   <th className="px-6 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold">Access Code</th>
                   <th className="px-6 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold text-center">Days</th>
-                  <th className="px-6 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold text-center">Classes</th>
                   <th className="px-6 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold text-center">Teachers</th>
                   <th className="px-6 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold text-center">Students</th>
                   <th className="px-6 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold text-center">Total Miles</th>
-                  <th className="px-6 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold text-center">Avg Miles</th>
                   <th className="px-6 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold text-center">Completed</th>
                   <th className="px-6 py-5 text-lg uppercase tracking-wider text-stone-400 font-semibold text-center">Actions</th>
                 </tr>
@@ -883,7 +1087,7 @@ export default function AdminDashboard() {
               <tbody>
                 {filteredSchoolStats.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="px-6 py-12 text-center text-stone-500 text-lg">
+                    <td colSpan={8} className="px-6 py-12 text-center text-stone-500 text-lg">
                       <p>{schoolStats.length === 0 ? "No schools found." : "No schools match your search."}</p>
                       {schoolStats.length === 0 && (
                         <button
@@ -897,7 +1101,7 @@ export default function AdminDashboard() {
                     </td>
                   </tr>
                 ) : (
-                  filteredSchoolStats.map((s) => {
+                  paginatedSchools.map((s) => {
                     const teacherStartCandidates = s.teachers
                       .map((t) => t.createdAt)
                       .filter((ts) => Number.isFinite(ts));
@@ -906,19 +1110,25 @@ export default function AdminDashboard() {
                       : undefined;
                     const campaignStart = s.school.campaignStartAt ?? firstTeacherStart ?? s.school.createdAt;
                     const dayCount = Math.min(200, calculateBusinessDays(campaignStart));
+                    const isExpanded = expandedSchoolId === s.school.id;
                     return (
+                      <React.Fragment key={s.school.id}>
                       <tr
-                        key={s.school.id}
-                        className="border-b border-stone-800/50 transition-colors hover:bg-stone-800/40"
+                        onClick={() => setExpandedSchoolId(current => current === s.school.id ? null : s.school.id)}
+                        className="border-b border-stone-800/50 transition-colors hover:bg-stone-800/40 cursor-pointer"
                       >
                         <td className="px-6 py-6 font-medium text-stone-100 text-xl">
-                          {s.school.name}
-                          <p className="text-roman-gold/75 text-xs mt-1 uppercase tracking-wider font-semibold">
-                            {s.school.schoolType ?? "School Type Not Set"}
-                          </p>
-                          {s.school.address && (
-                            <p className="mt-1 max-w-full wrap-break-word text-stone-500 text-sm leading-snug">{s.school.address}</p>
-                          )}
+                          <div className="flex items-center gap-3">
+                            <div>
+                              <div>{s.school.name}</div>
+                              <p className="text-roman-gold/75 text-xs mt-1 uppercase tracking-wider font-semibold">
+                                {s.school.schoolType ?? "School Type Not Set"}
+                              </p>
+                              {s.school.address && (
+                                <p className="mt-1 max-w-full wrap-break-word text-stone-500 text-sm leading-snug">{s.school.address}</p>
+                              )}
+                            </div>
+                          </div>
                         </td>
                         <td className="px-6 py-6">
                           <div className="flex items-center gap-3">
@@ -941,11 +1151,9 @@ export default function AdminDashboard() {
                         <td className="px-6 py-6 text-roman-gold text-lg font-semibold text-center">
                           {dayCount}/200
                         </td>
-                        <td className="px-6 py-6 text-stone-300 text-lg text-center">{s.classes.length}</td>
                         <td className="px-6 py-6 text-stone-300 text-lg text-center">{s.teachers.length}</td>
                         <td className="px-6 py-6 text-stone-300 text-lg text-center">{s.students.length}</td>
                         <td className="px-6 py-6 text-roman-gold font-bold text-lg text-center">{s.totalMiles.toFixed(1)}</td>
-                        <td className="px-6 py-6 text-stone-300 text-lg text-center">{s.avgMiles.toFixed(1)}</td>
                         <td className="px-6 py-6 text-center">
                           <span className="text-roman-gold font-semibold text-lg">{s.completedStudents}</span>
                           <span className="text-stone-500 text-sm ml-1">/ {s.students.length}</span>
@@ -968,7 +1176,7 @@ export default function AdminDashboard() {
                                 ref={actionsMenuRef}
                                 id={`school-actions-${s.school.id}`}
                                 role="menu"
-                                className={`fixed z-[70] w-44 rounded-xl border border-roman-gold/25 bg-stone-950/95 shadow-[0_16px_40px_rgba(0,0,0,0.55)] backdrop-blur-md overflow-hidden -translate-x-full ${desktopSchoolActionsAnchor.openUp ? "-translate-y-full origin-bottom-right" : "origin-top-right"}`}
+                                className={`fixed z-70 w-44 rounded-xl border border-roman-gold/25 bg-stone-950/95 shadow-[0_16px_40px_rgba(0,0,0,0.55)] backdrop-blur-md overflow-hidden -translate-x-full ${desktopSchoolActionsAnchor.openUp ? "-translate-y-full origin-bottom-right" : "origin-top-right"}`}
                                 style={{ top: `${desktopSchoolActionsAnchor.top}px`, left: `${desktopSchoolActionsAnchor.left}px` }}
                                 onClick={(e) => e.stopPropagation()}
                               >
@@ -1002,14 +1210,98 @@ export default function AdminDashboard() {
                           </div>
                         </td>
                       </tr>
+                      {isExpanded && (
+                        <tr className="bg-stone-900/30">
+                          <td colSpan={8} className="p-0 border-b border-stone-800/50">
+                            <div className="py-6 px-10 border-t border-stone-800/30 shadow-inner">
+                              <div className="flex items-center justify-between mb-4">
+                                <h4 className="text-roman-gold text-lg font-semibold flex items-center gap-2">
+                                  <span className="opacity-80">↳</span> Students ({s.students.length})
+                                </h4>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenAddStudentForSchool(s.school.id);
+                                  }}
+                                  className="rounded-lg border border-roman-gold/40 bg-roman-gold/10 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-roman-gold transition-colors hover:bg-roman-gold/20"
+                                >
+                                  + Add Student
+                                </button>
+                              </div>
+                              {s.students.length === 0 ? (
+                                <p className="text-stone-500 text-base italic">No students added yet.</p>
+                              ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 auto-rows-max max-h-96 overflow-y-auto pr-2 custom-scrollbar">
+                                  {s.students.map((student) => {
+                                    const studentMiles = allResults
+                                      .filter(r => r.studentId === student.uid)
+                                      .reduce((sum, r) => sum + r.distanceMiles, 0);
+                                    const pct = Math.min(100, (studentMiles / TOTAL_MILES) * 100);
+                                    return (
+                                      <div key={student.uid} className="flex flex-col bg-stone-800/50 border border-stone-700/60 rounded-xl p-4 shadow-sm hover:border-roman-gold/30 transition-colors group">
+                                        <div className="flex items-start justify-between">
+                                          <div>
+                                            <p className="font-semibold text-stone-100 text-base tracking-wide">{student.displayName}</p>
+                                            {student.romanNickname && <p className="text-sm text-roman-gold/70 mt-0.5 italic">{student.romanNickname}</p>}
+                                          </div>
+                                          <div className="text-right">
+                                            <p className="text-base font-bold text-roman-gold">{studentMiles.toFixed(1)} <span className="text-xs text-stone-500 font-normal">mi</span></p>
+                                            <p className={`text-[10px] font-bold uppercase tracking-wider mt-1 ${studentMiles >= TOTAL_MILES ? "text-green-500" : "text-stone-500"}`}>
+                                              {studentMiles >= TOTAL_MILES ? "Completed" : "In Progress"}
+                                            </p>
+                                          </div>
+                                        </div>
+                                        <div className="mt-4 w-full bg-stone-800/60 rounded-full h-1.5 overflow-hidden">
+                                          <div 
+                                            className={`h-full rounded-full transition-all duration-500 ${studentMiles >= TOTAL_MILES ? "bg-green-500" : "bg-roman-gold"}`}
+                                            style={{ width: `${pct}%` }}
+                                          />
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      </React.Fragment>
                     );
                   })
                 )}
               </tbody>
             </table>
             </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-6 border-t border-stone-800 pt-6">
+                <span className="text-stone-400 text-sm">
+                  Showing <span className="font-semibold text-stone-200">{(schoolsPage - 1) * SCHOOLS_PER_PAGE + 1}</span> to <span className="font-semibold text-stone-200">{Math.min(schoolsPage * SCHOOLS_PER_PAGE, filteredSchoolStats.length)}</span> of <span className="font-semibold text-stone-200">{filteredSchoolStats.length}</span> schools
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    disabled={schoolsPage === 1}
+                    onClick={() => setSchoolsPage(p => Math.max(1, p - 1))}
+                    className="px-4 py-2 rounded-lg border border-stone-700 bg-stone-800/50 text-stone-300 font-medium hover:bg-stone-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    disabled={schoolsPage === totalPages}
+                    onClick={() => setSchoolsPage(p => Math.min(totalPages, p + 1))}
+                    className="px-4 py-2 rounded-lg border border-stone-700 bg-stone-800/50 text-stone-300 font-medium hover:bg-stone-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Add School Modal */}
@@ -1208,6 +1500,82 @@ export default function AdminDashboard() {
                   className="flex-1 py-3 rounded-xl bg-roman-gold text-stone-950 font-semibold hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {studentSaving ? "Adding..." : "Add Student"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Deletion Request Confirm Modal */}
+      {deletionConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-stone-950/80 backdrop-blur-md"
+            onClick={() => setDeletionConfirm(null)}
+          />
+          <div className="relative w-full max-w-sm rounded-2xl overflow-hidden border shadow-[0_20px_50px_rgba(0,0,0,0.55)] animate-[addStudentModalZoomIn_180ms_cubic-bezier(0.16,1,0.3,1)]
+            bg-stone-950
+            ${deletionConfirm.action === 'approve' ? 'border-emerald-500/30' : 'border-red-500/30'}
+          ">
+            {deletionConfirm.action === "approve" ? (
+              <div className="h-px w-full bg-linear-to-r from-transparent via-emerald-500/60 to-transparent" />
+            ) : (
+              <div className="h-px w-full bg-linear-to-r from-transparent via-red-500/60 to-transparent" />
+            )}
+            <div className="p-8 flex flex-col items-center text-center">
+              <div className={`w-14 h-14 rounded-full flex items-center justify-center mb-5 ${
+                deletionConfirm.action === "approve"
+                  ? "border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.15)]"
+                  : "border border-red-500/30 bg-red-500/10 text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.15)]"
+              }`}>
+                {deletionConfirm.action === "approve" ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+                    <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
+                    <path d="M10 11v6M14 11v6" />
+                  </svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M9 9l6 6M15 9l-6 6" />
+                  </svg>
+                )}
+              </div>
+
+              <h2 className={`font-serif text-2xl font-bold mb-2 tracking-wide ${
+                deletionConfirm.action === "approve" ? "text-emerald-400" : "text-red-400"
+              }`}>
+                {deletionConfirm.action === "approve" ? "Approve Deletion" : "Decline Deletion"}
+              </h2>
+              <p className="text-stone-400 text-sm leading-relaxed mb-1 px-2">
+                {deletionConfirm.action === "approve" ? (
+                  <>
+                    This will <span className="text-red-400 font-semibold">permanently delete</span> the student record for
+                  </>
+                ) : (
+                  <>You are declining the deletion request for</>
+                )}
+              </p>
+              <p className="text-stone-100 font-semibold text-base mb-7">{deletionConfirm.studentName}</p>
+
+              <div className="w-full flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setDeletionConfirm(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-stone-800 text-stone-300 font-bold text-sm tracking-widest hover:bg-stone-800 active:scale-[0.97] transition-all"
+                >
+                  CANCEL
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleConfirmDeletionAction()}
+                  className={`flex-1 py-2.5 rounded-xl font-bold text-sm tracking-widest active:scale-[0.97] transition-all ${
+                    deletionConfirm.action === "approve"
+                      ? "bg-emerald-600 text-white hover:bg-emerald-500 shadow-[0_4px_15px_rgba(52,211,153,0.2)]"
+                      : "bg-red-600/80 text-white hover:bg-red-500/90 shadow-[0_4px_15px_rgba(239,68,68,0.2)]"
+                  }`}
+                >
+                  {deletionConfirm.action === "approve" ? "APPROVE" : "DECLINE"}
                 </button>
               </div>
             </div>

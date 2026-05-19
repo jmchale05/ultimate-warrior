@@ -40,6 +40,62 @@ const CAMPAIGNS = [
 
 const PRIMARY_YEAR_OPTIONS = ["Year 1", "Year 2", "Year 3", "Year 4", "Year 5", "Year 6"];
 const SECONDARY_YEAR_OPTIONS = ["Year 7", "Year 8", "Year 9", "Year 10", "Year 11"];
+const ROMAN_NICKNAME_SUGGESTIONS = [
+  "The Brave",
+  "The Swift",
+  "The Lion",
+  "The Eagle",
+  "The Valiant",
+  "The Iron Shield",
+  "The Falcon",
+  "The Conqueror",
+  "The Resolute",
+  "The Storm",
+  "The Guardian",
+  "The Victor",
+  "The Centurion",
+  "The Tribune",
+  "The Praetorian",
+  "The Invictus",
+  "The Imperator",
+  "The Sentinel",
+  "The Torchbearer",
+  "The Pathfinder",
+  "The Thunderbolt",
+  "The Spear",
+  "The Shieldbearer",
+  "The Legionary",
+  "The Standard Bearer",
+  "The Vanguard",
+  "The Unbroken",
+  "The Fearless",
+  "The Wolf",
+  "The Phoenix",
+  "The Titan",
+  "The Colossus",
+  "The Iron Will",
+  "The Dawnbringer",
+  "The Red Blade",
+  "The Stone Wall",
+  "The Golden Helm",
+  "The War Drum",
+  "The North Wind",
+  "The South Wind",
+  "The River Runner",
+  "The Mountain Heart",
+  "The Longstride",
+  "The Trailblazer",
+  "The Flame",
+  "The Oak",
+  "The Hammer",
+  "The Banner",
+  "The Triumph",
+  "The Ever Ready",
+  "The Light of Rome",
+  "The First Lance",
+];
+
+const ITEMS_PER_PAGE = 10;
 
 function getYearOptions(schoolType: SchoolType | null): string[] {
   return schoolType === "Primary School" ? PRIMARY_YEAR_OPTIONS : SECONDARY_YEAR_OPTIONS;
@@ -132,18 +188,17 @@ export default function Campaigns() {
   const [deleteRequestError, setDeleteRequestError] = useState("");
   const [submittingDeleteRequest, setSubmittingDeleteRequest] = useState(false);
   const [removingDeleteRequestForStudentId, setRemovingDeleteRequestForStudentId] = useState<string | null>(null);
-  const [quickUploadStudentId, setQuickUploadStudentId] = useState<string | null>(null);
-  const [quickUploadingStudentId, setQuickUploadingStudentId] = useState<string | null>(null);
   const [formPhoto, setFormPhoto] = useState<File | null>(null);
   const [formPhotoPreview, setFormPhotoPreview] = useState<string | null>(null);
   const formPhotoRef = useRef<HTMLInputElement>(null);
-  const quickUploadPhotoRef = useRef<HTMLInputElement>(null);
   const editPhotoRef = useRef<HTMLInputElement>(null);
   const actionsMenuRef = useRef<HTMLDivElement>(null);
   const [className, setClassName] = useState("");
   const [classSaving, setClassSaving] = useState(false);
   const [classError, setClassError] = useState("");
   const [schoolType, setSchoolType] = useState<SchoolType | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const yearOptions = getYearOptions(schoolType);
 
@@ -213,11 +268,12 @@ export default function Campaigns() {
       }
 
       const newUid = crypto.randomUUID();
+      const trimmedRomanNickname = formRomanNickname.trim();
       const newUser: AppUser = {
         uid: newUid,
         email: "",
         displayName: formName.trim(),
-        romanNickname: formRomanNickname.trim() || undefined,
+        ...(trimmedRomanNickname ? { romanNickname: trimmedRomanNickname } : {}),
         studentDataConsentConfirmedAt: Date.now(),
         studentDataConsentConfirmedBy: appUser.uid,
         role: "student",
@@ -273,6 +329,25 @@ export default function Campaigns() {
       return;
     }
     setShowAuthorityConsentModal(true);
+  }
+
+  function handleSuggestRomanNickname() {
+    const availableSuggestions = ROMAN_NICKNAME_SUGGESTIONS.filter(
+      (nickname) => nickname.toLowerCase() !== formRomanNickname.trim().toLowerCase()
+    );
+
+    const source = availableSuggestions.length > 0 ? availableSuggestions : ROMAN_NICKNAME_SUGGESTIONS;
+    const randomIndex = Math.floor(Math.random() * source.length);
+    setFormRomanNickname(source[randomIndex]);
+  }
+
+  function handleTopAddStudentClick() {
+    if (students.length >= 40) {
+      setErrorToast("Max students reached (40).");
+      return;
+    }
+
+    handleOpenAddStudent();
   }
 
   // logo upload removed
@@ -337,6 +412,10 @@ export default function Campaigns() {
     window.addEventListener("mousedown", handleClickOutside);
     return () => window.removeEventListener("mousedown", handleClickOutside);
   }, [openActionsForStudent]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
 
   useEffect(() => {
     if (!openActionsForStudent) return;
@@ -560,44 +639,6 @@ export default function Campaigns() {
     setSelectedStudentForCancelDeleteRequest(null);
   }
 
-  function handleOpenQuickPhotoUpload(student: StudentRow) {
-    if (quickUploadingStudentId) return;
-    setQuickUploadStudentId(student.uid);
-    quickUploadPhotoRef.current?.click();
-  }
-
-  async function handleQuickPhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0] ?? null;
-    const studentId = quickUploadStudentId;
-
-    if (!file || !studentId) {
-      e.target.value = "";
-      return;
-    }
-
-    setQuickUploadingStudentId(studentId);
-    try {
-      const photoUrl = await updateUserPhoto(studentId, file);
-      setStudents((prev) =>
-        sortStudentRows(
-          prev.map((student) =>
-            student.uid === studentId
-              ? { ...student, photoUrl }
-              : student
-          )
-        )
-      );
-      setSuccessToast("Profile photo updated.");
-    } catch (err) {
-      console.error("Failed to upload student photo:", err);
-      setErrorToast("Failed to upload profile photo. Please try again.");
-    } finally {
-      setQuickUploadingStudentId(null);
-      setQuickUploadStudentId(null);
-      e.target.value = "";
-    }
-  }
-
   async function loadData(retryCount = 1, showLoadingState = true) {
       let keepLoadingForRetry = false;
       if (showLoadingState) {
@@ -674,14 +715,30 @@ export default function Campaigns() {
       }
   }
 
-  const filtered = students;
+  const normalizedSearch = searchQuery.trim().toLowerCase();
+  const filtered = students.filter((student) => {
+    if (!normalizedSearch) return true;
+
+    return [
+      student.name,
+      student.romanNickname ?? "",
+      student.className,
+      student.campaignName,
+      String(student.campaignNumber),
+    ].some((value) => value.toLowerCase().includes(normalizedSearch));
+  });
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE) || 1;
+  const paginatedStudents = filtered.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   return (
     <div className="h-screen text-stone-100 flex flex-col overflow-hidden bg-stone-950">
       <Navbar />
 
       {successToast && (
-        <div className="fixed top-5 right-5 z-50 pointer-events-none">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
           <div className="rounded-lg border border-emerald-300/40 bg-emerald-500/15 text-emerald-100 px-4 py-3 shadow-lg backdrop-blur-sm text-sm font-semibold tracking-wide">
             {successToast}
           </div>
@@ -689,7 +746,7 @@ export default function Campaigns() {
       )}
 
       {errorToast && (
-        <div className="fixed top-5 right-5 z-50 pointer-events-none">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
           <div className="rounded-lg border border-red-300/40 bg-red-500/15 text-red-100 px-4 py-3 shadow-lg backdrop-blur-sm text-sm font-semibold tracking-wide">
             {errorToast}
           </div>
@@ -700,7 +757,64 @@ export default function Campaigns() {
         {/* Main content */}
         <div className="flex-1 min-w-0 px-12 py-14 overflow-y-auto overflow-x-hidden flex flex-col items-center">
           <div className="w-full max-w-[90rem]">
-        <div className="flex items-center justify-between gap-3 mb-6"></div>
+        <div className="flex items-center justify-between gap-3 mb-6">
+          <div>
+            <h1 className="text-stone-950 text-3xl font-bold mt-2 [text-shadow:0_2px_14px_rgba(255,255,255,0.55)]">
+              Students
+            </h1>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="relative min-w-[24rem]">
+              <div className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-roman-gold/80">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.5 3a5.5 5.5 0 014.392 8.812l3.648 3.649a1 1 0 01-1.414 1.414l-3.649-3.648A5.5 5.5 0 118.5 3zm0 2a3.5 3.5 0 100 7 3.5 3.5 0 000-7z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search by student, year, or campaign"
+                className="w-full rounded-2xl border border-stone-800/50 bg-stone-950/88 py-3 pl-12 pr-12 text-sm font-medium text-stone-100 placeholder:text-stone-500 shadow-[0_14px_34px_rgba(0,0,0,0.28)] outline-none transition-all focus:border-roman-gold/70 focus:bg-stone-950"
+                aria-label="Search students"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  title="Clear search"
+                  className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-stone-600/70 bg-stone-800/95 text-stone-200 shadow-sm transition-all hover:scale-105 hover:border-stone-500 hover:bg-stone-700 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-roman-gold/60"
+                  aria-label="Clear search"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={handleTopAddStudentClick}
+              className={
+                students.length >= 40
+                  ? "inline-flex items-center gap-2 rounded-xl border border-red-500/50 bg-stone-950/70 px-5 py-3 text-sm font-bold uppercase tracking-[0.2em] text-red-400 shadow-[0_4px_15px_rgba(239,68,68,0.15)] cursor-not-allowed opacity-90 transition-all hover:bg-stone-950/90 active:scale-100"
+                  : "inline-flex items-center gap-2 rounded-xl border border-roman-gold/50 bg-stone-950/85 px-5 py-3 text-sm font-bold uppercase tracking-[0.2em] text-roman-gold shadow-[0_12px_30px_rgba(0,0,0,0.35)] transition-all hover:bg-stone-900 hover:scale-[1.03] active:scale-[0.97]"
+              }
+              title={students.length >= 40 ? "Maximum capacity of 40 students reached." : "Add a new student to the roster"}
+            >
+              {students.length >= 40 ? (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
+                </svg>
+              ) : (
+                <span className="text-lg leading-none">+</span>
+              )}
+              <span>{students.length >= 40 ? "Roster Full (40/40)" : "Add Student"}</span>
+            </button>
+          </div>
+        </div>
 
         {loading ? (
           <CampaignsTableSkeleton />
@@ -729,71 +843,51 @@ export default function Campaigns() {
                 <path d="M12 8a1 1 0 0 1 1 1v3.5a1 1 0 0 1-2 0V9a1 1 0 0 1 1-1zm0 7a1.25 1.25 0 1 1 0-2.5A1.25 1.25 0 0 1 12 15z" />
               </svg>
             </div>
-            <h3 className="text-3xl font-bold text-roman-gold mb-4 tracking-wide font-serif drop-shadow-[0_2px_8px_rgba(235,191,90,0.3)]">Awaiting Warriors</h3>
+            <h3 className="text-3xl font-bold text-roman-gold mb-4 tracking-wide font-serif drop-shadow-[0_2px_8px_rgba(235,191,90,0.3)]">
+              {searchQuery.trim() ? "No Matching Warriors" : "Awaiting Warriors"}
+            </h3>
             <p className="text-yellow-100/90 mb-10 max-w-md mx-auto text-lg leading-relaxed font-medium drop-shadow-[0_2px_8px_rgba(235,191,90,0.2)]">
-              Your campaign board is currently empty.<br className="hidden sm:inline" /> Add students to a year group to start tracking their progress through the challenges.
+              {searchQuery.trim()
+                ? "No students match your search. Try a different name, year, or campaign."
+                : <>Your campaign board is currently empty.<br className="hidden sm:inline" /> Add students to a year group to start tracking their progress through the challenges.</>}
             </p>
             <button
               type="button"
-              onClick={handleOpenAddStudent}
+              onClick={searchQuery.trim() ? () => setSearchQuery("") : handleOpenAddStudent}
               className="group relative flex items-center justify-center gap-2 px-8 py-4 rounded-xl font-bold uppercase tracking-widest text-base transition-all overflow-hidden border-2 border-roman-gold text-stone-950 bg-roman-gold hover:bg-yellow-400 shadow-[0_0_20px_rgba(235,191,90,0.2)] hover:shadow-[0_0_30px_rgba(235,191,90,0.4)]"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 transition-transform group-hover:scale-110" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
               </svg>
-              Add Student
+              {searchQuery.trim() ? "Clear Search" : "Add Student"}
             </button>
           </div>
         ) : (
-          <div className="rounded-2xl border border-roman-gold/15 overflow-visible bg-stone-950/60 backdrop-blur-md shadow-[0_8px_60px_rgba(0,0,0,0.5)]">
+          <div className="rounded-3xl border border-roman-gold/20 overflow-visible bg-stone-950/90 shadow-[0_16px_60px_rgba(0,0,0,0.8)] mt-4">
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b border-roman-gold/20">
-                  <th className="pl-8 pr-10 py-5 text-lg uppercase tracking-wider text-roman-gold/90 font-bold w-[34rem] bg-stone-900/60 rounded-tl-2xl">Name</th>
-                  <th className="px-8 py-5 text-lg uppercase tracking-wider text-roman-gold/90 font-bold w-40 bg-stone-900/60">Year</th>
-                  <th className="px-8 py-5 text-lg uppercase tracking-wider text-roman-gold/90 font-bold w-56 bg-stone-900/60">Campaign</th>
-                  <th className="px-8 py-5 text-lg uppercase tracking-wider text-roman-gold/90 font-bold w-96 bg-stone-900/60">Progress</th>
-                  <th className="px-8 py-5 text-lg uppercase tracking-wider text-roman-gold/90 font-bold w-40 text-center bg-stone-900/60 rounded-tr-2xl">Actions</th>
+                  <th className="pl-8 pr-10 py-6 text-sm uppercase tracking-widest text-roman-gold/80 font-bold w-[34rem] bg-stone-900/90 rounded-tl-3xl shadow-sm">Name</th>
+                  <th className="px-8 py-6 text-sm uppercase tracking-widest text-roman-gold/80 font-bold w-40 bg-stone-900/90 shadow-sm">Year</th>
+                  <th className="px-8 py-6 text-sm uppercase tracking-widest text-roman-gold/80 font-bold w-56 bg-stone-900/90 shadow-sm">Campaign</th>
+                  <th className="px-8 py-6 text-sm uppercase tracking-widest text-roman-gold/80 font-bold w-96 bg-stone-900/90 shadow-sm">Progress</th>
+                  <th className="px-8 py-6 text-sm uppercase tracking-widest text-roman-gold/80 font-bold w-40 text-center bg-stone-900/90 rounded-tr-3xl shadow-sm">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((s) => (
+                {paginatedStudents.map((s) => (
                   <tr
                     key={`${s.uid}-${s.className}`}
                     onClick={() => navigate(`/campaigns/${s.uid}`)}
-                    className={`border-b border-stone-700/20 cursor-pointer transition-colors ${s.hasPendingDeletionRequest ? "bg-stone-900/60 hover:bg-stone-900/70" : "hover:bg-stone-800/30"}`}
+                    className={`border-b border-roman-gold/5 cursor-pointer transition-all duration-200 ${s.hasPendingDeletionRequest ? "bg-stone-900/80 hover:bg-stone-900" : "bg-stone-950/40 hover:bg-stone-800/60"}`}
                   >
                     <td className="pl-8 pr-12 py-6">
                       <div className="flex items-center gap-4">
-                        <div className="group relative w-20 h-20 rounded-full border border-roman-gold/20 overflow-hidden bg-stone-800 flex items-center justify-center shrink-0">
+                        <div className="w-20 h-20 rounded-full border border-roman-gold/20 overflow-hidden bg-stone-800 flex items-center justify-center shrink-0">
                           {s.photoUrl
                             ? <img src={s.photoUrl} alt={s.name} className="w-full h-full object-cover" />
                             : <img src="/profile-pics.png" alt={s.name} className="w-full h-full object-cover opacity-60" />
                           }
-                          {!s.photoUrl && !s.hasPendingDeletionRequest && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleOpenQuickPhotoUpload(s);
-                              }}
-                              title="Upload photo"
-                              aria-label={`Upload photo for ${s.name}`}
-                              className="absolute inset-0 flex items-center justify-center bg-stone-950/70 text-roman-gold opacity-0 transition-opacity group-hover:opacity-100"
-                            >
-                              {quickUploadingStudentId === s.uid ? (
-                                <svg className="roman-btn-spinner w-7 h-7 drop-shadow-[0_0_10px_rgba(212,175,55,0.35)]" viewBox="0 0 24 24" fill="none">
-                                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeDasharray="50 20" />
-                                </svg>
-                              ) : (
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7 drop-shadow-[0_0_10px_rgba(212,175,55,0.35)]">
-                                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                                  <path d="M17 8l-5-5-5 5" />
-                                  <path d="M12 3v12" />
-                                </svg>
-                              )}
-                            </button>
-                          )}
                         </div>
                         <div className="min-w-0">
                           <p className="font-medium text-stone-100 text-3xl leading-tight">{s.name}</p>
@@ -921,16 +1015,16 @@ export default function Campaigns() {
                     </td>
                   </tr>
                 ))}
-                {filtered.length < 40 && (
+                {filtered.length < 40 && currentPage === totalPages && (
                   <tr
                     onClick={handleOpenAddStudent}
-                    className="hover:bg-stone-800/30 transition-colors cursor-pointer"
+                    className="bg-stone-950/40 hover:bg-stone-800/60 transition-colors cursor-pointer"
                   >
-                    <td colSpan={5} className="px-8 py-6 text-center">
-                      <div className="flex items-center justify-center gap-2 w-full text-roman-gold/60 hover:text-roman-gold transition-colors">
-                        <span className="text-2xl">+</span>
-                        <span className="text-base uppercase tracking-wider font-semibold">Add Student</span>
-                        <span className="text-stone-500 text-sm">({filtered.length}/40)</span>
+                    <td colSpan={5} className="px-8 py-8 text-center rounded-b-3xl">
+                      <div className="flex items-center justify-center gap-3 w-full text-roman-gold/60 hover:text-roman-gold transition-colors">
+                        <span className="text-2xl pb-1">+</span>
+                        <span className="text-sm uppercase tracking-widest font-bold">Add Student</span>
+                        <span className="text-stone-500 text-xs font-mono ml-2">({filtered.length}/40)</span>
                       </div>
                     </td>
                   </tr>
@@ -940,27 +1034,47 @@ export default function Campaigns() {
           </div>
         )}
 
-        {/* Summary bar */}
+        {/* Summary and Pagination bar */}
         {!loading && filtered.length > 0 && (
-          <div className="mt-6 flex items-center justify-between text-base text-stone-500 px-2">
-            <span>{filtered.length} student{filtered.length !== 1 ? "s" : ""}</span>
-            <span>
-              Total:{" "}
-              <span className="text-roman-gold/70 font-bold">
-                {filtered.reduce((sum, s) => sum + s.totalMiles, 0).toFixed(1)}
-              </span>{" "}
-              miles
-            </span>
+          <div className="mt-6 flex items-center justify-between text-base px-2 py-1">
+            <div className="text-stone-950 font-extrabold tracking-wide [text-shadow:0_1px_0_rgba(255,255,255,0.65),0_2px_12px_rgba(255,255,255,0.65)]">
+              <span>{filtered.length} student{filtered.length !== 1 ? "s" : ""}</span>
+              <span className="mx-4 text-stone-800/80">|</span>
+              <span>
+                Total:{" "}
+                <span className="text-roman-red-dark font-black tracking-wide">
+                  {filtered.reduce((sum, s) => sum + s.totalMiles, 0).toFixed(1)}
+                </span>{" "}
+                miles
+              </span>
+            </div>
+
+            {totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1.5 rounded-lg border border-stone-950/40 bg-roman-gold/90 text-stone-950 font-extrabold shadow-[0_3px_12px_rgba(0,0,0,0.28)] disabled:opacity-45 disabled:cursor-not-allowed hover:bg-roman-gold transition-colors"
+                >
+                  Previous
+                </button>
+                <div className="px-4 py-1.5 rounded-lg bg-stone-100/85 border border-stone-950/20 text-stone-950 font-extrabold shadow-[0_3px_12px_rgba(0,0,0,0.22)]">
+                  Page <span className="text-roman-red-dark">{currentPage}</span> of <span className="text-roman-red-dark">{totalPages}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1.5 rounded-lg border border-stone-950/40 bg-roman-gold/90 text-stone-950 font-extrabold shadow-[0_3px_12px_rgba(0,0,0,0.28)] disabled:opacity-45 disabled:cursor-not-allowed hover:bg-roman-gold transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </div>
         )}
           </div>{/* end max-w-5xl */}
-          <input
-            ref={quickUploadPhotoRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => void handleQuickPhotoUpload(e)}
-          />
       </div>
 
 
@@ -979,7 +1093,7 @@ export default function Campaigns() {
               setDeleteRequestError("");
             }}
           />
-          <div className="relative bg-stone-900 border border-red-300/20 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
+          <div className="relative bg-stone-900 border border-red-300/20 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-[addStudentModalZoomIn_180ms_cubic-bezier(0.2,0.8,0.2,1)]">
             <div className="h-px w-full bg-linear-to-r from-transparent via-red-300/40 to-transparent" />
             <div className="px-8 py-8">
               <h2 className="text-red-200 font-serif text-2xl font-bold mb-2 tracking-wide">Request Student Deletion</h2>
@@ -1052,7 +1166,7 @@ export default function Campaigns() {
               setSelectedStudentForCancelDeleteRequest(null);
             }}
           />
-          <div className="relative bg-stone-900 border border-amber-300/20 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+          <div className="relative bg-stone-900 border border-amber-300/20 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-[addStudentModalZoomIn_180ms_cubic-bezier(0.2,0.8,0.2,1)]">
             <div className="h-px w-full bg-linear-to-r from-transparent via-amber-300/40 to-transparent" />
             <div className="px-8 py-8">
               <h2 className="text-amber-200 font-serif text-2xl font-bold mb-2 tracking-wide">Cancel Deletion Request</h2>
@@ -1103,7 +1217,7 @@ export default function Campaigns() {
               setEditError("");
             }}
           />
-          <div className="relative bg-stone-900/90 backdrop-blur-xl border border-roman-gold/20 rounded-3xl w-full max-w-lg shadow-[0_8px_60px_rgba(0,0,0,0.7)] overflow-hidden">
+          <div className="relative bg-stone-900/90 backdrop-blur-xl border border-roman-gold/20 rounded-3xl w-full max-w-lg shadow-[0_8px_60px_rgba(0,0,0,0.7)] overflow-hidden animate-[addStudentModalZoomIn_180ms_cubic-bezier(0.2,0.8,0.2,1)]">
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-32 bg-roman-gold/10 blur-[80px] rounded-full pointer-events-none"></div>
             
             <div className="px-8 py-10 relative">
@@ -1211,7 +1325,7 @@ export default function Campaigns() {
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-stone-950/80 backdrop-blur-sm" onClick={() => setShowAddModal(false)} />
-          <div className="relative bg-stone-900/90 backdrop-blur-xl border border-roman-gold/20 rounded-3xl w-full max-w-lg shadow-[0_8px_60px_rgba(0,0,0,0.7)] overflow-hidden">
+          <div className="relative bg-stone-900/90 backdrop-blur-xl border border-roman-gold/20 rounded-3xl w-full max-w-lg shadow-[0_8px_60px_rgba(0,0,0,0.7)] overflow-hidden animate-[addStudentModalZoomIn_180ms_cubic-bezier(0.2,0.8,0.2,1)]">
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-32 bg-roman-gold/10 blur-[80px] rounded-full pointer-events-none"></div>
             
             <div className="px-8 py-10 relative">
@@ -1261,7 +1375,16 @@ export default function Campaigns() {
                 </div>
 
                 <div>
-                  <label className="block text-stone-400 text-xs font-semibold uppercase tracking-widest mb-2 pl-1">Roman Nickname</label>
+                  <div className="mb-2 flex items-center justify-between pl-1">
+                    <label className="block text-stone-400 text-xs font-semibold uppercase tracking-widest">Roman Nickname</label>
+                    <button
+                      type="button"
+                      onClick={handleSuggestRomanNickname}
+                      className="rounded-lg border border-roman-gold/40 bg-stone-800/70 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-roman-gold transition-colors hover:bg-stone-700"
+                    >
+                      Suggest
+                    </button>
+                  </div>
                   <input
                     type="text"
                     value={formRomanNickname}
@@ -1314,7 +1437,7 @@ export default function Campaigns() {
       {showAuthorityConsentModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-stone-950/80 backdrop-blur-sm" onClick={() => setShowAuthorityConsentModal(false)} />
-          <div className="relative bg-stone-900/90 backdrop-blur-xl border border-roman-gold/20 rounded-3xl w-full max-w-lg shadow-[0_8px_60px_rgba(0,0,0,0.7)] overflow-hidden">
+          <div className="relative bg-stone-900/90 backdrop-blur-xl border border-roman-gold/20 rounded-3xl w-full max-w-lg shadow-[0_8px_60px_rgba(0,0,0,0.7)] overflow-hidden animate-[addStudentModalZoomIn_180ms_cubic-bezier(0.2,0.8,0.2,1)]">
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-32 bg-roman-gold/10 blur-[80px] rounded-full pointer-events-none"></div>
             
             <div className="px-8 py-10 relative">
@@ -1370,7 +1493,7 @@ export default function Campaigns() {
       {showAddClassModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-stone-950/80 backdrop-blur-sm" onClick={() => setShowAddClassModal(false)} />
-          <div className="relative bg-stone-900 border border-roman-gold/20 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+          <div className="relative bg-stone-900 border border-roman-gold/20 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-[addStudentModalZoomIn_180ms_cubic-bezier(0.2,0.8,0.2,1)]">
             <div className="h-px w-full bg-linear-to-r from-transparent via-roman-gold/50 to-transparent" />
             <div className="px-8 py-8">
               <h2 className="text-roman-gold font-serif text-2xl font-bold mb-3 tracking-wide">Add Class</h2>
