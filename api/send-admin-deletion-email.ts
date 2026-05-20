@@ -4,7 +4,7 @@ type DeletionEmailRequestBody = {
   studentName?: string;
   studentRomanNickname?: string;
   className?: string;
-  schoolId?: string;
+  schoolName?: string;
   requestedByName?: string;
   reason?: string;
 };
@@ -139,8 +139,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                   <div class="detail-value">${requestedByName}</div>
                 </div>
                 <div class="detail-row">
-                  <div class="detail-label">School ID:</div>
-                  <div class="detail-value">${schoolId}</div>
+                  <div class="detail-label">School:</div>
+                  <div class="detail-value">${schoolName}</div>
                 </div>
               </div>
 
@@ -150,18 +150,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                   <p>${reason}</p>
                 </div>
               </div>
-
-              <div class="details-section">
-                <h3>Request Tracking</h3>
-                <div class="detail-row">
-                  <div class="detail-label">Request ID:</div>
-                  <div class="detail-value"><span class="request-id">${requestId}</span></div>
-                </div>
-              </div>
             </div>
 
             <div class="footer">
               <p><strong>Next Steps:</strong> Log into the admin dashboard to review and approve/reject this deletion request.</p>
+              <p style="font-size: 11px; color: #999; margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px;">Request ID: <span class="request-id">${requestId}</span></p>
               <p>This is an automated message. Do not reply to this email.</p>
             </div>
           </div>

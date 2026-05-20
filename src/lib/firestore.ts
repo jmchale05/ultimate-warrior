@@ -456,10 +456,13 @@ export async function createStudentDeletionRequestAndNotifyAdmins(
   const requestId = await createStudentDeletionRequest(request);
 
   try {
-    const [adminsLowercaseSnap, adminsCapitalizedSnap] = await Promise.all([
+    const [adminsLowercaseSnap, adminsCapitalizedSnap, schoolSnap] = await Promise.all([
       getDocs(query(collection(db, "users"), where("role", "==", "admin"))),
       getDocs(query(collection(db, "users"), where("role", "==", "Admin"))),
+      getDoc(doc(db, "schools", request.schoolId)),
     ]);
+
+    const schoolName = (schoolSnap.data() as School)?.name ?? "Unknown School";
 
     const adminEmails = Array.from(
       new Set(
@@ -485,7 +488,7 @@ export async function createStudentDeletionRequestAndNotifyAdmins(
         studentName: request.studentName,
         studentRomanNickname: request.studentRomanNickname,
         className: request.className,
-        schoolId: request.schoolId,
+        schoolName,
         requestedByName: request.requestedByName,
         reason: request.reason,
       }),
