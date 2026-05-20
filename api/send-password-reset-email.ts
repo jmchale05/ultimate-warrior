@@ -3,7 +3,6 @@ import { getAuth } from "firebase-admin/auth";
 
 type PasswordResetRequestBody = {
   email?: string;
-  continueUrl?: string;
 };
 
 type VercelRequest = {
@@ -69,15 +68,6 @@ function ensureFirebaseAdmin() {
   }
 }
 
-function getBaseUrl(req: VercelRequest): string {
-  const configuredUrl = process.env.APP_URL || process.env.VITE_APP_URL;
-  if (configuredUrl?.trim()) return configuredUrl.trim().replace(/\/$/, "");
-
-  const host = (req as { headers?: { host?: string; "x-forwarded-proto"?: string } }).headers?.host;
-  const protocol = (req as { headers?: { "x-forwarded-proto"?: string } }).headers?.["x-forwarded-proto"] ?? "https";
-  return host ? `${protocol}://${host}` : "https://ultimate-warrior.vercel.app";
-}
-
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
@@ -113,12 +103,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     ensureFirebaseAdmin();
 
-    const baseUrl = getBaseUrl(req);
-    const continueUrl = req.body?.continueUrl?.trim() || `${baseUrl}/login`;
-    const resetLink = await getAuth().generatePasswordResetLink(email, {
-      url: continueUrl,
-      handleCodeInApp: false,
-    });
+    const resetLink = await getAuth().generatePasswordResetLink(email);
     const escapedResetLink = escapeHtml(resetLink);
 
     const emailPayload = {

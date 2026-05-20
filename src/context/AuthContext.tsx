@@ -226,7 +226,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function forgotPassword(email: string) {
-    const baseUrl = window.location.origin.replace(/\/$/, "");
     const response = await fetch("/api/send-password-reset-email", {
       method: "POST",
       headers: {
@@ -234,7 +233,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       body: JSON.stringify({
         email: email.trim(),
-        continueUrl: `${baseUrl}/login`,
       }),
     });
 

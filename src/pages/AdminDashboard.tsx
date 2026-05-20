@@ -30,6 +30,14 @@ const STUDENT_AUTHORITY_CONSENT_VERSION = "2026-05";
 const PRIMARY_YEAR_OPTIONS = ["Year 1", "Year 2", "Year 3", "Year 4", "Year 5", "Year 6"];
 const SECONDARY_YEAR_OPTIONS = ["Year 7", "Year 8", "Year 9", "Year 10", "Year 11"];
 const MAX_SCHOOL_ADDRESS_LENGTH = 120;
+const SUBMITTED_DATE_FORMATTER = new Intl.DateTimeFormat("en-GB", {
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
 
 function getYearOptionsForSchoolType(schoolType: SchoolType | undefined): string[] {
   return schoolType === "Primary School" ? PRIMARY_YEAR_OPTIONS : SECONDARY_YEAR_OPTIONS;
@@ -131,6 +139,9 @@ export default function AdminDashboard() {
   const [deletionRequestActionId, setDeletionRequestActionId] = useState<string | null>(null);
   const [deletionRequestError, setDeletionRequestError] = useState("");
   const [deletionConfirm, setDeletionConfirm] = useState<{ requestId: string; studentName: string; action: "approve" | "reject" } | null>(null);
+  const [reasonPreview, setReasonPreview] = useState<StudentDeletionRequest | null>(null);
+  const [truncatedReasonById, setTruncatedReasonById] = useState<Record<string, boolean>>({});
+  const reasonTextRefs = useRef<Record<string, HTMLParagraphElement | null>>({});
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -290,6 +301,8 @@ export default function AdminDashboard() {
     }
     setSchoolSaving(true);
     setSchoolError("");
+    let createdSchoolId: string | undefined;
+    let createdAccessCode: string | undefined;
     try {
       if (isEditingSchool && schoolToEdit) {
         await updateSchool(
@@ -302,13 +315,15 @@ export default function AdminDashboard() {
           await updateSchoolLogo(schoolToEdit.id, schoolLogoFile);
         }
       } else {
-        const createdSchool = await createSchool(
+        const result = await createSchool(
           schoolName.trim(),
           schoolType,
           normalizedAddress || undefined
         );
+        createdSchoolId = result.id;
+        createdAccessCode = result.accessCode;
         if (schoolLogoFile) {
-          await updateSchoolLogo(createdSchool.id, schoolLogoFile);
+          await updateSchoolLogo(result.id, schoolLogoFile);
         }
       }
       setSchoolName("");
@@ -319,7 +334,36 @@ export default function AdminDashboard() {
       setShowAddSchool(false);
       setIsEditingSchool(false);
       setSchoolToEdit(null);
-      await loadData();
+      const schoolTitle = schoolName.trim();
+      if (!isEditingSchool && createdSchoolId && createdAccessCode) {
+        const newSchool: School = {
+          id: createdSchoolId,
+          name: schoolTitle,
+          schoolType,
+          address: normalizedAddress || undefined,
+          accessCode: createdAccessCode,
+          createdAt: Date.now(),
+        };
+        const newSchoolStats: SchoolStats = {
+          school: newSchool,
+          classes: [],
+          teachers: [],
+          students: [],
+          totalMiles: 0,
+          completedStudents: 0,
+        };
+        setSchoolStats((prev) => [newSchoolStats, ...prev]);
+        setActionToast({ title: `${schoolTitle} added successfully.`, tone: "success" });
+      } else if (isEditingSchool && schoolToEdit) {
+        setSchoolStats((prev) =>
+          prev.map((stat) =>
+            stat.school.id === schoolToEdit.id
+              ? { ...stat, school: { ...stat.school, name: schoolTitle, schoolType, address: normalizedAddress || undefined } }
+              : stat
+          )
+        );
+        setActionToast({ title: `${schoolTitle} updated successfully.`, tone: "success" });
+      }
     } catch {
       setSchoolError(`Failed to ${isEditingSchool ? "update" : "create"} school. Try again.`);
     } finally {
@@ -401,11 +445,12 @@ export default function AdminDashboard() {
   async function handleDeleteSchool() {
     if (!schoolToDelete || deleteSchoolConfirmText.trim() !== "DELETE") return;
     const deletedSchoolName = schoolToDelete.name;
+    const deletedSchoolId = schoolToDelete.id;
     setSchoolDeleting(true);
     try {
-      await deleteSchool(schoolToDelete.id);
+      await deleteSchool(deletedSchoolId);
       handleCloseDeleteSchoolModal();
-      await loadData();
+      setSchoolStats((prev) => prev.filter((s) => s.school.id !== deletedSchoolId));
       setActionToast({
         title: `${deletedSchoolName} deleted.`,
         description: "Removed the school plus linked classes, users, results, and deletion requests.",
@@ -475,7 +520,21 @@ export default function AdminDashboard() {
       const createdStudentName = studentName.trim();
       resetStudentFormState();
       setShowAddStudent(false);
-      await loadData();
+      setSchoolStats((prev) =>
+        prev.map((stat) =>
+          stat.school.id === studentSchoolId
+            ? {
+                ...stat,
+                students: [...stat.students, newUser],
+                classes: stat.classes.map((c) =>
+                  c.id === classId
+                    ? { ...c, studentIds: [...c.studentIds, newUid] }
+                    : c
+                ),
+              }
+            : stat
+        )
+      );
       setActionToast({ title: `${createdStudentName} added successfully.`, tone: "success" });
     } catch {
       setStudentError("Failed to add student. Try again.");
@@ -529,8 +588,39 @@ export default function AdminDashboard() {
         targetClassId: editStudentClassId,
       });
       const updatedStudentName = editStudentName.trim();
+      const studentUid = editingStudentId;
       handleCloseEditStudent();
-      await loadData();
+      setSchoolStats((prev) =>
+        prev.map((stat) => {
+          let updated = stat;
+          if (stat.school.id === editStudentSchoolId) {
+            updated = {
+              ...stat,
+              students: stat.students.map((u) =>
+                u.uid === studentUid
+                  ? {
+                      ...u,
+                      displayName: updatedStudentName,
+                      romanNickname: editStudentRomanNickname.trim() || undefined,
+                      classId: editStudentClassId,
+                    }
+                  : u
+              ),
+              classes: stat.classes.map((c) => {
+                let updatedClass = c;
+                if (editingStudent.classId && c.id === editingStudent.classId && c.id !== editStudentClassId) {
+                  updatedClass = { ...c, studentIds: c.studentIds.filter((id) => id !== studentUid) };
+                }
+                if (c.id === editStudentClassId && !updatedClass.studentIds.includes(studentUid)) {
+                  updatedClass = { ...updatedClass, studentIds: [...updatedClass.studentIds, studentUid] };
+                }
+                return updatedClass;
+              }),
+            };
+          }
+          return updated;
+        })
+      );
       setActionToast({ title: `${updatedStudentName} updated successfully.`, tone: "success" });
     } catch {
       setEditStudentError("Failed to update student. Try again.");
@@ -592,7 +682,7 @@ export default function AdminDashboard() {
     try {
       await rejectStudentDeletionRequest(requestId, appUser?.uid);
       setActionToast({ title: "Deletion request declined.", tone: "success" });
-      await loadData();
+      setDeletionRequests((prev) => prev.filter((req) => req.id !== requestId));
     } catch (err) {
       console.error("Failed to decline deletion request:", err);
       setDeletionRequestError("Failed to decline request. Please try again.");
@@ -647,13 +737,39 @@ export default function AdminDashboard() {
       .map((request) => {
         const schoolName = schoolStats.find((s) => s.school.id === request.schoolId)?.school.name ?? "Unknown school";
         const requestedByUser = allUsers.find((u) => u.uid === request.requestedByUid);
+        const requestedByDisplay = [requestedByUser?.suffix, requestedByUser?.displayName ?? request.requestedByName]
+          .map((value) => value?.trim())
+          .filter(Boolean)
+          .join(" ");
         return {
           ...request,
           schoolName,
-          requestedByDisplay: requestedByUser?.displayName ?? request.requestedByName,
+          requestedByDisplay,
+          submittedAtDisplay: SUBMITTED_DATE_FORMATTER.format(new Date(request.createdAt)),
         };
       });
   }, [deletionRequests, schoolStats, allUsers]);
+
+  useEffect(() => {
+    const measureReasonOverflow = () => {
+      const nextState = deletionRequestsWithContext.reduce<Record<string, boolean>>((accumulator, request) => {
+        const reasonNode = reasonTextRefs.current[request.id];
+        accumulator[request.id] = Boolean(
+          reasonNode && reasonNode.scrollHeight > reasonNode.clientHeight + 1
+        );
+        return accumulator;
+      }, {});
+
+      setTruncatedReasonById(nextState);
+    };
+
+    measureReasonOverflow();
+    window.addEventListener("resize", measureReasonOverflow);
+
+    return () => {
+      window.removeEventListener("resize", measureReasonOverflow);
+    };
+  }, [deletionRequestsWithContext]);
 
   const filteredSchoolStats = useMemo(() => {
     const query = schoolSearch.trim().toLowerCase();
@@ -715,6 +831,7 @@ export default function AdminDashboard() {
   }, [filteredSchoolStats, schoolsPage]);
 
   const totalPages = Math.ceil(filteredSchoolStats.length / SCHOOLS_PER_PAGE);
+  const reasonPreviewText = reasonPreview?.reason?.trim() || "No reason provided.";
 
   if (loading) return <FullPageLoader message="Loading admin data..." />;
 
@@ -905,7 +1022,7 @@ export default function AdminDashboard() {
                     <th className="px-6 py-4 text-sm uppercase tracking-wider text-stone-400 font-semibold w-40">Year</th>
                     <th className="px-6 py-4 text-sm uppercase tracking-wider text-stone-400 font-semibold w-56">School</th>
                     <th className="px-6 py-4 text-sm uppercase tracking-wider text-stone-400 font-semibold w-56">Requested By</th>
-                    <th className="px-6 py-4 text-sm uppercase tracking-wider text-stone-400 font-semibold">Reason</th>
+                    <th className="px-6 py-4 text-sm uppercase tracking-wider text-stone-400 font-semibold flex-1 min-w-96">Reason</th>
                     <th className="px-6 py-4 text-sm uppercase tracking-wider text-stone-400 font-semibold w-44">Submitted</th>
                     <th className="px-6 py-4 text-sm uppercase tracking-wider text-stone-400 font-semibold w-52 text-center">Actions</th>
                   </tr>
@@ -922,11 +1039,29 @@ export default function AdminDashboard() {
                       <td className="px-6 py-4 text-stone-300">{request.className}</td>
                       <td className="px-6 py-4 text-stone-300">{request.schoolName}</td>
                       <td className="px-6 py-4 text-stone-300">{request.requestedByDisplay}</td>
-                      <td className="px-6 py-4 text-stone-300">
-                        <p className="line-clamp-2">{request.reason}</p>
+                      <td className="px-6 py-4 text-stone-300 align-top">
+                        <div>
+                          <p
+                            ref={(node) => {
+                              reasonTextRefs.current[request.id] = node;
+                            }}
+                            className="text-sm leading-relaxed line-clamp-3 break-words text-stone-300"
+                          >
+                            {request.reason}
+                          </p>
+                          {truncatedReasonById[request.id] && (
+                            <button
+                              type="button"
+                              onClick={() => setReasonPreview(request)}
+                              className="mt-2 text-xs uppercase tracking-wider font-semibold text-roman-gold hover:text-yellow-200 transition-colors"
+                            >
+                              View full reason
+                            </button>
+                          )}
+                        </div>
                       </td>
-                      <td className="px-6 py-4 text-stone-500 text-sm">
-                        {new Date(request.createdAt).toLocaleString()}
+                      <td className="px-6 py-4 text-stone-500 text-sm" title={new Date(request.createdAt).toLocaleString()}>
+                        {request.submittedAtDisplay}
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-center gap-2">
@@ -1937,6 +2072,54 @@ export default function AdminDashboard() {
                       Confirm
                     </>
                   )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Deletion Request Reason Modal */}
+      {reasonPreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-stone-950/80 backdrop-blur-md transition-opacity"
+            onClick={() => setReasonPreview(null)}
+          />
+          <div className="relative w-full max-w-2xl rounded-2xl overflow-hidden border border-roman-gold/25 shadow-[0_20px_50px_rgba(0,0,0,0.55)] animate-[addStudentModalZoomIn_180ms_cubic-bezier(0.16,1,0.3,1)] bg-stone-950">
+            <div className="h-px w-full bg-linear-to-r from-transparent via-roman-gold/70 to-transparent" />
+            <div className="p-7">
+              <div className="flex items-start justify-between gap-4 mb-5">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-roman-gold/80 font-semibold mb-2">Deletion Reason</p>
+                  <h2 className="font-serif text-2xl font-bold text-stone-100 tracking-wide">{reasonPreview.studentName}</h2>
+                  <p className="text-stone-500 text-sm mt-1">Submitted by {reasonPreview.requestedByName}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setReasonPreview(null)}
+                  className="shrink-0 w-9 h-9 rounded-full border border-stone-700 text-stone-400 hover:text-stone-100 hover:bg-stone-800 transition-colors flex items-center justify-center"
+                  aria-label="Close reason preview"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="rounded-xl border border-stone-800 bg-stone-900/70 p-5 max-h-[50vh] overflow-y-auto">
+                <p className="text-stone-200 text-sm leading-7 whitespace-pre-wrap break-words">{reasonPreviewText}</p>
+              </div>
+
+              <div className="mt-5 flex items-center justify-between gap-4">
+                <p className="text-xs uppercase tracking-wider text-stone-500">{reasonPreviewText.length}/500 characters</p>
+                <button
+                  type="button"
+                  onClick={() => setReasonPreview(null)}
+                  className="px-5 py-2.5 rounded-xl border border-stone-700 text-stone-300 font-bold text-xs uppercase tracking-widest hover:text-stone-100 hover:bg-stone-800 transition-all"
+                >
+                  Close
                 </button>
               </div>
             </div>
