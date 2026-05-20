@@ -6,10 +6,8 @@ import {
   type ReactNode,
 } from "react";
 import {
-  ActionCodeSettings,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  sendPasswordResetEmail,
   signOut as firebaseSignOut,
   onAuthStateChanged,
   type User,
@@ -72,16 +70,6 @@ function clearPendingSignup() {
   } catch {
     // Ignore storage cleanup failures.
   }
-}
-
-function getPasswordResetActionSettings(): ActionCodeSettings {
-  const configuredUrl = import.meta.env.VITE_APP_URL as string | undefined;
-  const baseUrl = configuredUrl?.trim() ? configuredUrl.trim() : window.location.origin;
-  return {
-    // Send users back to the login page on our app after reset completes.
-    url: `${baseUrl.replace(/\/$/, "")}/login`,
-    handleCodeInApp: false,
-  };
 }
 
 async function createUserDocWithRetry(profile: AppUser, authUser: User): Promise<void> {
@@ -238,7 +226,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function forgotPassword(email: string) {
-    await sendPasswordResetEmail(auth, email, getPasswordResetActionSettings());
+    const baseUrl = window.location.origin.replace(/\/$/, "");
+    const response = await fetch("/api/send-password-reset-email", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email: email.trim(),
+        continueUrl: `${baseUrl}/login`,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Password reset email request failed (${response.status}): ${await response.text()}`);
+    }
   }
 
   return (
