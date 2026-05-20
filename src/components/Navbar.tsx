@@ -177,7 +177,7 @@ export default function Navbar() {
               </div>
 
               <h2 className="text-roman-gold font-serif text-2xl font-bold mb-2 tracking-wide">Sign Out</h2>
-              <p className="text-stone-400 text-sm leading-relaxed mb-8 px-2 max-w-[260px]">
+              <p className="text-stone-400 text-sm leading-relaxed mb-8 px-2 max-w-65">
                 Are you sure you want to end your current session?
               </p>
 

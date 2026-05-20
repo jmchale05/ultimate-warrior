@@ -774,7 +774,7 @@ export default function Campaigns() {
       <div className="flex-1 min-h-0 flex overflow-hidden relative" style={{ backgroundImage: 'url(/full-background.png)', backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}>
         {/* Main content */}
         <div className="flex-1 min-w-0 px-12 py-14 overflow-y-auto overflow-x-hidden flex flex-col items-center">
-          <div className="w-full max-w-[90rem]">
+          <div className="w-full max-w-360">
         <div className="flex items-center justify-between gap-3 mb-6">
           <div>
             <h1 className="text-stone-950 text-3xl font-bold mt-2 [text-shadow:0_2px_14px_rgba(255,255,255,0.55)]">
@@ -855,7 +855,7 @@ export default function Campaigns() {
             {/* Subtle background glow */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-roman-gold/20 blur-[100px] rounded-full pointer-events-none"></div>
             {/* Warrior/Shield Icon */}
-            <div className="w-24 h-24 mb-6 rounded-full bg-gradient-to-br from-stone-900/90 to-stone-800/80 flex items-center justify-center border-4 border-roman-gold/40 shadow-[0_0_40px_rgba(235,191,90,0.18)] relative">
+            <div className="w-24 h-24 mb-6 rounded-full bg-linear-to-br from-stone-900/90 to-stone-800/80 flex items-center justify-center border-4 border-roman-gold/40 shadow-[0_0_40px_rgba(235,191,90,0.18)] relative">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-14 w-14 text-roman-gold drop-shadow-[0_2px_8px_rgba(235,191,90,0.5)]" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12 2c-.28 0-.56.06-.82.18l-7 3.11A2 2 0 0 0 3 7.09V12c0 5.25 6.13 8.69 8.22 9.74.5.25 1.06.25 1.56 0C14.87 20.69 21 17.25 21 12V7.09a2 2 0 0 0-1.18-1.8l-7-3.11A2 2 0 0 0 12 2zm0 2.18 7 3.11V12c0 4.13-4.81 7.06-7 8.11C9.81 19.06 5 16.13 5 12V7.29l7-3.11z" />
                 <path d="M12 8a1 1 0 0 1 1 1v3.5a1 1 0 0 1-2 0V9a1 1 0 0 1 1-1zm0 7a1.25 1.25 0 1 1 0-2.5A1.25 1.25 0 0 1 12 15z" />
@@ -885,7 +885,7 @@ export default function Campaigns() {
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b border-roman-gold/20">
-                  <th className="pl-8 pr-10 py-6 text-sm uppercase tracking-widest text-roman-gold/80 font-bold w-[34rem] bg-stone-900/90 rounded-tl-3xl shadow-sm">Name</th>
+                  <th className="pl-8 pr-10 py-6 text-sm uppercase tracking-widest text-roman-gold/80 font-bold w-136 bg-stone-900/90 rounded-tl-3xl shadow-sm">Name</th>
                   <th className="px-8 py-6 text-sm uppercase tracking-widest text-roman-gold/80 font-bold w-40 bg-stone-900/90 shadow-sm">Year</th>
                   <th className="px-8 py-6 text-sm uppercase tracking-widest text-roman-gold/80 font-bold w-56 bg-stone-900/90 shadow-sm">Campaign</th>
                   <th className="px-8 py-6 text-sm uppercase tracking-widest text-roman-gold/80 font-bold w-96 bg-stone-900/90 shadow-sm">Progress</th>
@@ -1471,7 +1471,7 @@ export default function Campaigns() {
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-32 bg-roman-gold/10 blur-[80px] rounded-full pointer-events-none"></div>
             
             <div className="px-8 py-10 relative">
-              <div className="w-16 h-16 mb-5 mx-auto rounded-full bg-gradient-to-br from-stone-800 to-stone-900 flex items-center justify-center border-2 border-roman-gold/30 shadow-[0_0_20px_rgba(235,191,90,0.15)]">
+              <div className="w-16 h-16 mb-5 mx-auto rounded-full bg-linear-to-br from-stone-800 to-stone-900 flex items-center justify-center border-2 border-roman-gold/30 shadow-[0_0_20px_rgba(235,191,90,0.15)]">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-roman-gold" viewBox="0 0 24 24" fill="currentColor">
                   <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clipRule="evenodd" />
                 </svg>

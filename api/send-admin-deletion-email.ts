@@ -43,7 +43,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     studentName,
     studentRomanNickname,
     className,
-    schoolId,
+    schoolName,
     requestedByName,
     reason,
   } = req.body ?? {};

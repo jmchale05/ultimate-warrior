@@ -836,7 +836,7 @@ export default function AdminDashboard() {
                 <p className="text-stone-400 text-[11px] uppercase tracking-[0.2em] font-semibold mb-1.5">{label}</p>
                 <p className="text-roman-gold font-serif text-3xl font-bold leading-none tracking-tight drop-shadow-sm">{value}</p>
               </div>
-              <div className={`relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border bg-stone-950/80 bg-gradient-to-br ${iconTone} group-hover:scale-110 group-hover:-translate-y-0.5 transition-all duration-300`}>
+              <div className={`relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border bg-stone-950/80 bg-linear-to-br ${iconTone} group-hover:scale-110 group-hover:-translate-y-0.5 transition-all duration-300`}>
                 <div className="pointer-events-none absolute inset-0 rounded-xl bg-linear-to-br from-white/5 via-transparent to-black/30" />
                 {icon}
               </div>
@@ -1350,7 +1350,7 @@ export default function AdminDashboard() {
                                 ref={actionsMenuRef}
                                 id={`school-actions-${s.school.id}`}
                                 role="menu"
-                                className={`fixed z-[90] w-44 rounded-xl border border-roman-gold/25 bg-stone-950/95 shadow-[0_16px_40px_rgba(0,0,0,0.55)] backdrop-blur-md overflow-hidden ${desktopSchoolActionsAnchor.openUp ? "-translate-y-full origin-bottom-right" : "origin-top-right"}`}
+                                className={`fixed z-90 w-44 rounded-xl border border-roman-gold/25 bg-stone-950/95 shadow-[0_16px_40px_rgba(0,0,0,0.55)] backdrop-blur-md overflow-hidden ${desktopSchoolActionsAnchor.openUp ? "-translate-y-full origin-bottom-right" : "origin-top-right"}`}
                                 style={{ top: `${desktopSchoolActionsAnchor.top}px`, left: `${desktopSchoolActionsAnchor.left}px` }}
                                 onClick={(e) => e.stopPropagation()}
                               >

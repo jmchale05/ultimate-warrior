@@ -53,7 +53,7 @@ export default function MobileCampaigns() {
               return (
                 <div key={c.number} className="relative flex items-start gap-4">
                   {/* Left dot */}
-                  <div className="relative z-10 flex-shrink-0">
+                  <div className="relative z-10 shrink-0">
                     <div className={`w-10 h-10 rounded-full bg-stone-800 border-2 flex items-center justify-center shadow-[0_0_10px_rgba(212,175,55,0.15)] ${
                       cardProgress >= 100
                         ? "border-roman-gold bg-roman-gold/10"
@@ -92,7 +92,7 @@ export default function MobileCampaigns() {
                           </h3>
                           <p className="text-stone-400 text-xs mt-0.5 italic truncate">{c.theme}</p>
                         </div>
-                        <div className="flex-shrink-0 bg-stone-700/40 rounded-lg px-2.5 py-1">
+                        <div className="shrink-0 bg-stone-700/40 rounded-lg px-2.5 py-1">
                           <span className="text-roman-gold font-bold text-xs">{c.miles}</span>
                           <span className="text-stone-500 text-[10px] ml-1">mi</span>
                         </div>
