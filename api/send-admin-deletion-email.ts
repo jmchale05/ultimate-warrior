@@ -6,6 +6,7 @@ type DeletionEmailRequestBody = {
   className?: string;
   schoolName?: string;
   requestedByName?: string;
+  requestedBySuffix?: string;
   reason?: string;
 };
 
@@ -45,6 +46,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     className,
     schoolName,
     requestedByName,
+    requestedBySuffix,
     reason,
   } = req.body ?? {};
 
@@ -57,6 +59,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
+  const requestedByDisplayName = [requestedBySuffix, requestedByName]
+    .map((value) => value?.trim())
+    .filter(Boolean)
+    .join(" ");
+
   const emailPayload = {
     from: `${fromName} <${fromEmail}>`,
     to: validRecipients,
@@ -68,7 +75,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       studentRomanNickname ? `Roman nickname: ${studentRomanNickname}` : undefined,
       `Year: ${className}`,
       `School: ${schoolName}`,
-      `Requested by: ${requestedByName}`,
+      `Requested by: ${requestedByDisplayName}`,
       `Reason: ${reason}`,
       "",
       `Request ID: ${requestId}`,
@@ -145,7 +152,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                   <h3>Request Details</h3>
                   <div class="detail-row">
                     <div class="detail-label">Requested By</div>
-                    <div class="detail-value">${requestedByName}</div>
+                    <div class="detail-value">${requestedByDisplayName}</div>
                   </div>
                   <div class="detail-row">
                     <div class="detail-label">School</div>

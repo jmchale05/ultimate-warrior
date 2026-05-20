@@ -335,6 +335,7 @@ interface StudentDeletionRequestInput {
   className: string;
   requestedByUid: string;
   requestedByName: string;
+  requestedBySuffix?: string;
   reason: string;
 }
 
@@ -441,6 +442,7 @@ export async function createStudentDeletionRequest(
     status: "pending",
     createdAt: Date.now(),
     ...(request.studentRomanNickname ? { studentRomanNickname: request.studentRomanNickname } : {}),
+    ...(request.requestedBySuffix ? { requestedBySuffix: request.requestedBySuffix } : {}),
   };
 
   const requestRef = doc(collection(db, "studentDeletionRequests"));
@@ -490,6 +492,7 @@ export async function createStudentDeletionRequestAndNotifyAdmins(
         className: request.className,
         schoolName,
         requestedByName: request.requestedByName,
+        requestedBySuffix: request.requestedBySuffix,
         reason: request.reason,
       }),
     });

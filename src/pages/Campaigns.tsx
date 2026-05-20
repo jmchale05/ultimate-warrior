@@ -560,6 +560,7 @@ export default function Campaigns() {
         className: selectedStudentForDeleteRequest.className,
         requestedByUid: appUser.uid,
         requestedByName: appUser.displayName,
+        requestedBySuffix: appUser.suffix,
         reason: deleteReason.trim(),
       });
 
