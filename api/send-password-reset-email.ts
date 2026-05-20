@@ -25,6 +25,11 @@ class ConfigurationError extends Error {
 }
 
 function getFirebasePrivateKey(): string | undefined {
+  const base64Key = process.env.FIREBASE_PRIVATE_KEY_BASE64;
+  if (base64Key?.trim()) {
+    return Buffer.from(base64Key.trim(), "base64").toString("utf8");
+  }
+
   const rawKey = process.env.FIREBASE_PRIVATE_KEY;
   if (!rawKey) return undefined;
 
@@ -45,7 +50,7 @@ function ensureFirebaseAdmin() {
     const missing = [
       !projectId ? "FIREBASE_PROJECT_ID" : undefined,
       !clientEmail ? "FIREBASE_CLIENT_EMAIL" : undefined,
-      !privateKey ? "FIREBASE_PRIVATE_KEY" : undefined,
+      !privateKey ? "FIREBASE_PRIVATE_KEY or FIREBASE_PRIVATE_KEY_BASE64" : undefined,
     ].filter(Boolean);
 
     throw new ConfigurationError(`Firebase Admin credentials are missing: ${missing.join(", ")}`);
@@ -65,7 +70,7 @@ function ensureFirebaseAdmin() {
     });
   } catch (err) {
     console.error("Failed to initialize Firebase Admin:", err);
-    throw new ConfigurationError("Firebase Admin credentials could not initialize. Check FIREBASE_PRIVATE_KEY formatting in Vercel.");
+    throw new ConfigurationError("Firebase Admin credentials could not initialize. Use FIREBASE_PRIVATE_KEY_BASE64 to avoid Vercel newline formatting issues.");
   }
 }
 
