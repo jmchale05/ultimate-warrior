@@ -214,13 +214,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
 
-    const code = (err as { code?: string }).code;
+    const firebaseErr = err as { code?: string; message?: string };
+    const code = firebaseErr.code;
     if (code === "auth/user-not-found") {
       res.status(200).json({ sent: true });
       return;
     }
 
+    if (code === "auth/invalid-continue-uri") {
+      res.status(500).json({ error: "APP_URL/continueUrl is invalid for Firebase password reset." });
+      return;
+    }
+
+    if (code === "auth/unauthorized-continue-uri") {
+      res.status(500).json({ error: "APP_URL domain is not authorized in Firebase Authentication settings." });
+      return;
+    }
+
+    if (code && code.startsWith("auth/")) {
+      res.status(500).json({ error: `${code}: ${firebaseErr.message ?? "Firebase Auth error"}` });
+      return;
+    }
+
     console.error("Failed to send password reset email:", err);
-    res.status(500).json({ error: "Failed to send password reset email" });
+    res.status(500).json({ error: firebaseErr.message || "Failed to send password reset email" });
   }
 }
