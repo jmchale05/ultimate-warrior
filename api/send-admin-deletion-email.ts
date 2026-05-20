@@ -52,7 +52,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     new Set(recipients.map((email) => email.trim().toLowerCase()).filter((email) => email.includes("@")))
   );
 
-  if (!requestId || !studentName || !className || !schoolId || !requestedByName || !reason || validRecipients.length === 0) {
+  if (!requestId || !studentName || !className || !schoolName || !requestedByName || !reason || validRecipients.length === 0) {
     res.status(400).json({ error: "Missing required email payload fields" });
     return;
   }
@@ -67,7 +67,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       `Student: ${studentName}`,
       studentRomanNickname ? `Roman nickname: ${studentRomanNickname}` : undefined,
       `Year: ${className}`,
-      `School ID: ${schoolId}`,
+      `School: ${schoolName}`,
       `Requested by: ${requestedByName}`,
       `Reason: ${reason}`,
       "",
