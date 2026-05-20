@@ -60,7 +60,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const emailPayload = {
     from: `${fromName} <${fromEmail}>`,
     to: validRecipients,
-    subject: `⚠️ Student deletion request: ${studentName}`,
+    subject: `Student deletion request: ${studentName}`,
     text: [
       "A deletion request has been submitted and requires admin review.",
       "",
@@ -81,81 +81,91 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         <head>
           <meta charset="utf-8">
           <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; background: #f5f5f5; margin: 0; padding: 0; }
-            .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow: hidden; }
-            .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; color: white; text-align: center; }
-            .header h1 { margin: 0; font-size: 24px; font-weight: 600; }
-            .header p { margin: 8px 0 0 0; font-size: 14px; opacity: 0.9; }
+            body { font-family: 'Plus Jakarta Sans', 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #e8dcc8; background: #0c0a09; margin: 0; padding: 0; }
+            .email-wrap { background: radial-gradient(circle at 20% 0%, rgba(139,28,28,0.26), transparent 34%), radial-gradient(circle at 82% 12%, rgba(212,175,55,0.14), transparent 30%), #0c0a09; padding: 32px 16px; }
+            .container { max-width: 620px; margin: 0 auto; background: linear-gradient(135deg, rgba(139,28,28,0.10) 0%, transparent 46%), linear-gradient(225deg, rgba(212,175,55,0.08) 0%, transparent 46%), #1c1917; border: 1px solid rgba(212,175,55,0.28); border-radius: 8px; box-shadow: 0 18px 50px rgba(0,0,0,0.42), inset 0 1px 0 rgba(212,175,55,0.12); overflow: hidden; }
+            .top-line { height: 3px; background: linear-gradient(90deg, transparent, #d4af37, transparent); }
+            .header { background: linear-gradient(135deg, #5e1313 0%, #8b1c1c 52%, #2c2c2c 100%); padding: 34px 30px 30px; color: #f0d060; text-align: center; border-bottom: 1px solid rgba(212,175,55,0.25); }
+            .kicker { margin: 0 0 10px; color: #c9b896; font-size: 11px; font-weight: 800; letter-spacing: 0.18em; text-transform: uppercase; }
+            .header h1 { margin: 0; font-family: Cinzel, Georgia, 'Times New Roman', serif; font-size: 26px; line-height: 1.2; font-weight: 700; letter-spacing: 0.02em; text-shadow: 0 0 18px rgba(212,175,55,0.24); }
+            .header p { margin: 10px 0 0; color: #e8dcc8; font-size: 14px; opacity: 0.92; }
             .content { padding: 30px; }
-            .alert-box { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin-bottom: 25px; border-radius: 4px; }
-            .alert-box p { margin: 0; color: #856404; font-size: 14px; }
-            .details-section { margin: 25px 0; }
-            .details-section h3 { margin: 0 0 15px 0; font-size: 16px; font-weight: 600; color: #333; border-bottom: 2px solid #667eea; padding-bottom: 10px; }
-            .detail-row { display: flex; margin: 12px 0; padding: 8px 0; border-bottom: 1px solid #eee; }
+            .alert-box { background: rgba(139,28,28,0.18); border: 1px solid rgba(212,175,55,0.25); border-left: 4px solid #d4af37; padding: 16px; margin-bottom: 26px; border-radius: 8px; }
+            .alert-box p { margin: 0; color: #e8dcc8; font-size: 14px; }
+            .alert-box strong { color: #f0d060; }
+            .details-section { margin: 26px 0; }
+            .details-section h3 { margin: 0 0 14px; font-family: Cinzel, Georgia, 'Times New Roman', serif; font-size: 15px; font-weight: 700; color: #d4af37; letter-spacing: 0.04em; text-transform: uppercase; border-bottom: 1px solid rgba(212,175,55,0.22); padding-bottom: 10px; }
+            .detail-row { display: flex; margin: 0; padding: 11px 0; border-bottom: 1px solid rgba(232,220,200,0.10); }
             .detail-row:last-child { border-bottom: none; }
-            .detail-label { font-weight: 600; color: #667eea; width: 140px; flex-shrink: 0; }
-            .detail-value { flex: 1; color: #333; word-break: break-word; }
-            .reason-box { background: #f8f9fa; border-left: 3px solid #667eea; padding: 12px; border-radius: 4px; margin: 15px 0; }
-            .reason-box p { margin: 0; font-size: 14px; color: #555; line-height: 1.5; }
-            .footer { background: #f8f9fa; padding: 20px 30px; border-top: 1px solid #eee; font-size: 12px; color: #666; text-align: center; }
-            .footer p { margin: 5px 0; }
-            .request-id { font-family: 'Courier New', monospace; background: #f0f0f0; padding: 8px 12px; border-radius: 4px; font-size: 12px; color: #666; }
+            .detail-label { font-weight: 800; color: #c9b896; width: 140px; flex-shrink: 0; font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; }
+            .detail-value { flex: 1; color: #f5f5f4; word-break: break-word; font-size: 15px; }
+            .reason-box { background: rgba(12,10,9,0.42); border: 1px solid rgba(212,175,55,0.18); border-left: 3px solid #8b1c1c; padding: 14px; border-radius: 8px; margin: 14px 0 0; }
+            .reason-box p { margin: 0; font-size: 14px; color: #e8dcc8; line-height: 1.6; }
+            .footer { background: rgba(12,10,9,0.45); padding: 22px 30px; border-top: 1px solid rgba(212,175,55,0.18); font-size: 12px; color: #c9b896; text-align: center; }
+            .footer p { margin: 6px 0; }
+            .footer strong { color: #d4af37; }
+            .request-id { font-family: 'Courier New', monospace; color: #8f8370; font-size: 11px; }
+            @media (max-width: 520px) { .content, .header, .footer { padding-left: 20px; padding-right: 20px; } .detail-row { display: block; } .detail-label { width: auto; margin-bottom: 3px; } }
           </style>
         </head>
         <body>
-          <div class="container">
-            <div class="header">
-              <h1>🔔 Student Deletion Request</h1>
-              <p>Action Required - Admin Review Needed</p>
-            </div>
+          <div class="email-wrap">
+            <div class="container">
+              <div class="top-line"></div>
+              <div class="header">
+                <p class="kicker">Admin Review Required</p>
+                <h1>Student Deletion Request</h1>
+                <p>A teacher has requested removal of a student record.</p>
+              </div>
             
-            <div class="content">
-              <div class="alert-box">
-                <p><strong>⚠️ Important:</strong> A student deletion request has been submitted and requires your immediate review and approval.</p>
+              <div class="content">
+                <div class="alert-box">
+                  <p><strong>Action needed:</strong> Review this request in the admin dashboard before any student data is removed.</p>
+                </div>
+
+                <div class="details-section">
+                  <h3>Student Information</h3>
+                  <div class="detail-row">
+                    <div class="detail-label">Name</div>
+                    <div class="detail-value">${studentName}</div>
+                  </div>
+                  ${studentRomanNickname ? `
+                  <div class="detail-row">
+                    <div class="detail-label">Roman Name</div>
+                    <div class="detail-value">${studentRomanNickname}</div>
+                  </div>
+                  ` : ""}
+                  <div class="detail-row">
+                    <div class="detail-label">Year/Class</div>
+                    <div class="detail-value">${className}</div>
+                  </div>
+                </div>
+
+                <div class="details-section">
+                  <h3>Request Details</h3>
+                  <div class="detail-row">
+                    <div class="detail-label">Requested By</div>
+                    <div class="detail-value">${requestedByName}</div>
+                  </div>
+                  <div class="detail-row">
+                    <div class="detail-label">School</div>
+                    <div class="detail-value">${schoolName}</div>
+                  </div>
+                </div>
+
+                <div class="details-section">
+                  <h3>Reason for Deletion</h3>
+                  <div class="reason-box">
+                    <p>${reason}</p>
+                  </div>
+                </div>
               </div>
 
-              <div class="details-section">
-                <h3>Student Information</h3>
-                <div class="detail-row">
-                  <div class="detail-label">Name:</div>
-                  <div class="detail-value">${studentName}</div>
-                </div>
-                ${studentRomanNickname ? `
-                <div class="detail-row">
-                  <div class="detail-label">Roman Nickname:</div>
-                  <div class="detail-value">${studentRomanNickname}</div>
-                </div>
-                ` : ""}
-                <div class="detail-row">
-                  <div class="detail-label">Year/Class:</div>
-                  <div class="detail-value">${className}</div>
-                </div>
+              <div class="footer">
+                <p><strong>Next Steps:</strong> Log into the admin dashboard to approve or reject this deletion request.</p>
+                <p style="font-size: 11px; color: #8f8370; margin-top: 15px; border-top: 1px solid rgba(212,175,55,0.12); padding-top: 10px;">Request ID: <span class="request-id">${requestId}</span></p>
+                <p>This is an automated message. Do not reply to this email.</p>
               </div>
-
-              <div class="details-section">
-                <h3>Request Details</h3>
-                <div class="detail-row">
-                  <div class="detail-label">Requested By:</div>
-                  <div class="detail-value">${requestedByName}</div>
-                </div>
-                <div class="detail-row">
-                  <div class="detail-label">School:</div>
-                  <div class="detail-value">${schoolName}</div>
-                </div>
-              </div>
-
-              <div class="details-section">
-                <h3>Reason for Deletion</h3>
-                <div class="reason-box">
-                  <p>${reason}</p>
-                </div>
-              </div>
-            </div>
-
-            <div class="footer">
-              <p><strong>Next Steps:</strong> Log into the admin dashboard to review and approve/reject this deletion request.</p>
-              <p style="font-size: 11px; color: #999; margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px;">Request ID: <span class="request-id">${requestId}</span></p>
-              <p>This is an automated message. Do not reply to this email.</p>
             </div>
           </div>
         </body>
