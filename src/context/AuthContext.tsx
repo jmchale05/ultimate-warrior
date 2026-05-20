@@ -239,7 +239,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     if (!response.ok) {
-      throw new Error(`Password reset email request failed (${response.status}): ${await response.text()}`);
+      const errorText = await response.text();
+      let parsedError: string | undefined;
+      try {
+        const errorBody = JSON.parse(errorText) as { error?: string };
+        parsedError = errorBody.error;
+      } catch {
+        // Fall back to the raw response body below.
+      }
+
+      throw new Error(parsedError || errorText || `Password reset email request failed (${response.status})`);
     }
   }
 

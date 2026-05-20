@@ -222,6 +222,8 @@ export default function LoginPage() {
         setResetError("Too many attempts. Please wait a moment and try again.");
       } else if (code === "auth/network-request-failed") {
         setResetError("Network error. Please check your internet connection.");
+      } else if (err instanceof Error && err.message) {
+        setResetError(err.message);
       } else {
         setResetError("We could not send the reset email right now. Please try again.");
       }
