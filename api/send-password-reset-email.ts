@@ -17,8 +17,21 @@ type VercelResponse = {
   setHeader: (name: string, value: string) => void;
 };
 
+class ConfigurationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ConfigurationError";
+  }
+}
+
 function getFirebasePrivateKey(): string | undefined {
-  return process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
+  const rawKey = process.env.FIREBASE_PRIVATE_KEY;
+  if (!rawKey) return undefined;
+
+  return rawKey
+    .trim()
+    .replace(/^['"]|['"]$/g, "")
+    .replace(/\\n/g, "\n");
 }
 
 function ensureFirebaseAdmin() {
@@ -29,16 +42,31 @@ function ensureFirebaseAdmin() {
   const privateKey = getFirebasePrivateKey();
 
   if (!projectId || !clientEmail || !privateKey) {
-    throw new Error("Firebase Admin credentials are not configured");
+    const missing = [
+      !projectId ? "FIREBASE_PROJECT_ID" : undefined,
+      !clientEmail ? "FIREBASE_CLIENT_EMAIL" : undefined,
+      !privateKey ? "FIREBASE_PRIVATE_KEY" : undefined,
+    ].filter(Boolean);
+
+    throw new ConfigurationError(`Firebase Admin credentials are missing: ${missing.join(", ")}`);
   }
 
-  initializeApp({
-    credential: cert({
-      projectId,
-      clientEmail,
-      privateKey,
-    }),
-  });
+  if (!privateKey.includes("BEGIN PRIVATE KEY") || !privateKey.includes("END PRIVATE KEY")) {
+    throw new ConfigurationError("FIREBASE_PRIVATE_KEY is not a valid service-account private key");
+  }
+
+  try {
+    initializeApp({
+      credential: cert({
+        projectId,
+        clientEmail,
+        privateKey,
+      }),
+    });
+  } catch (err) {
+    console.error("Failed to initialize Firebase Admin:", err);
+    throw new ConfigurationError("Firebase Admin credentials could not initialize. Check FIREBASE_PRIVATE_KEY formatting in Vercel.");
+  }
 }
 
 function getBaseUrl(req: VercelRequest): string {
@@ -181,6 +209,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     res.status(200).json({ sent: true });
   } catch (err) {
+    if (err instanceof ConfigurationError) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+
     const code = (err as { code?: string }).code;
     if (code === "auth/user-not-found") {
       res.status(200).json({ sent: true });
