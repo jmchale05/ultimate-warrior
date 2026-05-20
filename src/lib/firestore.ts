@@ -443,10 +443,11 @@ export async function createStudentDeletionRequest(
     ...(request.studentRomanNickname ? { studentRomanNickname: request.studentRomanNickname } : {}),
   };
 
-  const ref = await addDoc(collection(db, "studentDeletionRequests"), {
+  const requestRef = doc(collection(db, "studentDeletionRequests"));
+  await setDoc(requestRef, {
     ...payload,
   });
-  return ref.id;
+  return requestRef.id;
 }
 
 export async function createStudentDeletionRequestAndNotifyAdmins(
@@ -455,58 +456,48 @@ export async function createStudentDeletionRequestAndNotifyAdmins(
   const requestId = await createStudentDeletionRequest(request);
 
   try {
-    const requesterSnap = await getDoc(doc(db, "users", request.requestedByUid));
-    const requester = requesterSnap.exists() ? (requesterSnap.data() as AppUser) : null;
-    const canQueueEmail = requester?.role === "admin";
+    const [adminsLowercaseSnap, adminsCapitalizedSnap] = await Promise.all([
+      getDocs(query(collection(db, "users"), where("role", "==", "admin"))),
+      getDocs(query(collection(db, "users"), where("role", "==", "Admin"))),
+    ]);
 
-    if (!canQueueEmail) {
-      return { requestId, queuedEmails: 0 };
-    }
-
-    const adminsSnap = await getDocs(
-      query(collection(db, "users"), where("role", "==", "admin"))
-    );
-
-    const adminEmails = adminsSnap.docs
-      .map((d) => (d.data() as AppUser).email?.trim())
-      .filter((email): email is string => Boolean(email));
-
-    await Promise.all(
-      adminEmails.map((adminEmail) =>
-        addDoc(collection(db, "mail"), {
-          to: adminEmail,
-          message: {
-            subject: `Student deletion request: ${request.studentName}`,
-            text: [
-              "A deletion request has been submitted and requires admin review.",
-              "",
-              `Student: ${request.studentName}`,
-              request.studentRomanNickname ? `Roman nickname: ${request.studentRomanNickname}` : undefined,
-              `Year: ${request.className}`,
-              `School ID: ${request.schoolId}`,
-              `Requested by: ${request.requestedByName}`,
-              `Reason: ${request.reason}`,
-              "",
-              `Request ID: ${requestId}`,
-            ]
-              .filter(Boolean)
-              .join("\n"),
-            html: `
-              <p>A deletion request has been submitted and requires admin review.</p>
-              <p><strong>Student:</strong> ${request.studentName}</p>
-              ${request.studentRomanNickname ? `<p><strong>Roman nickname:</strong> ${request.studentRomanNickname}</p>` : ""}
-              <p><strong>Year:</strong> ${request.className}</p>
-              <p><strong>School ID:</strong> ${request.schoolId}</p>
-              <p><strong>Requested by:</strong> ${request.requestedByName}</p>
-              <p><strong>Reason:</strong> ${request.reason}</p>
-              <p><strong>Request ID:</strong> ${requestId}</p>
-            `,
-          },
-        })
+    const adminEmails = Array.from(
+      new Set(
+        [...adminsLowercaseSnap.docs, ...adminsCapitalizedSnap.docs]
+          .map((d) => (d.data() as AppUser).email?.trim().toLowerCase())
+          .filter((email): email is string => Boolean(email && email.includes("@")))
       )
     );
 
-    return { requestId, queuedEmails: adminEmails.length };
+    if (adminEmails.length === 0) {
+      console.warn("No admin email recipients found for deletion request", { requestId, schoolId: request.schoolId });
+      return { requestId, queuedEmails: 0 };
+    }
+
+    const emailResponse = await fetch("/api/send-admin-deletion-email", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        recipients: adminEmails,
+        requestId,
+        studentName: request.studentName,
+        studentRomanNickname: request.studentRomanNickname,
+        className: request.className,
+        schoolId: request.schoolId,
+        requestedByName: request.requestedByName,
+        reason: request.reason,
+      }),
+    });
+
+    if (!emailResponse.ok) {
+      throw new Error(`Email API request failed (${emailResponse.status}): ${await emailResponse.text()}`);
+    }
+
+    const emailResult = (await emailResponse.json()) as { sent?: number };
+
+    return { requestId, queuedEmails: emailResult.sent ?? adminEmails.length };
   } catch (err) {
     console.error("Failed to queue admin deletion-request emails:", err);
     return { requestId, queuedEmails: 0 };

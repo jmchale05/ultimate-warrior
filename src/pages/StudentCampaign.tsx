@@ -1,9 +1,9 @@
-﻿import { useEffect, useState, useRef } from "react";
+﻿import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import confetti from "canvas-confetti";
 import Navbar from "../components/Navbar";
 import { StudentCampaignSkeleton } from "../components/LoadingSpinner";
-import { getUserDoc, getResultsByStudent, submitResult, updateUserCampaignVideoProgress, updateUserPhoto } from "../lib/firestore";
+import { getUserDoc, getResultsByStudent, submitResult, updateUserCampaignVideoProgress } from "../lib/firestore";
 import { useAuth } from "../context/AuthContext";
 import type { AppUser, Result } from "../types";
 
@@ -109,23 +109,23 @@ export default function StudentCampaign() {
   const [awardModalCampaign, setAwardModalCampaign] = useState<number | null>(null);
   const [mileInput, setMileInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [photoUploading, setPhotoUploading] = useState(false);
+  // const [photoUploading, setPhotoUploading] = useState(false);
   const [imgError, setImgError] = useState<Set<number>>(new Set());
   const [showGrandFinale, setShowGrandFinale] = useState(false);
-  const photoInputRef = useRef<HTMLInputElement>(null);
+  // const photoInputRef = useRef<HTMLInputElement>(null);
 
-  async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file || !uid) return;
-    setPhotoUploading(true);
-    try {
-      const url = await updateUserPhoto(uid, file);
-      setStudent((prev) => prev ? { ...prev, photoUrl: url } : prev);
-    } finally {
-      setPhotoUploading(false);
-      if (photoInputRef.current) photoInputRef.current.value = "";
-    }
-  }
+  // async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  //   const file = e.target.files?.[0];
+  //   if (!file || !uid) return;
+  //   setPhotoUploading(true);
+  //   try {
+  //     const url = await updateUserPhoto(uid, file);
+  //     setStudent((prev) => prev ? { ...prev, photoUrl: url } : prev);
+  //   } finally {
+  //     setPhotoUploading(false);
+  //     if (photoInputRef.current) photoInputRef.current.value = "";
+  //   }
+  // }
 
   async function handleLogMiles(campaignNumber: number, milesRequired: number) {
     const input = parseFloat(mileInput);
@@ -306,7 +306,7 @@ export default function StudentCampaign() {
                   </button>
                   <div className="w-px h-8 bg-stone-700/50" />
                   {/* Avatar */}
-                  <div className="relative group shrink-0">
+                  <div className="relative shrink-0">
                     <div className="w-14 h-14 rounded-full border-2 border-roman-gold/50 overflow-hidden bg-stone-800 flex items-center justify-center">
                       {student?.photoUrl ? (
                         <img src={student.photoUrl} alt={student.displayName} className="w-full h-full object-cover" />
@@ -314,17 +314,6 @@ export default function StudentCampaign() {
                         <img src="/profile-pics.png" alt="Warrior" className="w-full h-full object-cover opacity-60" />
                       )}
                     </div>
-                    <button
-                      onClick={() => photoInputRef.current?.click()}
-                      disabled={photoUploading}
-                      title="Upload photo"
-                      className="absolute inset-0 rounded-full bg-stone-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer disabled:cursor-wait"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 text-roman-gold">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
-                      </svg>
-                    </button>
-                    <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
                   </div>
                   <div>
                     <p className="text-roman-gold font-serif font-bold text-3xl leading-tight">{student?.displayName ?? "Unknown Warrior"}</p>

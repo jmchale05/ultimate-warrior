@@ -112,7 +112,9 @@ service cloud.firestore {
     // Users can read/write their own doc.
     // Teachers can read docs for students in their school.
     // Admins have full access.
+    // All authenticated users can list (needed for querying admin emails).
     match /users/{uid} {
+      allow list: if isAuthed();
       allow read: if isAuthed() && (
         request.auth.uid == uid ||
         isAdmin() ||
@@ -193,13 +195,6 @@ service cloud.firestore {
         sameSchool(resource.data.schoolId) &&
         resource.data.status == 'pending'
       );
-    }
-
-    // ── /mail ───────────────────────────────────────────────────────────────
-    // Outbound email queue documents (e.g. Firebase Trigger Email extension).
-    match /mail/{mailId} {
-      allow create: if isAdmin();
-      allow read, update, delete: if isAdmin();
     }
   }
 }

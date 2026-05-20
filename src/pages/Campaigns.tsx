@@ -551,7 +551,7 @@ export default function Campaigns() {
     try {
       const pendingStudentId = selectedStudentForDeleteRequest.uid;
 
-      await createStudentDeletionRequestAndNotifyAdmins({
+      const { queuedEmails } = await createStudentDeletionRequestAndNotifyAdmins({
         studentId: pendingStudentId,
         studentName: selectedStudentForDeleteRequest.name,
         studentRomanNickname: selectedStudentForDeleteRequest.romanNickname,
@@ -576,7 +576,11 @@ export default function Campaigns() {
       setShowDeleteRequestModal(false);
       setSelectedStudentForDeleteRequest(null);
       setDeleteReason("");
-      setSuccessToast("Deletion request sent to admin for review.");
+      if (queuedEmails > 0) {
+        setSuccessToast("Deletion request sent to admin for review.");
+      } else {
+        setErrorToast("Deletion request saved, but no admin email could be sent.");
+      }
     } catch (err) {
       console.error("Failed to create deletion request:", err);
       setDeleteRequestError("Failed to submit request. Please try again.");
@@ -739,16 +743,30 @@ export default function Campaigns() {
 
       {successToast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
-          <div className="rounded-lg border border-emerald-300/40 bg-emerald-500/15 text-emerald-100 px-4 py-3 shadow-lg backdrop-blur-sm text-sm font-semibold tracking-wide">
-            {successToast}
+          <div className="flex items-center gap-3 rounded-xl border border-emerald-500/30 bg-stone-900/95 px-5 py-4 shadow-2xl backdrop-blur-md">
+            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <span className="text-stone-100 font-medium tracking-wide">
+              {successToast}
+            </span>
           </div>
         </div>
       )}
 
       {errorToast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
-          <div className="rounded-lg border border-red-300/40 bg-red-500/15 text-red-100 px-4 py-3 shadow-lg backdrop-blur-sm text-sm font-semibold tracking-wide">
-            {errorToast}
+          <div className="flex items-center gap-3 rounded-xl border border-red-500/30 bg-stone-900/95 px-5 py-4 shadow-2xl backdrop-blur-md">
+            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-red-500/20 text-red-400">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </div>
+            <span className="text-stone-100 font-medium tracking-wide">
+              {errorToast}
+            </span>
           </div>
         </div>
       )}
@@ -879,28 +897,40 @@ export default function Campaigns() {
                   <tr
                     key={`${s.uid}-${s.className}`}
                     onClick={() => navigate(`/campaigns/${s.uid}`)}
-                    className={`border-b border-roman-gold/5 cursor-pointer transition-all duration-200 ${s.hasPendingDeletionRequest ? "bg-stone-900/80 hover:bg-stone-900" : "bg-stone-950/40 hover:bg-stone-800/60"}`}
+                    className={`border-b cursor-pointer transition-all duration-200 relative ${
+                      s.hasPendingDeletionRequest
+                        ? "bg-red-950/20 border-red-900/40 hover:bg-red-950/30"
+                        : "border-roman-gold/5 bg-stone-950/40 hover:bg-stone-800/60"
+                    }`}
                   >
-                    <td className="pl-8 pr-12 py-6">
+                    <td className="pl-8 pr-12 py-6 relative">
                       <div className="flex items-center gap-4">
-                        <div className="w-20 h-20 rounded-full border border-roman-gold/20 overflow-hidden bg-stone-800 flex items-center justify-center shrink-0">
+                        <div className={`w-20 h-20 rounded-full border overflow-hidden flex items-center justify-center shrink-0 ${
+                          s.hasPendingDeletionRequest ? "border-red-500/30 bg-red-950/40 shadow-[0_0_15px_rgba(220,38,38,0.2)]" : "border-roman-gold/20 bg-stone-800"
+                        }`}>
                           {s.photoUrl
-                            ? <img src={s.photoUrl} alt={s.name} className="w-full h-full object-cover" />
-                            : <img src="/profile-pics.png" alt={s.name} className="w-full h-full object-cover opacity-60" />
+                            ? <img src={s.photoUrl} alt={s.name} className={`w-full h-full object-cover ${s.hasPendingDeletionRequest ? 'opacity-60 grayscale' : ''}`} />
+                            : <img src="/profile-pics.png" alt={s.name} className={`w-full h-full object-cover opacity-60 ${s.hasPendingDeletionRequest ? 'grayscale' : ''}`} />
                           }
                         </div>
                         <div className="min-w-0">
-                          <p className="font-medium text-stone-100 text-3xl leading-tight">{s.name}</p>
-                          {s.romanNickname && (
-                            <div className="mt-2.5">
+                          <p className={`font-medium text-3xl leading-tight ${s.hasPendingDeletionRequest ? 'text-stone-300' : 'text-stone-100'}`}>{s.name}</p>
+                          <div className="flex flex-wrap items-center gap-2 mt-2.5">
+                            {s.romanNickname && (
                               <span className="inline-block px-3 py-1 rounded-full border border-roman-gold/30 bg-roman-gold/10 text-roman-gold/90 text-xs font-bold uppercase tracking-[0.2em] shadow-[0_2px_10px_rgba(235,191,90,0.15)] flex-none">
                                 {s.romanNickname}
                               </span>
-                            </div>
-                          )}
-                          {s.hasPendingDeletionRequest && (
-                            <p className="text-amber-300/90 text-xs uppercase tracking-wider mt-2">Deletion requested - awaiting admin review</p>
-                          )}
+                            )}
+                            {s.hasPendingDeletionRequest && (
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md border border-red-500/30 bg-red-500/10 text-red-400 text-xs font-bold uppercase tracking-wider overflow-hidden group/badge flex-none relative">
+                                <span className="absolute inset-0 bg-red-400/10 animate-pulse pointer-events-none"></span>
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                </svg>
+                                Awaiting Deletion
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -1037,12 +1067,12 @@ export default function Campaigns() {
         {/* Summary and Pagination bar */}
         {!loading && filtered.length > 0 && (
           <div className="mt-6 flex items-center justify-between text-base px-2 py-1">
-            <div className="text-stone-950 font-extrabold tracking-wide [text-shadow:0_1px_0_rgba(255,255,255,0.65),0_2px_12px_rgba(255,255,255,0.65)]">
+            <div className="text-stone-200 font-extrabold tracking-wide">
               <span>{filtered.length} student{filtered.length !== 1 ? "s" : ""}</span>
-              <span className="mx-4 text-stone-800/80">|</span>
+              <span className="mx-4 text-stone-600">|</span>
               <span>
                 Total:{" "}
-                <span className="text-roman-red-dark font-black tracking-wide">
+                <span className="text-roman-gold font-black tracking-wide">
                   {filtered.reduce((sum, s) => sum + s.totalMiles, 0).toFixed(1)}
                 </span>{" "}
                 miles
@@ -1055,18 +1085,18 @@ export default function Campaigns() {
                   type="button"
                   onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
-                  className="px-3 py-1.5 rounded-lg border border-stone-950/40 bg-roman-gold/90 text-stone-950 font-extrabold shadow-[0_3px_12px_rgba(0,0,0,0.28)] disabled:opacity-45 disabled:cursor-not-allowed hover:bg-roman-gold transition-colors"
+                  className="px-3 py-1.5 rounded-lg border border-stone-600 bg-stone-800 text-stone-200 font-bold hover:bg-stone-700 hover:text-roman-gold disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   Previous
                 </button>
-                <div className="px-4 py-1.5 rounded-lg bg-stone-100/85 border border-stone-950/20 text-stone-950 font-extrabold shadow-[0_3px_12px_rgba(0,0,0,0.22)]">
-                  Page <span className="text-roman-red-dark">{currentPage}</span> of <span className="text-roman-red-dark">{totalPages}</span>
+                <div className="px-4 py-1.5 rounded-lg bg-stone-800 border border-stone-600 text-stone-300 font-bold">
+                  Page <span className="text-roman-gold">{currentPage}</span> of <span className="text-roman-gold">{totalPages}</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages}
-                  className="px-3 py-1.5 rounded-lg border border-stone-950/40 bg-roman-gold/90 text-stone-950 font-extrabold shadow-[0_3px_12px_rgba(0,0,0,0.28)] disabled:opacity-45 disabled:cursor-not-allowed hover:bg-roman-gold transition-colors"
+                  className="px-3 py-1.5 rounded-lg border border-stone-600 bg-stone-800 text-stone-200 font-bold hover:bg-stone-700 hover:text-roman-gold disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   Next
                 </button>

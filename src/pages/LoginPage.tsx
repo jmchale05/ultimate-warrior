@@ -234,8 +234,10 @@ export default function LoginPage() {
     setShowSupportModal(true);
   }
 
+  const isSignup = mode === "signup";
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 relative overflow-hidden">
+    <div className={`min-h-screen flex flex-col items-center px-4 relative overflow-x-hidden ${isSignup ? "justify-start py-6 sm:py-8" : "justify-center overflow-hidden"}`}>
       {logoutMessage && (
         <div className="fixed top-5 right-5 z-50 pointer-events-none">
           <div className="rounded-lg border border-emerald-300/40 bg-emerald-500/15 text-emerald-100 px-4 py-3 shadow-lg backdrop-blur-sm text-sm font-semibold tracking-wide">
@@ -245,14 +247,14 @@ export default function LoginPage() {
       )}
 
       {/* Background image */}
-      <div className="absolute inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/BACKGROUND-login.png')" }} />
+      <div className="fixed inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/BACKGROUND-login.png')" }} />
       {/* Atmospheric corner glows */}
       <div className="absolute top-0 left-0 w-96 h-96 bg-roman-red/10 rounded-full blur-[120px] -translate-x-1/2 -translate-y-1/2" />
       <div className="absolute bottom-0 right-0 w-80 h-80 bg-roman-gold/5 rounded-full blur-[100px] translate-x-1/3 translate-y-1/3" />
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-150 h-150 bg-roman-red/5 rounded-full blur-[200px]" />
 
       {/* Hero header */}
-      <div className="text-center mb-8 relative">
+      <div className={`text-center relative ${isSignup ? "mb-4 sm:mb-5" : "mb-8"}`}>
         {/* Glow behind logo */}
         <div className="absolute inset-0 flex items-center justify-center -top-4">
           <div className="w-40 h-40 bg-roman-gold/10 rounded-full blur-3xl" />
@@ -260,9 +262,9 @@ export default function LoginPage() {
         <img
           src="/logonew.jpeg"
           alt="Ultimate Warrior"
-          className="w-full max-w-96 h-auto object-contain mx-auto mb-5 relative z-10 [image-rendering:--webkit-optimize-contrast] transform-gpu"
+          className={`w-full h-auto object-contain mx-auto relative z-10 [image-rendering:--webkit-optimize-contrast] transform-gpu ${isSignup ? "max-w-64 sm:max-w-72 mb-3" : "max-w-96 mb-5"}`}
         />
-        <h1 className="text-roman-gold-light font-serif text-4xl font-bold tracking-widest uppercase relative z-10 [text-shadow:0_2px_12px_rgba(0,0,0,0.9),0_0_30px_rgba(0,0,0,0.7)]">
+        <h1 className={`text-roman-gold-light font-serif font-bold tracking-widest uppercase relative z-10 [text-shadow:0_2px_12px_rgba(0,0,0,0.9),0_0_30px_rgba(0,0,0,0.7)] ${isSignup ? "text-2xl sm:text-3xl" : "text-4xl"}`}>
           Ultimate Warrior
         </h1>
         <div className="roman-divider text-roman-gold text-xs font-serif mt-2 [text-shadow:0_1px_8px_rgba(0,0,0,0.9)]">
@@ -271,17 +273,17 @@ export default function LoginPage() {
       </div>
 
       {/* Card */}
-      <div className="w-full max-w-md roman-card rounded-2xl p-8 relative z-10">
+      <div className={`w-full max-w-md roman-card rounded-2xl relative z-10 ${isSignup ? "p-5 sm:p-6" : "p-8"}`}>
         <h2 className="text-roman-gold font-serif text-xl font-bold tracking-widest uppercase text-center mb-1">
           {mode === "signin" ? "Sign In" : "Join the Legion"}
         </h2>
-        <p className="text-stone-500 text-xs text-center mb-6 italic font-serif">
+        <p className={`text-stone-500 text-xs text-center italic font-serif ${isSignup ? "mb-4" : "mb-6"}`}>
           {mode === "signin"
             ? "Enter your credentials to access your account"
             : "Register to lead your warriors to glory"}
         </p>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className={isSignup ? "space-y-3" : "space-y-4"}>
           {mode === "signup" && (
             <div>
               <label className="block text-roman-gold/70 text-xs uppercase tracking-wider mb-1.5 font-semibold">
@@ -654,7 +656,7 @@ export default function LoginPage() {
       )}
 
       {/* Footer motto */}
-      <p className="text-stone-700 text-xs mt-8 font-serif italic tracking-wider select-none">
+      <p className={`text-stone-700 text-xs font-serif italic tracking-wider select-none ${isSignup ? "mt-4 mb-2" : "mt-8"}`}>
         "Audentes Fortuna Iuvat" — Fortune Favors the Bold
       </p>
     </div>

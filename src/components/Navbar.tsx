@@ -77,19 +77,21 @@ export default function Navbar() {
         <div className="flex-1 flex justify-center items-center">
           {school && (
             <div className="flex items-center gap-4 bg-stone-900/80 px-5 py-2.5 border border-roman-gold/20 rounded-full shadow-inner">
-              <img
-                src={school.logoUrl ?? "/warriorschool.png"}
-                alt={school.name}
-                className="w-12 h-12 rounded-full object-cover border border-roman-gold/30"
-              />
-              <div className="w-px h-8 bg-roman-gold/20" />
+              {school.logoUrl && (
+                <>
+                  <img
+                    src={school.logoUrl}
+                    alt={school.name}
+                    className="w-12 h-12 rounded-full object-cover border border-roman-gold/30"
+                  />
+                  <div className="w-px h-8 bg-roman-gold/20" />
+                </>
+              )}
               <div className="leading-tight">
                 <div className="text-stone-300 text-lg tracking-wide font-semibold">
                   {school.name}
                 </div>
-                <div className="text-roman-gold/70 text-[11px] uppercase tracking-wider font-semibold mt-0.5">
-                  {school.schoolType ?? "School Type Not Set"}
-                </div>
+
               </div>
             </div>
           )}
