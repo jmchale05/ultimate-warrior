@@ -239,7 +239,7 @@ export default function LoginPage() {
   const isSignup = mode === "signup";
 
   return (
-    <div className={`min-h-screen flex flex-col items-center px-4 relative overflow-x-hidden ${isSignup ? "justify-start py-6 sm:py-8" : "justify-center overflow-hidden"}`}>
+    <div className={`min-h-screen flex flex-col items-center px-4 relative overflow-x-hidden ${isSignup ? "justify-start py-6 sm:py-8 lg:py-6" : "justify-center overflow-hidden"}`}>
       {logoutMessage && (
         <div className="fixed top-5 right-5 z-50 pointer-events-none">
           <div className="rounded-lg border border-emerald-300/40 bg-emerald-500/15 text-emerald-100 px-4 py-3 shadow-lg backdrop-blur-sm text-sm font-semibold tracking-wide">
@@ -248,38 +248,41 @@ export default function LoginPage() {
         </div>
       )}
 
+      {/* Fallback background shown immediately while hero image loads */}
+      <div className="fixed inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(212,175,55,0.16),transparent_46%),radial-gradient(circle_at_85%_80%,rgba(139,28,28,0.2),transparent_50%),linear-gradient(155deg,#1f1b16_0%,#121212_55%,#25130f_100%)]" />
       {/* Background image */}
-      <div className="fixed inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/BACKGROUND-login.png')" }} />
+      <div className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-90" style={{ backgroundImage: "url('/BACKGROUND-login.png')" }} />
+      <div className="absolute inset-0 bg-stone-950/45" />
       {/* Atmospheric corner glows */}
       <div className="absolute top-0 left-0 w-96 h-96 bg-roman-red/10 rounded-full blur-[120px] -translate-x-1/2 -translate-y-1/2" />
       <div className="absolute bottom-0 right-0 w-80 h-80 bg-roman-gold/5 rounded-full blur-[100px] translate-x-1/3 translate-y-1/3" />
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-150 h-150 bg-roman-red/5 rounded-full blur-[200px]" />
 
       {/* Hero header */}
-      <div className={`text-center relative ${isSignup ? "mb-4 sm:mb-5" : "mb-8"}`}>
+      <div className={`text-center relative ${isSignup ? "mb-4 sm:mb-5 lg:mb-4" : "mb-8 lg:mb-6"}`}>
         {/* Glow behind logo */}
         <div className="absolute inset-0 flex items-center justify-center -top-4">
           <div className="w-40 h-40 bg-roman-gold/10 rounded-full blur-3xl" />
         </div>
         <img
-          src="/logonew.jpeg"
+          src="/logo-new.png"
           alt="Ultimate Warrior"
-          className={`w-full h-auto object-contain mx-auto relative z-10 [image-rendering:--webkit-optimize-contrast] transform-gpu ${isSignup ? "max-w-64 sm:max-w-72 mb-3" : "max-w-96 mb-5"}`}
+          className={`w-full h-auto object-contain mx-auto relative z-10 [image-rendering:--webkit-optimize-contrast] transform-gpu ${isSignup ? "max-w-64 sm:max-w-72 lg:max-w-64 mb-3 lg:mb-2" : "max-w-96 lg:max-w-80 mb-5 lg:mb-4"}`}
         />
-        <h1 className={`text-roman-gold-light font-serif font-bold tracking-widest uppercase relative z-10 [text-shadow:0_2px_12px_rgba(0,0,0,0.9),0_0_30px_rgba(0,0,0,0.7)] ${isSignup ? "text-2xl sm:text-3xl" : "text-4xl"}`}>
+        <h1 className={`text-roman-gold-light font-serif font-bold tracking-widest uppercase relative z-10 [text-shadow:0_2px_12px_rgba(0,0,0,0.9),0_0_30px_rgba(0,0,0,0.7)] ${isSignup ? "text-2xl sm:text-3xl lg:text-2xl" : "text-4xl lg:text-3xl"}`}>
           Ultimate Warrior
         </h1>
-        <div className="roman-divider text-roman-gold text-xs font-serif mt-2 [text-shadow:0_1px_8px_rgba(0,0,0,0.9)]">
+        <div className="roman-divider text-roman-gold text-xs font-serif mt-2 lg:mt-1.5 [text-shadow:0_1px_8px_rgba(0,0,0,0.9)]">
           ⚔ CHALLENGES OF THE LEGION ⚔
         </div>
       </div>
 
       {/* Card */}
-      <div className={`w-full max-w-md roman-card rounded-2xl relative z-10 ${isSignup ? "p-5 sm:p-6" : "p-8"}`}>
+      <div className={`w-full max-w-md roman-card rounded-2xl relative z-10 ${isSignup ? "p-5 sm:p-6 lg:p-5" : "p-8 lg:p-6"}`}>
         <h2 className="text-roman-gold font-serif text-xl font-bold tracking-widest uppercase text-center mb-1">
           {mode === "signin" ? "Sign In" : "Join the Legion"}
         </h2>
-        <p className={`text-stone-500 text-xs text-center italic font-serif ${isSignup ? "mb-4" : "mb-6"}`}>
+        <p className={`text-stone-500 text-xs text-center italic font-serif ${isSignup ? "mb-4 lg:mb-3" : "mb-6 lg:mb-4"}`}>
           {mode === "signin"
             ? "Enter your credentials to access your account"
             : "Register to lead your warriors to glory"}
@@ -592,10 +595,6 @@ export default function LoginPage() {
       {showSupportModal && (
         <TeacherSupportModal
           onClose={() => setShowSupportModal(false)}
-          onOpenTerms={() => {
-            setShowSupportModal(false);
-            navigate("/terms");
-          }}
         />
       )}
 
@@ -658,7 +657,7 @@ export default function LoginPage() {
       )}
 
       {/* Footer motto */}
-      <p className={`text-stone-700 text-xs font-serif italic tracking-wider select-none ${isSignup ? "mt-4 mb-2" : "mt-8"}`}>
+      <p className={`text-stone-700 text-xs font-serif italic tracking-wider select-none ${isSignup ? "mt-4 mb-2 lg:mt-3 lg:mb-1" : "mt-8 lg:mt-6"}`}>
         "Audentes Fortuna Iuvat" — Fortune Favors the Bold
       </p>
     </div>

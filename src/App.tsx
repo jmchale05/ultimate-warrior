@@ -43,8 +43,9 @@ function DesktopOnlyGuard() {
   if (isMobileViewport) {
     return (
       <div className="min-h-screen relative overflow-hidden flex items-center justify-center px-4">
-        <div className="fixed inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/BACKGROUND-login.png')" }} />
-        <div className="absolute inset-0 bg-stone-950/80" />
+        <div className="fixed inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(212,175,55,0.16),transparent_46%),radial-gradient(circle_at_85%_80%,rgba(139,28,28,0.2),transparent_50%),linear-gradient(155deg,#1f1b16_0%,#121212_55%,#25130f_100%)]" />
+        <div className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-90" style={{ backgroundImage: "url('/BACKGROUND-login.png')" }} />
+        <div className="absolute inset-0 bg-stone-950/45" />
 
         <div className="relative roman-card w-full max-w-md rounded-2xl p-8 text-center z-10">
           <div className="mx-auto mb-5 w-16 h-16 rounded-full border border-roman-gold/50 bg-stone-900/80 flex items-center justify-center text-roman-gold text-2xl">

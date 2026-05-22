@@ -1,9 +1,9 @@
 type TeacherSupportModalProps = {
   onClose: () => void;
-  onOpenTerms: () => void;
 };
 
 const supportEmail = "support@tuwc.online";
+const policiesHref = "/Terms%20%26%20Conditions.docx.pdf";
 
 const supportQuestions = [
   {
@@ -32,7 +32,7 @@ const supportQuestions = [
   },
 ];
 
-export default function TeacherSupportModal({ onClose, onOpenTerms }: TeacherSupportModalProps) {
+export default function TeacherSupportModal({ onClose }: TeacherSupportModalProps) {
   return (
     <div className="fixed inset-0 z-9999 flex items-start justify-center overflow-y-auto px-3 py-4 sm:items-center sm:px-6 sm:py-8">
       <button
@@ -54,13 +54,14 @@ export default function TeacherSupportModal({ onClose, onOpenTerms }: TeacherSup
                   Help Centre
                 </p>
                 <div className="h-3 w-px bg-roman-gold/30"></div>
-                <button
-                  type="button"
-                  onClick={onOpenTerms}
+                <a
+                  href={policiesHref}
+                  target="_blank"
+                  rel="noreferrer"
                   className="text-[11px] font-semibold uppercase tracking-widest text-stone-500 hover:text-roman-gold transition-colors"
                 >
                   View Policies
-                </button>
+                </a>
               </div>
               <h2 className="font-serif text-2xl font-bold tracking-wide text-roman-gold sm:text-3xl">
                 Teacher Support

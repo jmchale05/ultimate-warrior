@@ -22,13 +22,12 @@ import {
   ensureSchoolAccessCodeIndex,
   updateStudentProfileAndClass,
 } from "../lib/firestore";
+import { getYearOptionsForSchoolType } from "../lib/yearOptions";
 import type { AppUser, Class, Result, School, SchoolType } from "../types";
 import type { StudentDeletionRequest } from "../lib/firestore";
 
 const TOTAL_MILES = 78;
 const STUDENT_AUTHORITY_CONSENT_VERSION = "2026-05";
-const PRIMARY_YEAR_OPTIONS = ["Year 1", "Year 2", "Year 3", "Year 4", "Year 5", "Year 6"];
-const SECONDARY_YEAR_OPTIONS = ["Year 7", "Year 8", "Year 9", "Year 10", "Year 11"];
 const MAX_SCHOOL_ADDRESS_LENGTH = 120;
 const SUBMITTED_DATE_FORMATTER = new Intl.DateTimeFormat("en-GB", {
   day: "2-digit",
@@ -38,10 +37,6 @@ const SUBMITTED_DATE_FORMATTER = new Intl.DateTimeFormat("en-GB", {
   minute: "2-digit",
   hour12: false,
 });
-
-function getYearOptionsForSchoolType(schoolType: SchoolType | undefined): string[] {
-  return schoolType === "Primary School" ? PRIMARY_YEAR_OPTIONS : SECONDARY_YEAR_OPTIONS;
-}
 
 interface SchoolStats {
   school: School;

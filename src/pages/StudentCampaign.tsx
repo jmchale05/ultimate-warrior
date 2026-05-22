@@ -1,97 +1,20 @@
-﻿import { useEffect, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import confetti from "canvas-confetti";
 import Navbar from "../components/Navbar";
 import { StudentCampaignSkeleton } from "../components/LoadingSpinner";
 import { getUserDoc, getResultsByStudent, submitResult, updateUserCampaignVideoProgress } from "../lib/firestore";
+import {
+  CAMPAIGNS,
+  TOTAL_MILES,
+  roundMiles,
+  getCampaignMedalName,
+  resolveVideoUrl,
+} from "../lib/campaignConfig";
 import { useAuth } from "../context/AuthContext";
 import type { AppUser, Result } from "../types";
 
-const CAMPAIGNS = [
-  {
-    number: 1, name: "The Beginning", subtitle: "Mars God of War", milesRequired: 1,
-    startVideo: "/beginning.mars.mov", endVideo: "/end.mars.mov",
-    image: "/campaigns/mars.png",
-    description: "Every warrior's journey begins with a single step. Mars, the God of War, watches over those brave enough to take the first stride. Complete your first mile and prove you are worthy of the path ahead.",
-  },
-  {
-    number: 2, name: "The Foundations", subtitle: "Romulus & Remus", milesRequired: 2,
-    startVideo: "/roman-vid.mp4", endVideo: "/roman-vid.mp4",
-    image: "/campaigns/romulus.png",
-    description: "Twin brothers raised by wolves founded the greatest civilisation the world has ever known. Like Romulus and Remus, you must build strong foundations. Run 2 miles to lay the first stones of your empire.",
-  },
-  {
-    number: 3, name: "The Emperor", subtitle: "Augustus", milesRequired: 3,
-    startVideo: "/roman-vid.mp4", endVideo: "/roman-vid.mp4",
-    image: "/campaigns/augustus.png",
-    description: "Augustus transformed Rome from a republic into an unstoppable empire. To follow in his footsteps, you must show discipline and endurance. Conquer 3 miles to claim the imperial mantle.",
-  },
-  {
-    number: 4, name: "The Legion", subtitle: "Domination of the Roman Army", milesRequired: 4,
-    startVideo: "/roman-vid.mp4", endVideo: "/roman-vid.mp4",
-    image: "/campaigns/legion.png",
-    description: "The Roman Legion was the most feared fighting force in the ancient world. Discipline, formation, and relentless marching made them unstoppable. Push through 4 miles and earn your place in the ranks.",
-  },
-  {
-    number: 5, name: "The Empire", subtitle: "Trajan", milesRequired: 5,
-    startVideo: "/roman-vid.mp4", endVideo: "/roman-vid.mp4",
-    image: "/campaigns/Trajan1.jpg",
-    description: "Under Trajan, the Roman Empire reached its greatest territorial extent. His campaigns stretched across mountains and deserts. Cover 5 miles to expand the borders of your own empire.",
-  },
-  {
-    number: 6, name: "The Hero", subtitle: "Markus Aurelius", milesRequired: 6,
-    startVideo: "/roman-vid.mp4", endVideo: "/roman-vid.mp4",
-    image: "/campaigns/aurelius.png",
-    description: "Marcus Aurelius, the philosopher emperor, believed strength comes from within. He led from the front lines while writing his Meditations. Run 6 miles with the wisdom and courage of a true hero.",
-  },
-  {
-    number: 7, name: "The Wall", subtitle: "Hadrian", milesRequired: 7,
-    startVideo: "/roman-vid.mp4", endVideo: "/roman-vid.mp4",
-    image: "/campaigns/Hadrian6.jpg",
-    description: "Hadrian built a wall that stretched 73 miles across Britannia - a monument to Roman engineering and determination. Push through 7 miles and build your own unbreakable barrier.",
-  },
-  {
-    number: 8, name: "The Restorer of The World", subtitle: "Aurelian", milesRequired: 8,
-    startVideo: "/roman-vid.mp4", endVideo: "/roman-vid.mp4",
-    image: "/campaigns/Aurelian7.jpg",
-    description: "When the empire was fracturing, Aurelian reunited it through sheer force of will. He earned the title Restitutor Orbis - Restorer of the World. Complete 8 miles to restore your own strength.",
-  },
-  {
-    number: 9, name: "The Enemy", subtitle: "Hannibal", milesRequired: 9,
-    startVideo: "/roman-vid.mp4", endVideo: "/roman-vid.mp4",
-    image: "/campaigns/Hannibal3.jpg",
-    description: "Hannibal Barca marched elephants across the Alps to strike at the heart of Rome. He was the greatest enemy Rome ever faced. Endure 9 miles and prove you can overcome any obstacle in your path.",
-  },
-  {
-    number: 10, name: "The Gladiator", subtitle: "Spartacus", milesRequired: 10,
-    startVideo: "/roman-vid.mp4", endVideo: "/roman-vid.mp4",
-    image: "/campaigns/Spartacus5.jpg",
-    description: "Spartacus rose from slavery to lead the greatest rebellion Rome had ever seen. His courage inspired thousands to fight for freedom. Push through 10 miles with the heart of a gladiator.",
-  },
-  {
-    number: 11, name: "The Fall of Rome", subtitle: "Barbarian Invasion", milesRequired: 11,
-    startVideo: "/roman-vid.mp4", endVideo: "/roman-vid.mp4",
-    image: "/campaigns/TheFallofRome2.jpg",
-    description: "The barbarian hordes descended on Rome from every direction. Only the strongest warriors survived the fall. Fight through 11 miles and prove you can endure when all seems lost.",
-  },
-  {
-    number: 12, name: "The Voice of Rome", subtitle: "Julius Caesar", milesRequired: 12,
-    startVideo: "/roman-vid.mp4", endVideo: "/roman-vid.mp4",
-    image: "/campaigns/julius.png",
-    description: "Julius Caesar conquered Gaul, crossed the Rubicon, and changed the world forever. He is the ultimate warrior. Complete the final 12 miles and cement your legacy as a true champion of Rome.",
-  },
-];
 
-const TOTAL_MILES = 78;
-
-function roundMiles(value: number) {
-  return Math.round(value * 10) / 10;
-}
-
-function getCampaignMedalName(campaignNumber: number) {
-  const campaign = CAMPAIGNS[campaignNumber - 1];
-  return campaign ? `${campaign.name} Medal` : "Warrior Medal";
-}
 
 export default function StudentCampaign() {
   const { uid } = useParams<{ uid: string }>();
@@ -109,9 +32,13 @@ export default function StudentCampaign() {
   const [awardModalCampaign, setAwardModalCampaign] = useState<number | null>(null);
   const [mileInput, setMileInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [videoLoadingKey, setVideoLoadingKey] = useState<string | null>(null);
+  const [videoError, setVideoError] = useState("");
+  const [videoPlaybackNotice, setVideoPlaybackNotice] = useState("");
   // const [photoUploading, setPhotoUploading] = useState(false);
   const [imgError, setImgError] = useState<Set<number>>(new Set());
   const [showGrandFinale, setShowGrandFinale] = useState(false);
+  const videoElementRef = useRef<HTMLVideoElement | null>(null);
   // const photoInputRef = useRef<HTMLInputElement>(null);
 
   // async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -187,6 +114,16 @@ export default function StudentCampaign() {
         }
 
         setCampaignMiles(bycampaign);
+        // Keep legacy progress usable: if miles exist for a campaign, treat intro as watched.
+        setWatchedCampaigns((prev) => {
+          const combined = new Set(prev);
+          Object.entries(bycampaign).forEach(([campaignNumber, miles]) => {
+            if (miles > 0) {
+              combined.add(Number(campaignNumber));
+            }
+          });
+          return combined;
+        });
         const watchedEndVideoSet = new Set(user?.watchedCampaignEndVideos ?? []);
         let activeCampaign = 1;
         for (const c of CAMPAIGNS) {
@@ -223,13 +160,87 @@ export default function StudentCampaign() {
   function closeVideoModal() {
     setVideoModal(null);
     setIsPlayingVideo(false);
+    setVideoPlaybackNotice("");
   }
+
+  function getCampaignVideoFallbackSrc(campaignNumber: number, isEnd = false) {
+    const selectedCampaignData = CAMPAIGNS[campaignNumber - 1];
+    if (!selectedCampaignData) return "/roman-vid.mp4";
+    const configuredFallback = isEnd
+      ? selectedCampaignData.endVideoFallback
+      : selectedCampaignData.startVideoFallback;
+    return configuredFallback ?? (isEnd ? selectedCampaignData.endVideo : selectedCampaignData.startVideo);
+  }
+
+  function getVideoLoadingKey(campaignNumber: number, isEnd?: boolean) {
+    return `${campaignNumber}-${isEnd ? "end" : "start"}`;
+  }
+
+  async function openVideoModal(campaignNumber: number, isEnd = false) {
+    const selectedCampaignData = CAMPAIGNS[campaignNumber - 1];
+    if (!selectedCampaignData) return;
+
+    const loadingKey = getVideoLoadingKey(campaignNumber, isEnd);
+    setVideoError("");
+    setVideoPlaybackNotice("");
+    setVideoLoadingKey(loadingKey);
+
+    try {
+      const src = await resolveVideoUrl(
+        isEnd ? selectedCampaignData.endVideoStoragePath : selectedCampaignData.startVideoStoragePath,
+        isEnd ? selectedCampaignData.endVideo : selectedCampaignData.startVideo,
+      );
+      setIsPlayingVideo(false);
+      setVideoModal({ src, campaignNumber, isEnd });
+    } catch (error) {
+      console.error("Failed to open campaign video:", error);
+      setVideoError("Could not load this campaign video right now. Please try again.");
+    } finally {
+      setVideoLoadingKey(null);
+    }
+  }
+
+  function handleVideoPlaybackError() {
+    if (!videoModal) return;
+
+    const fallbackSrc = getCampaignVideoFallbackSrc(videoModal.campaignNumber, videoModal.isEnd);
+    if (videoModal.src !== fallbackSrc) {
+      setVideoPlaybackNotice("This uploaded video could not be played in this browser. Showing the fallback video instead. For reliable playback, convert uploaded campaign videos to MP4.");
+      setVideoModal({ ...videoModal, src: fallbackSrc });
+      return;
+    }
+
+    setVideoPlaybackNotice("This video could not be played. The uploaded file format may not be supported by this browser.");
+    setIsPlayingVideo(false);
+  }
+
+  function getVideoMimeType(src: string) {
+    const normalizedSrc = src.toLowerCase();
+    if (normalizedSrc.includes(".mp4")) return "video/mp4";
+    return undefined;
+  }
+
+  useEffect(() => {
+    if (!isPlayingVideo || !videoModal) return;
+
+    const videoElement = videoElementRef.current;
+    if (!videoElement) return;
+
+    void videoElement.play().catch((error) => {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
+      console.error("Failed to start video playback:", error);
+      setVideoPlaybackNotice("The browser blocked automatic playback. Press play on the video controls or open the video directly.");
+    });
+  }, [isPlayingVideo, videoModal]);
 
   async function handleVideoEnded() {
     if (!videoModal) return;
 
     const completedVideo = videoModal;
     if (completedVideo.isEnd) {
+      const isFirstEndVideoWatch = !watchedEndVideos.has(completedVideo.campaignNumber);
       setWatchedEndVideos((prev) => new Set(prev).add(completedVideo.campaignNumber));
       setStudent((prev) => prev
         ? {
@@ -237,7 +248,9 @@ export default function StudentCampaign() {
             watchedCampaignEndVideos: Array.from(new Set([...(prev.watchedCampaignEndVideos ?? []), completedVideo.campaignNumber])),
           }
         : prev);
-      setAwardModalCampaign(completedVideo.campaignNumber);
+      if (isFirstEndVideoWatch) {
+        setAwardModalCampaign(completedVideo.campaignNumber);
+      }
     } else {
       setWatchedCampaigns((prev) => new Set(prev).add(completedVideo.campaignNumber));
       setStudent((prev) => prev
@@ -266,9 +279,8 @@ export default function StudentCampaign() {
   const status = campaign ? getCampaignStatus(campaign) : "locked";
   const myMiles = campaignMiles[selectedCampaign] ?? 0;
   const progress = campaign ? Math.min(100, Math.round((myMiles / campaign.milesRequired) * 100)) : 0;
-  const canLogMiles = status === "active" && (watchedCampaigns.has(selectedCampaign) || myMiles > 0);
-  const nextCampaign = campaign && campaign.number < CAMPAIGNS.length ? CAMPAIGNS[campaign.number] : null;
-  const nextCampaignLocked = Boolean(nextCampaign && getCampaignStatus(nextCampaign) === "locked");
+  const isIntroVideoLoading = videoLoadingKey === getVideoLoadingKey(selectedCampaign);
+  const isEndVideoLoading = videoLoadingKey === getVideoLoadingKey(selectedCampaign, true);
 
   return (
     <div className="h-screen bg-stone-900 text-stone-100 flex flex-col overflow-hidden">
@@ -432,30 +444,28 @@ export default function StudentCampaign() {
                       </div>
 
                       {/* Action area */}
-                      {status === "locked" && (
+                      {status === "locked" ? (
                         <div className="py-8 text-center">
                           <span className="text-5xl mb-4 block opacity-40">{"\uD83D\uDD12"}</span>
                           <p className="text-stone-500 text-sm leading-relaxed max-w-xs mx-auto">Complete the previous campaign and watch its end video to unlock this one.</p>
                         </div>
-                      )}
-
-                      {status === "active" && !canLogMiles && (
+                      ) : !watchedCampaigns.has(selectedCampaign) ? (
                         <div className="text-center py-4">
                           <button
-                            onClick={() => setVideoModal({ src: campaign.startVideo, campaignNumber: campaign.number })}
+                            onClick={() => void openVideoModal(campaign.number)}
+                            disabled={Boolean(videoLoadingKey)}
                             className="group relative overflow-hidden px-10 py-4 rounded-2xl border border-roman-gold/70 bg-linear-to-r from-roman-gold/90 via-amber-300 to-roman-gold/90 text-stone-950 text-sm uppercase tracking-[0.2em] font-bold shadow-[0_0_25px_rgba(212,175,55,0.45)] hover:brightness-110 hover:shadow-[0_0_35px_rgba(212,175,55,0.7)] active:scale-[0.98] transition-all animate-pulse cursor-pointer"
                           >
                             <span className="absolute inset-0 bg-linear-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
                             <span className="relative flex items-center gap-3">
                               <span className="text-lg">{"\u23F5"}</span>
-                              <span>Watch Intro & Begin</span>
+                              <span>{isIntroVideoLoading ? "Loading Video..." : "Watch Intro & Begin"}</span>
                             </span>
                           </button>
                           <p className="text-stone-600 text-xs mt-4 uppercase tracking-widest">Watch the intro video to start logging miles</p>
+                          {videoError && <p className="text-red-400 text-xs mt-3">{videoError}</p>}
                         </div>
-                      )}
-
-                      {status === "active" && canLogMiles && (
+                      ) : myMiles < campaign.milesRequired ? (
                         <div>
                           <p className="text-stone-500 text-xs uppercase tracking-[0.25em] font-semibold mb-3">Log Miles</p>
                           <div className="flex items-center gap-3">
@@ -478,25 +488,48 @@ export default function StudentCampaign() {
                           </div>
                           <p className="text-stone-600 text-xs mt-2">{roundMiles(campaign.milesRequired - myMiles)} miles remaining</p>
                         </div>
-                      )}
-
-                      {status === "complete" && (
+                      ) : !watchedEndVideos.has(selectedCampaign) ? (
+                        <div className="text-center py-4">
+                          <button
+                            onClick={() => void openVideoModal(campaign.number, true)}
+                            disabled={Boolean(videoLoadingKey)}
+                            className="group relative overflow-hidden px-10 py-4 rounded-2xl border border-roman-gold/70 bg-linear-to-r from-roman-gold/90 via-amber-300 to-roman-gold/90 text-stone-950 text-sm uppercase tracking-[0.2em] font-bold shadow-[0_0_25px_rgba(212,175,55,0.45)] hover:brightness-110 hover:shadow-[0_0_35px_rgba(212,175,55,0.7)] active:scale-[0.98] transition-all animate-pulse cursor-pointer"
+                          >
+                            <span className="absolute inset-0 bg-linear-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+                            <span className="relative flex items-center gap-3">
+                              <span className="text-lg">{"\u23F5"}</span>
+                              <span>{isEndVideoLoading ? "Loading Video..." : "Watch End Video"}</span>
+                            </span>
+                          </button>
+                          <p className="text-stone-600 text-xs mt-4 uppercase tracking-widest">Watch the closing video to complete the campaign</p>
+                          {videoError && <p className="text-red-400 text-xs mt-3">{videoError}</p>}
+                        </div>
+                      ) : (
                         <div className="text-center py-4">
                           <span className="text-5xl mb-4 block">{"\uD83C\uDFC6"}</span>
-                          <p className="text-roman-gold font-serif font-bold text-xl mb-4">Campaign Complete!</p>
-                          <button
-                            onClick={() => setVideoModal({ src: campaign.endVideo, campaignNumber: campaign.number, isEnd: true })}
-                            className="px-6 py-3 rounded-xl border border-roman-gold/30 text-roman-gold text-xs uppercase tracking-wider font-semibold hover:bg-roman-gold/10 transition-colors cursor-pointer"
-                          >
-                            {watchedEndVideos.has(campaign.number)
-                              ? "Rewatch End Video"
-                              : nextCampaignLocked
-                              ? "Watch End Video to Unlock Next"
-                              : "Watch End Video"}
-                          </button>
-                          {!watchedEndVideos.has(campaign.number) && nextCampaignLocked && (
-                            <p className="text-stone-500 text-xs mt-4 italic">Watch the end video to unlock the next campaign</p>
-                          )}
+                          <p className="text-roman-gold font-serif font-bold text-xl mb-8">Campaign Complete!</p>
+                          
+                          {/* Video Access */}
+                          <div className="pt-6 border-t border-stone-800/50 text-center">
+                            <p className="text-stone-500 text-xs uppercase tracking-[0.25em] font-semibold mb-4">Video Access</p>
+                            <div className="flex flex-wrap items-center justify-center gap-4">
+                              <button
+                                onClick={() => void openVideoModal(campaign.number)}
+                                disabled={Boolean(videoLoadingKey)}
+                                className="px-5 py-2.5 rounded-xl border border-roman-gold/30 text-roman-gold text-xs uppercase tracking-wider font-semibold hover:bg-roman-gold/10 transition-colors cursor-pointer"
+                              >
+                                {isIntroVideoLoading ? "Loading Intro..." : "Watch Intro Video"}
+                              </button>
+                              <button
+                                onClick={() => void openVideoModal(campaign.number, true)}
+                                disabled={Boolean(videoLoadingKey)}
+                                className="px-5 py-2.5 rounded-xl border border-roman-gold/30 text-roman-gold text-xs uppercase tracking-wider font-semibold hover:bg-roman-gold/10 transition-colors cursor-pointer"
+                              >
+                                {isEndVideoLoading ? "Loading End..." : "Watch End Video"}
+                              </button>
+                            </div>
+                            {videoError && <p className="text-red-400 text-xs mt-4">{videoError}</p>}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -553,7 +586,7 @@ export default function StudentCampaign() {
                 {CAMPAIGNS[videoModal.campaignNumber - 1].subtitle}
               </p>
             </div>
-            <div className="flex-1 min-h-0 flex items-center justify-center w-full px-4">
+            <div className="flex-1 min-h-0 flex items-center justify-center w-full px-0 md:px-2">
               {!isPlayingVideo ? (
                 <div className="flex flex-col items-center gap-8">
                   <div className="relative">
@@ -574,27 +607,40 @@ export default function StudentCampaign() {
               ) : (
                 <video
                   key={videoModal.src}
-                  src={videoModal.src}
+                  ref={videoElementRef}
                   controls
-                  autoPlay
+                  preload="auto"
                   playsInline
-                  className="max-h-full max-w-[min(100%,480px)] rounded-lg shadow-[0_0_80px_rgba(0,0,0,0.8)]"
+                  className="h-auto w-full md:w-auto max-h-[84vh] md:max-h-[90vh] md:max-w-[98vw] rounded-none md:rounded-lg shadow-[0_0_80px_rgba(0,0,0,0.8)]"
                   onEnded={handleVideoEnded}
-                />
+                  onError={handleVideoPlaybackError}
+                >
+                  <source src={videoModal.src} type={getVideoMimeType(videoModal.src)} />
+                  Your browser does not support embedded video playback.
+                </video>
               )}
             </div>
-            <div className="w-full px-8 py-4 flex items-center justify-between z-10">
-              <p className="text-stone-600 text-xs uppercase tracking-[0.25em] font-semibold">
-                {videoModal.isEnd ? "Complete this video to unlock the next campaign" : "Watch this video to begin logging miles"}
-              </p>
-              {isPlayingVideo && (
-                <button
-                  onClick={handleVideoEnded}
-                  className="px-5 py-2.5 rounded-lg bg-roman-gold/20 border border-roman-gold/50 text-roman-gold text-xs uppercase tracking-wider font-bold hover:bg-roman-gold/30 transition-colors cursor-pointer"
-                >
-                  Done {"\u2713"}
-                </button>
-              )}
+            <div className="w-full px-4 md:px-8 py-4 flex items-center justify-between z-10 bg-linear-to-t from-black/80 to-transparent">
+              <div>
+                <p className="text-stone-600 text-xs uppercase tracking-[0.25em] font-semibold">
+                  {videoModal.isEnd ? "Complete this video to unlock the next campaign" : "Watch this video to begin logging miles"}
+                </p>
+                {videoPlaybackNotice && (
+                  <p className="mt-2 text-xs text-amber-300 max-w-xl">
+                    {videoPlaybackNotice}
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                {isPlayingVideo && (
+                  <button
+                    onClick={handleVideoEnded}
+                    className="px-5 py-2.5 rounded-lg bg-roman-gold/20 border border-roman-gold/50 text-roman-gold text-xs uppercase tracking-wider font-bold hover:bg-roman-gold/30 transition-colors cursor-pointer"
+                  >
+                    Done {"\u2713"}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>

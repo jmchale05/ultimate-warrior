@@ -19,6 +19,7 @@ import {
   updateUserPhoto,
   recordStudentAuthorityConsent,
 } from "../lib/firestore";
+import { getYearOptionsForSchoolType } from "../lib/yearOptions";
 import type { AppUser, Class, Result, SchoolType } from "../types";
 
 const STUDENT_AUTHORITY_CONSENT_VERSION = "2026-05";
@@ -37,9 +38,6 @@ const CAMPAIGNS = [
   { number: 11, name: "The Fall of Rome",          minMiles: 55 },
   { number: 12, name: "The Voice of Rome",         minMiles: 66 },
 ];
-
-const PRIMARY_YEAR_OPTIONS = ["Year 1", "Year 2", "Year 3", "Year 4", "Year 5", "Year 6"];
-const SECONDARY_YEAR_OPTIONS = ["Year 7", "Year 8", "Year 9", "Year 10", "Year 11"];
 const ROMAN_NICKNAME_SUGGESTIONS = [
   "The Brave",
   "The Swift",
@@ -96,10 +94,6 @@ const ROMAN_NICKNAME_SUGGESTIONS = [
 ];
 
 const ITEMS_PER_PAGE = 10;
-
-function getYearOptions(schoolType: SchoolType | null): string[] {
-  return schoolType === "Primary School" ? PRIMARY_YEAR_OPTIONS : SECONDARY_YEAR_OPTIONS;
-}
 
 function getCampaignInfo(miles: number) {
   let current = CAMPAIGNS[0];
@@ -200,7 +194,7 @@ export default function Campaigns() {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const yearOptions = getYearOptions(schoolType);
+  const yearOptions = getYearOptionsForSchoolType(schoolType);
 
   async function handleAddClass() {
     if (!appUser?.schoolId) {

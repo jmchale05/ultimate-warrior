@@ -59,7 +59,7 @@ export default function Navbar() {
         {/* Left — Logo & Title */}
         <div className="flex items-center gap-4 flex-1">
           <img
-            src="/logonew.jpeg"
+            src="/logo-new.png"
             alt="Ultimate Warrior"
             className="w-32 self-stretch object-cover"
           />
@@ -208,10 +208,6 @@ export default function Navbar() {
       {showSupport && (
         <TeacherSupportModal
           onClose={() => setShowSupport(false)}
-          onOpenTerms={() => {
-            setShowSupport(false);
-            navigate("/terms");
-          }}
         />
       )}
     </>
