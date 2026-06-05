@@ -8,7 +8,6 @@ import {
   getClassesBySchool,
   getUsersByIds,
   getResultsByClass,
-  getSchoolById,
   createUserDoc,
   createClass,
   addStudentToClass,
@@ -19,8 +18,13 @@ import {
   updateUserPhoto,
   recordStudentAuthorityConsent,
 } from "../lib/firestore";
-import { getYearOptionsForSchoolType } from "../lib/yearOptions";
-import type { AppUser, Class, Result, SchoolType } from "../types";
+import { YEAR_OPTIONS } from "../lib/yearOptions";
+import {
+  resolveVideoUrl,
+  TEACHER_INTRO_VIDEO,
+  TEACHER_INTRO_VIDEO_STORAGE_PATH,
+} from "../lib/campaignConfig";
+import type { AppUser, Class, Result } from "../types";
 
 const STUDENT_AUTHORITY_CONSENT_VERSION = "2026-05";
 
@@ -182,6 +186,7 @@ export default function Campaigns() {
   const [deleteRequestError, setDeleteRequestError] = useState("");
   const [submittingDeleteRequest, setSubmittingDeleteRequest] = useState(false);
   const [removingDeleteRequestForStudentId, setRemovingDeleteRequestForStudentId] = useState<string | null>(null);
+  const [introVideoSrc, setIntroVideoSrc] = useState(TEACHER_INTRO_VIDEO);
   const [formPhoto, setFormPhoto] = useState<File | null>(null);
   const [formPhotoPreview, setFormPhotoPreview] = useState<string | null>(null);
   const formPhotoRef = useRef<HTMLInputElement>(null);
@@ -190,11 +195,10 @@ export default function Campaigns() {
   const [className, setClassName] = useState("");
   const [classSaving, setClassSaving] = useState(false);
   const [classError, setClassError] = useState("");
-  const [schoolType, setSchoolType] = useState<SchoolType | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const yearOptions = getYearOptionsForSchoolType(schoolType);
+  const yearOptions = YEAR_OPTIONS;
 
   async function handleAddClass() {
     if (!appUser?.schoolId) {
@@ -363,19 +367,24 @@ export default function Campaigns() {
   useEffect(() => {
     if (!appUser) return;
     setHasAuthorityConsent(Boolean(appUser.studentAuthorityConsentAt));
-    if (appUser.schoolId) {
-      void getSchoolById(appUser.schoolId)
-        .then((school) => {
-          setSchoolType((school?.schoolType ?? "Secondary School") as SchoolType);
-        })
-        .catch(() => {
-          setSchoolType("Secondary School");
-        });
-    } else {
-      setSchoolType(null);
-    }
     loadData();
   }, [appUser]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void resolveVideoUrl(TEACHER_INTRO_VIDEO_STORAGE_PATH, TEACHER_INTRO_VIDEO)
+      .then((src) => {
+        if (!cancelled) setIntroVideoSrc(src);
+      })
+      .catch(() => {
+        if (!cancelled) setIntroVideoSrc(TEACHER_INTRO_VIDEO);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!successToast) return;
@@ -770,6 +779,43 @@ export default function Campaigns() {
         {/* Main content */}
         <div className="flex-1 min-w-0 px-12 py-14 overflow-y-auto overflow-x-hidden flex flex-col items-center">
           <div className="w-full max-w-360">
+        <section
+          className="mb-8 w-full rounded-3xl border border-roman-gold/20 bg-stone-950/80 backdrop-blur-md shadow-[0_12px_40px_rgba(0,0,0,0.5)] overflow-hidden"
+          aria-label="Introduction video"
+        >
+          <div className="h-px w-full bg-linear-to-r from-transparent via-roman-gold/40 to-transparent" />
+          <div className="grid grid-cols-[minmax(0,1fr)_minmax(240px,22rem)] gap-6 items-center p-6">
+            <div className="min-w-0">
+              <p className="text-roman-gold/60 text-[10px] uppercase tracking-[0.35em] font-semibold mb-2">
+                Getting Started
+              </p>
+              <h2 className="text-roman-gold font-serif text-2xl font-bold tracking-wide">
+                Introduction Video
+              </h2>
+              <p className="text-stone-400 text-sm mt-2 leading-relaxed max-w-xl">
+                Know more about the journey you&apos;re about to embark on.
+              </p>
+            </div>
+            <div className="aspect-video w-full rounded-2xl overflow-hidden border border-roman-gold/25 bg-stone-900 shadow-[inset_0_0_24px_rgba(0,0,0,0.35)]">
+              <video
+                key={introVideoSrc}
+                className="h-full w-full object-contain"
+                controls
+                playsInline
+                preload="metadata"
+                onError={() => {
+                  if (introVideoSrc !== TEACHER_INTRO_VIDEO) {
+                    setIntroVideoSrc(TEACHER_INTRO_VIDEO);
+                  }
+                }}
+              >
+                <source src={introVideoSrc} type="video/mp4" />
+                Your browser does not support embedded video playback.
+              </video>
+            </div>
+          </div>
+        </section>
+
         <div className="flex items-center justify-between gap-3 mb-6">
           <div>
             <h1 className="text-stone-950 text-3xl font-bold mt-2 [text-shadow:0_2px_14px_rgba(255,255,255,0.55)]">

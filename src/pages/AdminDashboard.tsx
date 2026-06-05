@@ -22,8 +22,10 @@ import {
   ensureSchoolAccessCodeIndex,
   updateStudentProfileAndClass,
 } from "../lib/firestore";
-import { getYearOptionsForSchoolType } from "../lib/yearOptions";
+import { YEAR_OPTIONS } from "../lib/yearOptions";
 import type { AppUser, Class, Result, School, SchoolType } from "../types";
+
+const PRIMARY_SCHOOL_TYPE: SchoolType = "Primary School";
 import type { StudentDeletionRequest } from "../lib/firestore";
 
 const TOTAL_MILES = 78;
@@ -88,7 +90,6 @@ export default function AdminDashboard() {
   // Add School modal
   const [showAddSchool, setShowAddSchool] = useState(false);
   const [schoolName, setSchoolName] = useState("");
-  const [schoolType, setSchoolType] = useState<SchoolType>("Primary School");
   const [schoolAddress, setSchoolAddress] = useState("");
   const [schoolSaving, setSchoolSaving] = useState(false);
   const [schoolError, setSchoolError] = useState("");
@@ -303,7 +304,7 @@ export default function AdminDashboard() {
         await updateSchool(
           schoolToEdit.id,
           schoolName.trim(),
-          schoolType,
+          PRIMARY_SCHOOL_TYPE,
           normalizedAddress || undefined
         );
         if (schoolLogoFile) {
@@ -312,7 +313,7 @@ export default function AdminDashboard() {
       } else {
         const result = await createSchool(
           schoolName.trim(),
-          schoolType,
+          PRIMARY_SCHOOL_TYPE,
           normalizedAddress || undefined
         );
         createdSchoolId = result.id;
@@ -322,7 +323,6 @@ export default function AdminDashboard() {
         }
       }
       setSchoolName("");
-      setSchoolType("Primary School");
       setSchoolAddress("");
       setSchoolLogoFile(null);
       setSchoolLogoPreview(null);
@@ -334,7 +334,7 @@ export default function AdminDashboard() {
         const newSchool: School = {
           id: createdSchoolId,
           name: schoolTitle,
-          schoolType,
+          schoolType: PRIMARY_SCHOOL_TYPE,
           address: normalizedAddress || undefined,
           accessCode: createdAccessCode,
           createdAt: Date.now(),
@@ -353,7 +353,7 @@ export default function AdminDashboard() {
         setSchoolStats((prev) =>
           prev.map((stat) =>
             stat.school.id === schoolToEdit.id
-              ? { ...stat, school: { ...stat.school, name: schoolTitle, schoolType, address: normalizedAddress || undefined } }
+              ? { ...stat, school: { ...stat.school, name: schoolTitle, schoolType: PRIMARY_SCHOOL_TYPE, address: normalizedAddress || undefined } }
               : stat
           )
         );
@@ -368,7 +368,6 @@ export default function AdminDashboard() {
 
   function resetSchoolFormState() {
     setSchoolName("");
-    setSchoolType("Primary School");
     setSchoolAddress("");
     setSchoolLogoFile(null);
     setSchoolLogoPreview(null);
@@ -389,7 +388,6 @@ export default function AdminDashboard() {
 
   function handleOpenEditSchool(school: School) {
     setSchoolName(school.name);
-    setSchoolType(school.schoolType || "Secondary School");
     setSchoolAddress(school.address || "");
     setSchoolLogoFile(null);
     setSchoolLogoPreview(school.logoUrl || null);
@@ -475,10 +473,8 @@ export default function AdminDashboard() {
     if (!studentSchoolId) { setStudentError("Select a school."); return; }
     if (!studentClassId) { setStudentError("Select a year."); return; }
 
-    const selectedSchool = schoolStats.find((s) => s.school.id === studentSchoolId)?.school;
-    const validYearsForSchool = getYearOptionsForSchoolType(selectedSchool?.schoolType);
-    if (!validYearsForSchool.includes(studentClassId)) {
-      setStudentError("Select a valid year for this school type.");
+    if (!YEAR_OPTIONS.includes(studentClassId)) {
+      setStudentError("Select a valid primary school year (Year 4, 5, or 6).");
       return;
     }
 
@@ -723,8 +719,7 @@ export default function AdminDashboard() {
   const totalMilesAll = allResults.reduce((s, r) => s + r.distanceMiles, 0);
   const totalSchools = schoolStats.length;
   const totalPendingDeletionRequests = deletionRequests.length;
-  const selectedStudentSchool = schoolStats.find((s) => s.school.id === studentSchoolId)?.school;
-  const selectedStudentYearOptions = getYearOptionsForSchoolType(selectedStudentSchool?.schoolType);
+  const selectedStudentYearOptions = YEAR_OPTIONS;
 
   const deletionRequestsWithContext = useMemo(() => {
     return [...deletionRequests]
@@ -1199,7 +1194,7 @@ export default function AdminDashboard() {
                           {s.school.name}
                         </h3>
                         <p className="text-roman-gold/75 text-xs mt-1 uppercase tracking-wider font-semibold">
-                          {s.school.schoolType ?? "School Type Not Set"}
+                          Primary School
                         </p>
                         {s.school.address && (
                           <p className="mt-2 wrap-break-word text-stone-500 text-sm leading-snug">{s.school.address}</p>
@@ -1426,7 +1421,7 @@ export default function AdminDashboard() {
                             <div>
                               <div>{s.school.name}</div>
                               <p className="text-roman-gold/75 text-xs mt-1 uppercase tracking-wider font-semibold">
-                                {s.school.schoolType ?? "School Type Not Set"}
+                                Primary School
                               </p>
                               {s.school.address && (
                                 <p className="mt-1 max-w-full wrap-break-word text-stone-500 text-sm leading-snug">{s.school.address}</p>
@@ -1651,17 +1646,6 @@ export default function AdminDashboard() {
                     placeholder="e.g. St. Mary's Primary"
                     className="w-full bg-stone-800/50 border border-stone-700/80 rounded-xl px-4 py-3.5 text-stone-100 placeholder-stone-600 focus:outline-none focus:border-roman-gold focus:ring-1 focus:ring-roman-gold/50 transition-all font-medium shadow-inner"
                   />
-                </div>
-                <div>
-                  <label className="block text-stone-400 text-xs font-semibold uppercase tracking-widest mb-2 pl-1">School Type *</label>
-                  <select
-                    value={schoolType}
-                    onChange={(e) => setSchoolType(e.target.value as SchoolType)}
-                    className="w-full bg-stone-800/50 border border-stone-700/80 rounded-xl px-4 py-3.5 text-stone-100 focus:outline-none focus:border-roman-gold focus:ring-1 focus:ring-roman-gold/50 transition-all font-medium shadow-inner"
-                  >
-                    <option value="Primary School">Primary School</option>
-                    <option value="Secondary School">Secondary School</option>
-                  </select>
                 </div>
                 <div>
                   <label className="block text-stone-400 text-xs font-semibold uppercase tracking-widest mb-2 pl-1">Address (optional)</label>

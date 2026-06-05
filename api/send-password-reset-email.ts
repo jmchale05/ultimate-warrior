@@ -86,8 +86,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const apiKey = process.env.RESEND_API_KEY;
-  const fromEmail = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
-  const fromName = process.env.RESEND_FROM_NAME || "TUWC Demo";
+  const fromEmail = process.env.RESEND_FROM_EMAIL || "no-reply@tuwc.uk";
+  const fromName = process.env.RESEND_FROM_NAME || "Ultimate Warrior Challenges";
 
   if (!apiKey) {
     res.status(500).json({ error: "RESEND_API_KEY is not configured" });

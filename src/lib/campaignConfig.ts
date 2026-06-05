@@ -3,6 +3,9 @@ import { storage } from "./firebase";
 
 export const TOTAL_MILES = 78;
 
+export const TEACHER_INTRO_VIDEO = "/introduction-video.mp4";
+export const TEACHER_INTRO_VIDEO_STORAGE_PATH = "campaign-videos/introduction-video.mp4";
+
 export interface Campaign {
   number: number;
   name: string;
@@ -37,9 +40,9 @@ export const CAMPAIGNS: Campaign[] = [
     name: "The Foundations",
     subtitle: "Romulus & Remus",
     milesRequired: 2,
-    startVideo: "/TUWC/romulus-welcome.mp4",
+    startVideo: "/the-foundations.mp4",
     endVideo: "/TUWC/romulus-complete.mp4",
-    startVideoStoragePath: "campaign-videos/romulus-welcome.mp4",
+    startVideoStoragePath: "campaign-videos/the-foundations.mp4",
     endVideoStoragePath: "campaign-videos/romulus-complete.mp4",
     image: "/campaigns/romulus.png",
     description:
@@ -51,9 +54,9 @@ export const CAMPAIGNS: Campaign[] = [
     subtitle: "Augustus",
     milesRequired: 3,
     startVideo: "/TUWC/Augustus-welcome.mp4",
-    endVideo: "/TUWC/Augustus-complete.mp4",
+    endVideo: "/augustus-complete.mp4",
     startVideoStoragePath: "campaign-videos/Augustus-welcome.mp4",
-    endVideoStoragePath: "campaign-videos/Augustus-complete.mp4",
+    endVideoStoragePath: "campaign-videos/augustus-complete.mp4",
     image: "/campaigns/augustus.png",
     description:
       "Augustus transformed Rome from a republic into an unstoppable empire. To follow in his footsteps, you must show discipline and endurance. Conquer 3 miles to claim the imperial mantle.",
@@ -63,9 +66,9 @@ export const CAMPAIGNS: Campaign[] = [
     name: "The Legion",
     subtitle: "Domination of the Roman Army",
     milesRequired: 4,
-    startVideo: "/TUWC/the-legion-welcome.mp4",
+    startVideo: "/legion-welcome.mp4",
     endVideo: "/TUWC/legion-complete.mp4",
-    startVideoStoragePath: "campaign-videos/the-legion-welcome.mp4",
+    startVideoStoragePath: "campaign-videos/legion-welcome.mp4",
     endVideoStoragePath: "campaign-videos/legion-complete.mp4",
     image: "/campaigns/legion.png",
     description:
@@ -90,9 +93,9 @@ export const CAMPAIGNS: Campaign[] = [
     subtitle: "Markus Aurelius",
     milesRequired: 6,
     startVideo: "/TUWC/aurelius-welcome.mp4",
-    endVideo: "/TUWC/Aurelius-complete.mp4",
+    endVideo: "/hero-end.mp4",
     startVideoStoragePath: "campaign-videos/aurelius-welcome.mp4",
-    endVideoStoragePath: "campaign-videos/Aurelius-complete.mp4",
+    endVideoStoragePath: "campaign-videos/hero-end.mp4",
     image: "/campaigns/aurelius.png",
     description:
       "Marcus Aurelius, the philosopher emperor, believed strength comes from within. He led from the front lines while writing his Meditations. Run 6 miles with the wisdom and courage of a true hero.",
@@ -116,7 +119,7 @@ export const CAMPAIGNS: Campaign[] = [
     subtitle: "Aurelian",
     milesRequired: 8,
     startVideo: "/TUWC/aurelian-welcome.mp4",
-    endVideo: "/TUWC/aurelian-complete.mp4",
+    endVideo: "/aurelian-complete.mp4",
     startVideoStoragePath: "campaign-videos/aurelian-welcome.mp4",
     endVideoStoragePath: "campaign-videos/aurelian-complete.mp4",
     image: "/campaigns/Aurelian7.jpg",
@@ -142,7 +145,7 @@ export const CAMPAIGNS: Campaign[] = [
     subtitle: "Spartacus",
     milesRequired: 10,
     startVideo: "/TUWC/spartacus-welcome.mp4",
-    endVideo: "/TUWC/spartacus-complete.mp4",
+    endVideo: "/spartacus-complete.mp4",
     startVideoStoragePath: "campaign-videos/spartacus-welcome.mp4",
     endVideoStoragePath: "campaign-videos/spartacus-complete.mp4",
     image: "/campaigns/Spartacus5.jpg",
@@ -155,7 +158,7 @@ export const CAMPAIGNS: Campaign[] = [
     subtitle: "Barbarian Invasion",
     milesRequired: 11,
     startVideo: "/TUWC/fall-of-rome-welcome.mp4",
-    endVideo: "/TUWC/fall-of-rome-complete.mp4",
+    endVideo: "/fall-of-rome-complete.mp4",
     startVideoStoragePath: "campaign-videos/fall-of-rome-welcome.mp4",
     endVideoStoragePath: "campaign-videos/fall-of-rome-complete.mp4",
     image: "/campaigns/TheFallofRome2.jpg",
