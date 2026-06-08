@@ -41,9 +41,9 @@ export const CAMPAIGNS: Campaign[] = [
     subtitle: "Romulus & Remus",
     milesRequired: 2,
     startVideo: "/the-foundations.mp4",
-    endVideo: "/TUWC/romulus-complete.mp4",
+    endVideo: "/foundations-end.mp4",
     startVideoStoragePath: "campaign-videos/the-foundations.mp4",
-    endVideoStoragePath: "campaign-videos/romulus-complete.mp4",
+    endVideoStoragePath: "campaign-videos/foundations-end.mp4",
     image: "/campaigns/romulus.png",
     description:
       "Twin brothers raised by wolves founded the greatest civilisation the world has ever known. Like Romulus and Remus, you must build strong foundations. Run 2 miles to lay the first stones of your empire.",
