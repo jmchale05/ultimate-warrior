@@ -792,9 +792,17 @@ export default function Campaigns() {
               <h2 className="text-roman-gold font-serif text-2xl font-bold tracking-wide">
                 Introduction Video
               </h2>
-              <p className="text-stone-400 text-sm mt-2 leading-relaxed max-w-xl">
-                Know more about the journey you&apos;re about to embark on.
-              </p>
+              <div className="text-stone-400 text-sm mt-2 leading-relaxed max-w-xl space-y-2">
+                <p>
+                  Greetings, young Centurion. I am Adonis Ricardo Jonas, and I will lead you on this virtual distance journey.
+                </p>
+                <p>
+                  Prepare to test your limits, claim real rewards, and discover your own heritage. The Romans laid the foundations of this country - now, we live inside their history.
+                </p>
+                <p className="text-stone-300">
+                  Your journey begins now.
+                </p>
+              </div>
             </div>
             <div className="aspect-video w-full rounded-2xl overflow-hidden border border-roman-gold/25 bg-stone-900 shadow-[inset_0_0_24px_rgba(0,0,0,0.35)]">
               <video
