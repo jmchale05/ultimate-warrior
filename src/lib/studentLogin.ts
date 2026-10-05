@@ -64,6 +64,18 @@ export function generateStudentPassword(): string {
   return `${word}${number}`;
 }
 
+function apiErrorMessage(body: unknown, fallback: string): string {
+  if (!body || typeof body !== "object") return fallback;
+  const record = body as { error?: unknown; message?: unknown };
+  if (typeof record.error === "string" && record.error.trim()) return record.error;
+  if (record.error && typeof record.error === "object") {
+    const message = (record.error as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim()) return message;
+  }
+  if (typeof record.message === "string" && record.message.trim()) return record.message;
+  return fallback;
+}
+
 export async function enableStudentHomeLogin(input: {
   idToken: string;
   studentId: string;
@@ -74,18 +86,18 @@ export async function enableStudentHomeLogin(input: {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${input.idToken}`,
     },
     body: JSON.stringify({
       studentId: input.studentId,
       username: input.username,
       password: input.password,
+      idToken: input.idToken,
     }),
   });
 
-  const body = await response.json().catch(() => ({})) as { error?: string; username?: string; homeLoginEnabled?: boolean };
+  const body = await response.json().catch(() => ({})) as { error?: unknown; username?: string; homeLoginEnabled?: boolean };
   if (!response.ok) {
-    throw new Error(body.error || "Could not enable add login.");
+    throw new Error(apiErrorMessage(body, "Could not enable home login."));
   }
 
   return {

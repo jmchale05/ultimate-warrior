@@ -6,6 +6,7 @@ type RequestBody = {
   studentId?: string;
   username?: string;
   password?: string;
+  idToken?: string;
 };
 
 type VercelRequest = {
@@ -65,8 +66,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    const bodyToken = req.body?.idToken?.trim() ?? "";
     const authHeader = getHeader(req, "authorization");
-    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+    const headerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+    const token = bodyToken || headerToken;
     if (!token) {
       res.status(401).json({ error: "You must be signed in." });
       return;

@@ -564,7 +564,7 @@ export default function Campaigns() {
 
   async function handleEnableHomeLogin() {
     if (!currentUser || !selectedStudentForHomeLogin) {
-      setHomeLoginError("Could not enable add login. Please try again.");
+      setHomeLoginError("Could not enable home login. Please try again.");
       return;
     }
     if (homeLoginUsername.trim().length < 3) {
@@ -600,7 +600,7 @@ export default function Campaigns() {
         password: passwordToShow,
       });
     } catch (err) {
-      setHomeLoginError(err instanceof Error ? err.message : "Could not enable add login.");
+      setHomeLoginError(err instanceof Error ? err.message : "Could not enable home login.");
     } finally {
       setHomeLoginSaving(false);
     }
