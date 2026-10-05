@@ -431,7 +431,7 @@ export default function Campaigns() {
   useEffect(() => {
     if (!appUser) return;
     if (appUser.role === "student") {
-      navigate("/home", { replace: true });
+      navigate(`/campaigns/${appUser.uid}`, { replace: true });
       return;
     }
     setHasAuthorityConsent(Boolean(appUser.studentAuthorityConsentAt));

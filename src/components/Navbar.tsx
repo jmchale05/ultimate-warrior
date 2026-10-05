@@ -123,7 +123,7 @@ export default function Navbar() {
             type="button"
             onClick={() => {
               if (!appUser) return;
-              navigate(appUser.role === "admin" ? "/admin" : appUser.role === "student" ? "/home" : "/campaigns");
+              navigate(appUser.role === "admin" ? "/admin" : appUser.role === "student" ? `/campaigns/${appUser.uid}` : "/campaigns");
             }}
             className="self-stretch"
             aria-label="Home"

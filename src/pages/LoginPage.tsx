@@ -57,7 +57,7 @@ export default function LoginPage() {
   // Navigate once Firebase Auth and the Firestore user profile are both ready.
   useEffect(() => {
     if (currentUser && appUser) {
-      navigate(appUser.role === "admin" ? "/admin" : appUser.role === "student" ? "/home" : "/campaigns", { replace: true });
+      navigate(appUser.role === "admin" ? "/admin" : appUser.role === "student" ? `/campaigns/${appUser.uid}` : "/campaigns", { replace: true });
     }
   }, [currentUser, appUser, navigate]);
 
