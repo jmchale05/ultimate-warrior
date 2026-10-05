@@ -60,7 +60,10 @@ const KID_PASSWORD_WORDS = [
 
 export function generateStudentPassword(): string {
   const word = KID_PASSWORD_WORDS[Math.floor(Math.random() * KID_PASSWORD_WORDS.length)];
-  const number = String(Math.floor(10 + Math.random() * 90));
+  const digitsNeeded = Math.max(2, 6 - word.length);
+  const min = 10 ** (digitsNeeded - 1);
+  const max = 10 ** digitsNeeded;
+  const number = String(Math.floor(min + Math.random() * (max - min)));
   return `${word}${number}`;
 }
 
