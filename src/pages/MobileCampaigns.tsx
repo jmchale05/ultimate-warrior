@@ -1,173 +1,213 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Navigate, useNavigate } from "react-router-dom";
+import Navbar from "../components/Navbar";
+import { FullPageLoader } from "../components/LoadingSpinner";
+import { useAuth } from "../context/AuthContext";
+import { getResultsByStudent, getUserDoc } from "../lib/firestore";
+import { CAMPAIGNS, TOTAL_MILES, roundMiles } from "../lib/campaignConfig";
+import type { AppUser, Result } from "../types";
 
-const CAMPAIGNS = [
-  { number: 1,  name: "The Beginning",              theme: "Mars God of War",              miles: 1  },
-  { number: 2,  name: "The Foundations",             theme: "Romulus & Remus",              miles: 2  },
-  { number: 3,  name: "The Emperor",                 theme: "Augustus",                     miles: 3  },
-  { number: 4,  name: "The Legion",                  theme: "Domination of the Roman Army", miles: 4  },
-  { number: 5,  name: "The Empire",                  theme: "Trajan",                       miles: 5  },
-  { number: 6,  name: "The Hero",                    theme: "Markus Aurelius",              miles: 6  },
-  { number: 7,  name: "The Wall",                    theme: "Hadrian",                      miles: 7  },
-  { number: 8,  name: "The Restorer of The World",   theme: "Aurelian",                     miles: 8  },
-  { number: 9,  name: "The Enemy",                   theme: "Hannibal",                     miles: 9  },
-  { number: 10, name: "The Gladiator",               theme: "Spartacus",                    miles: 10 },
-  { number: 11, name: "The Fall of Rome",            theme: "Barbarian Invasion",           miles: 11 },
-  { number: 12, name: "The Voice of Rome",           theme: "Julius Caesar",                miles: 12 },
-];
+type CampaignStatus = "locked" | "active" | "complete";
+
+function milesByCampaign(results: Result[]): Record<number, number> {
+  const byCampaign: Record<number, number> = {};
+  for (const result of results) {
+    const match = result.challengeId?.match(/^campaign-(\d+)$/);
+    if (!match) continue;
+    const number = parseInt(match[1], 10);
+    byCampaign[number] = roundMiles(Math.min((byCampaign[number] ?? 0) + result.distanceMiles, number));
+  }
+  return byCampaign;
+}
 
 export default function MobileCampaigns() {
-  const currentMiles = 4.5;
-  const [selectedCampaign, setSelectedCampaign] = useState<typeof CAMPAIGNS[0] | null>(null);
+  const { appUser, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const [student, setStudent] = useState<AppUser | null>(null);
+  const [campaignMiles, setCampaignMiles] = useState<Record<number, number>>({});
+  const [watchedEndVideos, setWatchedEndVideos] = useState<Set<number>>(new Set());
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
-  function getCampaignProgress(index: number) {
-    const current = CAMPAIGNS[index];
-    const previousMiles = index === 0 ? 0 : CAMPAIGNS[index - 1].miles;
-    const span = current.miles - previousMiles;
-    const raw = ((currentMiles - previousMiles) / span) * 100;
-    return Math.max(0, Math.min(raw, 100));
+  useEffect(() => {
+    if (!appUser || appUser.role !== "student") return;
+    const studentId = appUser.uid;
+    const schoolId = appUser.schoolId;
+
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      setLoadError("");
+      try {
+        const [user, results] = await Promise.all([
+          getUserDoc(studentId),
+          getResultsByStudent(studentId, schoolId),
+        ]);
+        if (cancelled) return;
+        const byCampaign = milesByCampaign(results);
+        setStudent(user);
+        setCampaignMiles(byCampaign);
+        setWatchedEndVideos(new Set(user?.watchedCampaignEndVideos ?? []));
+      } catch (error) {
+        console.error("Failed to load home:", error);
+        if (!cancelled) setLoadError("Could not load your campaigns. Please try again.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [appUser]);
+
+  if (authLoading) return <FullPageLoader />;
+  if (!appUser) return <Navigate to="/login" replace />;
+  if (appUser.role === "admin") return <Navigate to="/admin" replace />;
+  if (appUser.role !== "student") return <Navigate to="/campaigns" replace />;
+
+  function getCampaignStatus(campaignNumber: number): CampaignStatus {
+    const myMiles = campaignMiles[campaignNumber] ?? 0;
+    const required = CAMPAIGNS[campaignNumber - 1]?.milesRequired ?? campaignNumber;
+    if (myMiles >= required) return "complete";
+    const previousComplete =
+      campaignNumber === 1 ||
+      ((campaignMiles[campaignNumber - 1] ?? 0) >= campaignNumber - 1 && watchedEndVideos.has(campaignNumber - 1));
+    return previousComplete ? "active" : "locked";
+  }
+
+  const totalMiles = CAMPAIGNS.reduce(
+    (sum, campaign) => sum + Math.min(campaignMiles[campaign.number] ?? 0, campaign.milesRequired),
+    0,
+  );
+  const progress = Math.min(100, Math.round((totalMiles / TOTAL_MILES) * 100));
+  const activeCampaign = CAMPAIGNS.find((campaign) => getCampaignStatus(campaign.number) === "active") ?? CAMPAIGNS[0];
+  const displayName = student?.displayName ?? appUser.displayName;
+  const studentUid = appUser.uid;
+
+  function openCampaign(campaignNumber: number) {
+    navigate(`/campaigns/${studentUid}?campaign=${campaignNumber}`);
   }
 
   return (
-    <div className="min-h-screen bg-stone-900 text-stone-100 flex flex-col">
-      {/* Compact mobile header */}
-      <div className="sticky top-0 z-30 bg-stone-900/95 backdrop-blur-sm border-b border-roman-gold/20 px-4 py-3 text-center">
-        <h1 className="text-roman-gold font-serif text-lg font-bold tracking-widest uppercase">
-          The Campaigns
-        </h1>
-        <p className="text-stone-500 text-[10px] italic font-serif mt-0.5">
-          Complete each challenge to advance through the history of Rome
-        </p>
-      </div>
+    <div className="min-h-dvh bg-stone-900 text-stone-100 flex flex-col">
+      <Navbar />
 
-      {/* Vertical timeline — single column for mobile */}
-      <div className="flex-1 px-4 py-6">
-        <div className="relative">
-          {/* Vertical line on the left */}
-          <div className="absolute left-5 top-0 bottom-0 w-px bg-linear-to-b from-roman-gold/60 via-roman-gold/30 to-roman-gold/10" />
-
-          <div className="space-y-4">
-            {CAMPAIGNS.map((c, i) => {
-              const cardProgress = getCampaignProgress(i);
-              const status = cardProgress >= 100 ? "Completed" : cardProgress > 0 ? "In Progress" : "Locked";
-
-              return (
-                <div key={c.number} className="relative flex items-start gap-4">
-                  {/* Left dot */}
-                  <div className="relative z-10 shrink-0">
-                    <div className={`w-10 h-10 rounded-full bg-stone-800 border-2 flex items-center justify-center shadow-[0_0_10px_rgba(212,175,55,0.15)] ${
-                      cardProgress >= 100
-                        ? "border-roman-gold bg-roman-gold/10"
-                        : cardProgress > 0
-                        ? "border-roman-gold/60"
-                        : "border-stone-600"
-                    }`}>
-                      {cardProgress >= 100 ? (
-                        <svg className="w-4 h-4 text-roman-gold" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                        </svg>
-                      ) : (
-                        <span className={`font-bold text-xs font-mono ${cardProgress > 0 ? "text-roman-gold" : "text-stone-500"}`}>
-                          {c.number}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Card */}
-                  <div
-                    className="flex-1 min-w-0"
-                    onClick={() => setSelectedCampaign(c)}
-                  >
-                    <div className={`bg-stone-800/60 border rounded-xl p-4 active:scale-[0.98] transition-all ${
-                      cardProgress >= 100
-                        ? "border-roman-gold/30"
-                        : cardProgress > 0
-                        ? "border-stone-700/50"
-                        : "border-stone-700/30"
-                    }`}>
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <h3 className="text-roman-gold font-serif text-base font-bold tracking-wide truncate">
-                            {c.name}
-                          </h3>
-                          <p className="text-stone-400 text-xs mt-0.5 italic truncate">{c.theme}</p>
-                        </div>
-                        <div className="shrink-0 bg-stone-700/40 rounded-lg px-2.5 py-1">
-                          <span className="text-roman-gold font-bold text-xs">{c.miles}</span>
-                          <span className="text-stone-500 text-[10px] ml-1">mi</span>
-                        </div>
-                      </div>
-
-                      {cardProgress > 0 && (
-                        <div className="mt-3">
-                          <div className="flex items-center justify-between text-[10px] uppercase tracking-wider mb-1">
-                            <span className="text-stone-400">{status}</span>
-                            <span className="text-roman-gold/80">{cardProgress.toFixed(0)}%</span>
-                          </div>
-                          <div className="h-1.5 rounded-full bg-stone-700/70 overflow-hidden border border-stone-600/30">
-                            <div
-                              className="h-full bg-linear-to-r from-roman-gold/60 to-roman-gold transition-all duration-500"
-                              style={{ width: `${cardProgress}%` }}
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+      {loading ? (
+        <FullPageLoader />
+      ) : loadError ? (
+        <div className="flex-1 flex items-center justify-center px-6">
+          <div className="roman-card rounded-2xl px-8 py-8 max-w-lg w-full text-center">
+            <h2 className="text-roman-gold font-serif text-2xl font-bold mb-3">Home Unavailable</h2>
+            <p className="text-stone-400 mb-6">{loadError}</p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="px-5 py-2.5 rounded-lg border border-roman-gold/40 text-roman-gold text-xs uppercase tracking-wider font-semibold"
+            >
+              Reload
+            </button>
           </div>
         </div>
-      </div>
-
-      {/* Campaign Popup */}
-      {selectedCampaign && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center">
-          <div
-            className="absolute inset-0 bg-stone-950/80 backdrop-blur-sm"
-            onClick={() => setSelectedCampaign(null)}
-          />
-          <div className="relative bg-stone-900 border-t border-roman-gold/30 rounded-t-2xl p-6 w-full max-w-lg shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
-            {/* Drag handle */}
-            <div className="w-10 h-1 bg-stone-600 rounded-full mx-auto mb-5" />
-
-            <div className="text-center">
-              <span className="text-roman-gold/60 font-mono text-xs tracking-widest uppercase mb-2 block">
-                Challenge {selectedCampaign.number}
-              </span>
-              <h3 className="text-stone-100 font-serif text-2xl font-bold mb-1">
-                {selectedCampaign.name}
-              </h3>
-              <p className="text-roman-gold italic text-sm mb-6">
-                {selectedCampaign.theme}
-              </p>
-
-              <div className="bg-stone-800/50 rounded-xl p-3 mb-6 border border-stone-700/30">
-                <div className="text-stone-400 text-xs mb-0.5 uppercase tracking-tighter font-semibold">Requirement</div>
-                <div className="text-xl font-bold text-stone-100">
-                  {selectedCampaign.miles} <span className="text-stone-500 text-base">Miles</span>
-                </div>
+      ) : (
+        <div className="flex-1 overflow-y-auto">
+          <div className="px-5 pt-6 pb-8 max-w-lg mx-auto">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-16 h-16 rounded-full border-2 border-roman-gold/50 overflow-hidden bg-stone-800 shrink-0">
+                {student?.photoUrl ? (
+                  <img src={student.photoUrl} alt={displayName} className="w-full h-full object-cover" />
+                ) : (
+                  <img src="/profile-pics.png" alt="Warrior" className="w-full h-full object-cover opacity-70" />
+                )}
               </div>
+              <div className="min-w-0">
+                <p className="text-stone-500 text-xs uppercase tracking-[0.28em] font-semibold">Welcome</p>
+                <h1 className="text-roman-gold font-serif text-3xl font-bold leading-tight truncate">{displayName}</h1>
+                {student?.romanNickname && (
+                  <p className="text-roman-gold/70 italic font-serif truncate">{student.romanNickname}</p>
+                )}
+              </div>
+            </div>
 
-              {getCampaignProgress(CAMPAIGNS.findIndex(c => c.number === selectedCampaign.number)) >= 100 ? (
-                <div className="w-full bg-stone-800 text-stone-500 font-bold py-3.5 rounded-xl border border-stone-700/50 cursor-not-allowed uppercase tracking-widest flex items-center justify-center gap-2 text-sm">
-                  <svg className="w-4 h-4 text-roman-gold" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Completed
-                </div>
-              ) : (
-                <button
-                  className="w-full bg-roman-gold active:bg-roman-gold/80 text-stone-900 font-bold py-3.5 rounded-xl shadow-[0_0_20px_rgba(212,175,55,0.2)] transition-all active:scale-[0.98] uppercase tracking-widest text-sm"
-                  onClick={() => {
-                    console.log(`Starting campaign: ${selectedCampaign.name}`);
-                    setSelectedCampaign(null);
-                  }}
-                >
-                  Begin Campaign
-                </button>
-              )}
+            <div className="rounded-2xl border border-roman-gold/25 bg-stone-800/40 px-5 py-4 mb-5">
+              <div className="flex items-end justify-between mb-2">
+                <p className="text-stone-400 text-xs uppercase tracking-[0.28em] font-semibold">Total Miles</p>
+                <p className="text-roman-gold font-semibold">{progress}%</p>
+              </div>
+              <p className="text-stone-50 font-serif text-3xl font-bold mb-3">
+                {totalMiles.toFixed(1)}
+                <span className="text-stone-500 text-base font-sans font-normal ml-1">/ {TOTAL_MILES} mi</span>
+              </p>
+              <div className="h-2 rounded-full bg-stone-800 overflow-hidden">
+                <div className="h-full rounded-full bg-linear-to-r from-roman-gold/50 to-roman-gold" style={{ width: `${progress}%` }} />
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => openCampaign(activeCampaign.number)}
+              className="w-full mb-8 rounded-2xl border border-roman-gold/70 bg-linear-to-r from-roman-gold/90 via-amber-300 to-roman-gold/90 px-5 py-4 text-left shadow-[0_0_22px_rgba(212,175,55,0.28)]"
+            >
+              <p className="text-stone-950/70 text-[10px] uppercase tracking-[0.28em] font-bold">
+                {getCampaignStatus(activeCampaign.number) === "complete" ? "Campaign" : "Continue"}
+              </p>
+              <p className="text-stone-950 font-serif text-2xl font-bold leading-tight">{activeCampaign.name}</p>
+              <p className="text-stone-950/80 text-sm italic">{activeCampaign.subtitle}</p>
+            </button>
+
+            <p className="text-stone-500 text-xs uppercase tracking-[0.28em] font-semibold mb-3">The Campaigns</p>
+            <div className="space-y-3">
+              {CAMPAIGNS.map((campaign) => {
+                const status = getCampaignStatus(campaign.number);
+                const miles = Math.min(campaignMiles[campaign.number] ?? 0, campaign.milesRequired);
+                const percent = Math.min(100, Math.round((miles / campaign.milesRequired) * 100));
+                return (
+                  <button
+                    key={campaign.number}
+                    type="button"
+                    onClick={() => openCampaign(campaign.number)}
+                    className={`w-full text-left rounded-xl border p-4 transition-colors ${
+                      status === "complete"
+                        ? "border-roman-gold/30 bg-stone-800/50"
+                        : status === "active"
+                        ? "border-roman-gold/50 bg-stone-800/70"
+                        : "border-stone-700/40 bg-stone-900/40"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
+                          status === "complete"
+                            ? "bg-roman-gold text-stone-950"
+                            : status === "active"
+                            ? "border border-roman-gold/60 text-roman-gold"
+                            : "border border-stone-700 text-stone-500"
+                        }`}
+                      >
+                        {status === "complete" ? "✓" : campaign.number}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className={`font-serif font-bold truncate ${status === "locked" ? "text-stone-500" : "text-stone-100"}`}>
+                          {campaign.name}
+                        </p>
+                        <p className="text-stone-500 text-xs truncate">{campaign.subtitle}</p>
+                      </div>
+                      <p className="text-xs text-stone-400 shrink-0">
+                        {miles}/{campaign.milesRequired} mi
+                      </p>
+                    </div>
+                    {status !== "locked" && (
+                      <div className="mt-3 h-1.5 rounded-full bg-stone-800 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${status === "complete" ? "bg-roman-gold" : "bg-roman-gold/70"}`}
+                          style={{ width: `${percent}%` }}
+                        />
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>

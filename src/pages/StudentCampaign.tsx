@@ -1,5 +1,5 @@
 ﻿import { useEffect, useRef, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import confetti from "canvas-confetti";
 import Navbar from "../components/Navbar";
 import { StudentCampaignSkeleton } from "../components/LoadingSpinner";
@@ -19,6 +19,7 @@ import type { AppUser, Result } from "../types";
 export default function StudentCampaign() {
   const { uid } = useParams<{ uid: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { appUser } = useAuth();
   const [student, setStudent] = useState<AppUser | null>(null);
   const [campaignMiles, setCampaignMiles] = useState<Record<number, number>>({});
@@ -151,7 +152,16 @@ export default function StudentCampaign() {
             break;
           }
         }
-        setSelectedCampaign(activeCampaign);
+        const requestedCampaign = Number(searchParams.get("campaign"));
+        if (
+          Number.isInteger(requestedCampaign) &&
+          requestedCampaign >= 1 &&
+          requestedCampaign <= CAMPAIGNS.length
+        ) {
+          setSelectedCampaign(requestedCampaign);
+        } else {
+          setSelectedCampaign(activeCampaign);
+        }
       } catch (err) {
         console.error("Failed to load student campaign data:", err);
         setLoadError("Could not load this student right now. Please refresh and try again.");
@@ -160,7 +170,7 @@ export default function StudentCampaign() {
       }
     }
     loadData();
-  }, [uid, appUser, navigate]);
+  }, [uid, appUser, navigate, searchParams]);
 
   const totalMiles = CAMPAIGNS.reduce((sum, c) => sum + Math.min(campaignMiles[c.number] ?? 0, c.milesRequired), 0);
 
@@ -417,7 +427,14 @@ export default function StudentCampaign() {
               {/* Top bar: back, student info, navigation */}
               <div className="px-4 md:px-10 pt-3 pb-3 lg:pt-4 lg:pb-4 border-b border-stone-800/60 flex flex-col gap-4 shrink-0 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex items-center gap-3 sm:gap-5 min-w-0">
-                  {appUser?.role !== "student" && (
+                  {appUser?.role === "student" ? (
+                    <button
+                      onClick={() => navigate("/home")}
+                      className="text-stone-500 hover:text-roman-gold transition-colors text-sm uppercase tracking-wider font-semibold cursor-pointer"
+                    >
+                      ← Home
+                    </button>
+                  ) : (
                     <button
                       onClick={() => navigate("/campaigns")}
                       className="text-stone-500 hover:text-roman-gold transition-colors text-sm uppercase tracking-wider font-semibold cursor-pointer"
@@ -425,9 +442,7 @@ export default function StudentCampaign() {
                       ← Back
                     </button>
                   )}
-                  {appUser?.role !== "student" && (
-                    <div className="w-px h-8 bg-stone-700/50" />
-                  )}
+                  <div className="w-px h-8 bg-stone-700/50" />
                   {/* Avatar */}
                   <div className="relative shrink-0">
                     <div className="w-14 h-14 rounded-full border-2 border-roman-gold/50 overflow-hidden bg-stone-800 flex items-center justify-center">

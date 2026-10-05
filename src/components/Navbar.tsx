@@ -119,11 +119,21 @@ export default function Navbar() {
       <div className="relative w-full flex items-stretch min-h-[4.5rem]">
         {/* Left — Logo & Title */}
         <div className="flex items-center gap-3 md:gap-4 flex-1 min-w-0">
-          <img
-            src="/logo-new.png"
-            alt="Ultimate Warrior"
-            className="w-20 md:w-32 self-stretch object-cover"
-          />
+          <button
+            type="button"
+            onClick={() => {
+              if (!appUser) return;
+              navigate(appUser.role === "admin" ? "/admin" : appUser.role === "student" ? "/home" : "/campaigns");
+            }}
+            className="self-stretch"
+            aria-label="Home"
+          >
+            <img
+              src="/logo-new.png"
+              alt="Ultimate Warrior"
+              className="w-20 md:w-32 h-full object-cover"
+            />
+          </button>
           <div className="min-w-0 hidden lg:block">
             <h1 className="text-roman-gold font-bold text-lg md:text-2xl tracking-widest uppercase font-serif leading-tight roman-glow truncate">
               The Ultimate Warrior Challenges

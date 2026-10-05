@@ -65,9 +65,10 @@ export default function App() {
           <Route path="/terms" element={<TermsConditionsPage />} />
           <Route path="/download" element={<DownloadPage />} />
           <Route path="/mobile-login" element={<Navigate to="/login" replace />} />
-          <Route path="/mobile-campaigns" element={<MobileCampaigns />} />
           <Route element={<PrivateRoute />}>
             <Route element={<CampaignsRoute />}>
+              <Route path="/home" element={<MobileCampaigns />} />
+              <Route path="/mobile-campaigns" element={<Navigate to="/home" replace />} />
               <Route path="/campaigns" element={<Campaigns />} />
               <Route path="/campaigns/:uid" element={<StudentCampaign />} />
             </Route>
