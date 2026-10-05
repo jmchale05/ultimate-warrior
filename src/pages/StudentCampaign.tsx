@@ -308,6 +308,12 @@ export default function StudentCampaign() {
   const isIntroVideoLoading = videoLoadingKey === getVideoLoadingKey(selectedCampaign);
   const isEndVideoLoading = videoLoadingKey === getVideoLoadingKey(selectedCampaign, true);
   const showMobileHeroVideo = Boolean(mobileHeroVideo && status !== "locked");
+  const showLogMiles = Boolean(
+    campaign &&
+    watchedCampaigns.has(selectedCampaign) &&
+    myMiles < campaign.milesRequired,
+  );
+  const remainingMiles = campaign ? roundMiles(campaign.milesRequired - myMiles) : 0;
   const showCompletedVideoActions = Boolean(
     campaign &&
     watchedCampaigns.has(selectedCampaign) &&
@@ -651,7 +657,7 @@ export default function StudentCampaign() {
                       </div>
 
                       {/* Description */}
-                      <p className="text-stone-400 text-sm sm:text-base lg:text-lg leading-relaxed mb-4 lg:mb-10">{campaign.description}</p>
+                      <p className="hidden lg:block text-stone-400 text-lg leading-relaxed mb-10">{campaign.description}</p>
 
                       {/* Progress */}
                       <div className="mb-4 lg:mb-8">
@@ -696,15 +702,10 @@ export default function StudentCampaign() {
                           <p className="hidden lg:block text-stone-600 text-xs mt-4 uppercase tracking-widest">Watch the intro video to start logging miles</p>
                           {videoError && <p className="text-red-400 text-xs mt-3">{videoError}</p>}
                         </div>
-                      ) : myMiles < campaign.milesRequired ? (
-                        <div className="rounded-xl border border-stone-700/50 bg-stone-800/30 p-3 lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0">
-                          <div className="mb-2 flex items-center justify-between lg:mb-3">
-                            <p className="text-stone-500 text-xs uppercase tracking-[0.25em] font-semibold">Log Miles</p>
-                            <p className="text-stone-500 text-xs lg:hidden">
-                              {roundMiles(campaign.milesRequired - myMiles)} remaining
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2 lg:gap-3">
+                      ) : showLogMiles ? (
+                        <div className="hidden lg:block">
+                          <p className="text-stone-500 text-xs uppercase tracking-[0.25em] font-semibold mb-3">Log Miles</p>
+                          <div className="flex items-center gap-3">
                             <input
                               type="number"
                               min="0"
@@ -714,17 +715,17 @@ export default function StudentCampaign() {
                               value={mileInput}
                               onChange={(e) => setMileInput(e.target.value)}
                               aria-label="Miles run"
-                              className="min-w-0 flex-1 rounded-lg border border-stone-700/60 bg-stone-900/60 px-3 py-2.5 text-base text-stone-100 placeholder:text-stone-600 focus:border-roman-gold/50 focus:outline-none transition-colors lg:rounded-xl lg:bg-stone-800/60 lg:px-4 lg:py-3"
+                              className="min-w-0 flex-1 rounded-xl border border-stone-700/60 bg-stone-800/60 px-4 py-3 text-base text-stone-100 placeholder:text-stone-600 focus:border-roman-gold/50 focus:outline-none transition-colors"
                             />
                             <button
                               onClick={() => handleLogMiles(campaign.number, campaign.milesRequired)}
                               disabled={submitting}
-                              className="shrink-0 rounded-lg border border-roman-gold/40 bg-roman-gold/15 px-4 py-2.5 text-sm font-bold uppercase tracking-wider text-roman-gold hover:bg-roman-gold/25 transition-colors cursor-pointer disabled:opacity-50 lg:rounded-xl lg:px-6 lg:py-3"
+                              className="shrink-0 rounded-xl border border-roman-gold/40 bg-roman-gold/15 px-6 py-3 text-sm font-bold uppercase tracking-wider text-roman-gold hover:bg-roman-gold/25 transition-colors cursor-pointer disabled:opacity-50"
                             >
                               {submitting ? "Saving..." : "Log"}
                             </button>
                           </div>
-                          <p className="hidden text-stone-600 text-xs mt-2 lg:block">{roundMiles(campaign.milesRequired - myMiles)} miles remaining</p>
+                          <p className="text-stone-600 text-xs mt-2">{remainingMiles} miles remaining</p>
                         </div>
                       ) : !watchedEndVideos.has(selectedCampaign) ? (
                         <div className="text-center py-4">
@@ -798,6 +799,34 @@ export default function StudentCampaign() {
             </div>
           )}
         </div>
+        {showLogMiles && campaign && (
+          <div className="lg:hidden shrink-0 border-t border-stone-800/60 bg-stone-900 px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-stone-400 text-xs uppercase tracking-[0.25em] font-semibold">Log Miles</p>
+              <p className="text-stone-400 text-xs">{remainingMiles} remaining</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min="0"
+                step="0.1"
+                inputMode="decimal"
+                placeholder="Miles run..."
+                value={mileInput}
+                onChange={(e) => setMileInput(e.target.value)}
+                aria-label="Miles run"
+                className="min-w-0 flex-1 rounded-lg border border-stone-700/60 bg-stone-950/80 px-3 py-3 text-base text-stone-100 placeholder:text-stone-600 focus:border-roman-gold/50 focus:outline-none transition-colors"
+              />
+              <button
+                onClick={() => handleLogMiles(campaign.number, campaign.milesRequired)}
+                disabled={submitting}
+                className="shrink-0 rounded-lg border border-roman-gold/40 bg-roman-gold/15 px-5 py-3 text-sm font-bold uppercase tracking-wider text-roman-gold hover:bg-roman-gold/25 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {submitting ? "Saving..." : "Log"}
+              </button>
+            </div>
+          </div>
+        )}
         {showCompletedVideoActions && campaign && (
           <div className="lg:hidden shrink-0 border-t border-stone-800/60 bg-stone-900 px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             {videoError && <p className="text-red-400 text-xs text-center mb-2">{videoError}</p>}
