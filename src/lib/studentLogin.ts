@@ -98,9 +98,17 @@ export async function enableStudentHomeLogin(input: {
     }),
   });
 
-  const body = await response.json().catch(() => ({})) as { error?: unknown; username?: string; homeLoginEnabled?: boolean };
+  const raw = await response.text();
+  let body: { error?: unknown; message?: unknown; username?: string; homeLoginEnabled?: boolean } = {};
+  if (raw) {
+    try {
+      body = JSON.parse(raw) as typeof body;
+    } catch {
+      body = { message: raw.replace(/\s+/g, " ").trim().slice(0, 180) };
+    }
+  }
   if (!response.ok) {
-    throw new Error(apiErrorMessage(body, "Could not enable home login."));
+    throw new Error(apiErrorMessage(body, `Could not enable home login (${response.status}).`));
   }
 
   return {

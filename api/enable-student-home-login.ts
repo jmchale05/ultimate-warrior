@@ -1,4 +1,4 @@
-import { ConfigurationError, getAdminAuth, getAdminDb } from "./_firebaseAdmin";
+import { ConfigurationError, getAdminAuth, getAdminDb } from "../server/firebaseAdmin";
 
 const STUDENT_HOME_LOGIN_DOMAIN = "students.tuwc.online";
 
@@ -167,22 +167,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       homeLoginEnabled: true,
     });
   } catch (err) {
-    if (err instanceof ConfigurationError) {
+    if (err instanceof ConfigurationError || (err instanceof Error && err.name === "ConfigurationError")) {
       res.status(500).json({ error: err.message });
       return;
     }
 
-    const code = (err as { code?: string }).code;
+    const code = err && typeof err === "object"
+      ? (err as { code?: string; errorInfo?: { code?: string } }).code
+        ?? (err as { errorInfo?: { code?: string } }).errorInfo?.code
+      : undefined;
     if (code === "auth/email-already-exists") {
       res.status(409).json({ error: "That username is already in use. Choose another." });
       return;
     }
-    if (code === "auth/argument-error" || code === "auth/id-token-expired") {
+    if (code === "auth/argument-error" || code === "auth/id-token-expired" || code === "auth/invalid-id-token") {
       res.status(401).json({ error: "Your session expired. Please sign in again." });
       return;
     }
 
     console.error("Failed to enable student home login:", err);
-    res.status(500).json({ error: "Could not enable home login. Please try again." });
+    res.status(500).json({
+      error: code ? `Could not enable home login (${code}).` : "Could not enable home login. Please try again.",
+    });
   }
 }
