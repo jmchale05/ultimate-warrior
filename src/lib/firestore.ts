@@ -214,16 +214,15 @@ export async function updateOwnUserProfile(
   uid: string,
   input: { displayName: string; suffix?: string; romanNickname?: string }
 ): Promise<void> {
-  const updates: Record<string, unknown> = {
+  await updateDoc(doc(db, "users", uid), {
     displayName: input.displayName,
-  };
-  if (input.suffix !== undefined) {
-    updates.suffix = input.suffix.trim() ? input.suffix.trim() : deleteField();
-  }
-  if (input.romanNickname !== undefined) {
-    updates.romanNickname = input.romanNickname.trim() ? input.romanNickname.trim() : deleteField();
-  }
-  await updateDoc(doc(db, "users", uid), updates);
+    ...(input.suffix !== undefined
+      ? { suffix: input.suffix.trim() ? input.suffix.trim() : deleteField() }
+      : {}),
+    ...(input.romanNickname !== undefined
+      ? { romanNickname: input.romanNickname.trim() ? input.romanNickname.trim() : deleteField() }
+      : {}),
+  });
 }
 
 export async function getUsersByIds(uids: string[]): Promise<AppUser[]> {
