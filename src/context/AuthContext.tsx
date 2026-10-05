@@ -23,6 +23,7 @@ import {
   initializeSchoolCampaignStart,
 } from "../lib/firestore";
 import type { AppUser } from "../types";
+import { resolveSignInIdentifier } from "../lib/studentLogin";
 
 interface AuthContextValue {
   currentUser: User | null;
@@ -39,6 +40,7 @@ interface AuthContextValue {
   ) => Promise<void>;
   forgotPassword: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
+  refreshAppUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -128,7 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function signIn(email: string, password: string) {
-    const cred = await signInWithEmailAndPassword(auth, email, password);
+    const cred = await signInWithEmailAndPassword(auth, resolveSignInIdentifier(email), password);
     const profile = await getUserDoc(cred.user.uid);
 
     if (!profile) {
@@ -225,6 +227,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await firebaseSignOut(auth);
   }
 
+  async function refreshAppUser() {
+    if (!currentUser) return;
+    const profile = await getUserDoc(currentUser.uid);
+    if (profile) setAppUser(profile);
+  }
+
   async function forgotPassword(email: string) {
     const response = await fetch("/api/send-password-reset-email", {
       method: "POST",
@@ -252,7 +260,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ currentUser, appUser, loading, signIn, signUp, forgotPassword, signOut }}
+      value={{ currentUser, appUser, loading, signIn, signUp, forgotPassword, signOut, refreshAppUser }}
     >
       {children}
     </AuthContext.Provider>

@@ -57,7 +57,7 @@ export default function LoginPage() {
   // Navigate once Firebase Auth and the Firestore user profile are both ready.
   useEffect(() => {
     if (currentUser && appUser) {
-      navigate(appUser.role === "admin" ? "/admin" : "/campaigns", { replace: true });
+      navigate(appUser.role === "admin" ? "/admin" : appUser.role === "student" ? `/campaigns/${appUser.uid}` : "/campaigns", { replace: true });
     }
   }, [currentUser, appUser, navigate]);
 
@@ -72,6 +72,7 @@ export default function LoginPage() {
 
     const normalizedEmail = email.trim();
     const normalizedPassword = password.trim();
+    const isUsernameLogin = mode === "signin" && !normalizedEmail.includes("@");
     const isEmailFormatValid = /^\S+@\S+\.\S+$/.test(normalizedEmail);
 
     if (mode === "signup" && !accessCode.trim()) {
@@ -99,13 +100,19 @@ export default function LoginPage() {
     }
 
     if (!normalizedEmail) {
-      setEmailError("Email is required.");
+      setEmailError("Email or username is required.");
       setError("Please correct the highlighted fields.");
       return;
     }
 
-    if (!isEmailFormatValid) {
-      setEmailError("Enter a valid email address.");
+    if (!isUsernameLogin && !isEmailFormatValid) {
+      setEmailError("Enter a valid email or username.");
+      setError("Please correct the highlighted fields.");
+      return;
+    }
+
+    if (isUsernameLogin && normalizedEmail.replace(/[^a-zA-Z0-9._]/g, "").length < 3) {
+      setEmailError("Enter a valid email or username.");
       setError("Please correct the highlighted fields.");
       return;
     }
@@ -239,7 +246,7 @@ export default function LoginPage() {
   const isSignup = mode === "signup";
 
   return (
-    <div className={`min-h-screen flex flex-col items-center px-4 relative overflow-x-hidden ${isSignup ? "justify-start py-6 sm:py-8 lg:py-6" : "justify-center overflow-hidden"}`}>
+    <div className={`min-h-dvh flex flex-col items-center px-4 relative overflow-x-hidden ${isSignup ? "justify-start py-6 sm:py-8 lg:py-6" : "justify-center py-6 sm:py-8 lg:py-6"}`}>
       {logoutMessage && (
         <div className="fixed top-5 right-5 z-50 pointer-events-none">
           <div className="rounded-lg border border-emerald-300/40 bg-emerald-500/15 text-emerald-100 px-4 py-3 shadow-lg backdrop-blur-sm text-sm font-semibold tracking-wide">
@@ -284,7 +291,7 @@ export default function LoginPage() {
         </h2>
         <p className={`text-stone-500 text-xs text-center italic font-serif ${isSignup ? "mb-4 lg:mb-3" : "mb-6 lg:mb-4"}`}>
           {mode === "signin"
-            ? "Enter your credentials to access your account"
+            ? "Sign in with your email or username"
             : "Register to lead your warriors to glory"}
         </p>
 
@@ -385,10 +392,10 @@ export default function LoginPage() {
           {(mode === "signin" || accessCodeConfirmed) && (
             <div>
               <label className="block text-roman-gold/70 text-xs uppercase tracking-wider mb-1.5 font-semibold">
-                ◆ Email *
+                ◆ {mode === "signin" ? "Email or Username" : "Email"} *
               </label>
               <input
-                type="email"
+                type="text"
                 required
                 autoComplete="off"
                 value={email}
@@ -396,7 +403,7 @@ export default function LoginPage() {
                   setEmail(e.target.value);
                   if (emailError) setEmailError(null);
                 }}
-                placeholder="your@email.com"
+                placeholder={mode === "signin" ? "email or username" : "your@email.com"}
                 className={`roman-input ${emailError ? "border-red-400 focus:border-red-300 focus:ring-red-300/30" : ""}`}
               />
               {emailError && (
@@ -451,7 +458,7 @@ export default function LoginPage() {
             </div>
           )}
 
-          {mode === "signin" && (
+          {mode === "signin" && email.includes("@") && (
             <div className="text-right -mt-1">
               <button
                 type="button"
@@ -584,7 +591,7 @@ export default function LoginPage() {
       <button
         type="button"
         onClick={openSupportModal}
-        className="absolute bottom-6 right-6 z-20 flex items-center justify-center gap-2 rounded-full border border-roman-gold/30 bg-stone-900/80 px-4 py-2.5 text-roman-gold text-xs font-semibold uppercase tracking-widest backdrop-blur-sm shadow-[0_0_15px_rgba(212,175,55,0.15)] hover:bg-roman-gold/20 hover:border-roman-gold/60 transition-all hover:scale-105"
+        className="absolute bottom-4 right-4 z-20 flex items-center justify-center gap-2 rounded-full border border-roman-gold/30 bg-stone-900/80 px-3 py-2 text-roman-gold text-[10px] font-semibold uppercase tracking-widest backdrop-blur-sm shadow-[0_0_15px_rgba(212,175,55,0.15)] hover:bg-roman-gold/20 hover:border-roman-gold/60 transition-all sm:bottom-6 sm:right-6 sm:px-4 sm:py-2.5 sm:text-xs"
       >
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
           <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>

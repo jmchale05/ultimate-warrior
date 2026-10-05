@@ -7,7 +7,7 @@ export default function TermsConditionsPage() {
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
-      <header className="bg-white border-b border-gray-300 px-8 py-4 flex items-center justify-between shadow-sm">
+      <header className="bg-white border-b border-gray-300 px-4 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between shadow-sm md:px-8">
         <div className="flex items-center gap-4">
           <button
             type="button"

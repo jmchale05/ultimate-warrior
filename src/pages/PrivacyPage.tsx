@@ -48,14 +48,14 @@ export default function PrivacyPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 px-6 py-8 md:px-10" style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}>
+    <div className="min-h-screen bg-gray-100 px-4 py-6 sm:px-6 md:px-10" style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}>
       <div className="mx-auto max-w-5xl">
-        <header className="bg-white border border-gray-300 shadow-sm px-6 py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <header className="bg-white border border-gray-300 shadow-sm px-4 py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between sm:px-6">
           <div>
             <p className="text-xs text-gray-400 uppercase tracking-widest" style={{ fontFamily: "system-ui, sans-serif" }}>Legal Document</p>
             <h1 className="text-2xl md:text-3xl font-bold text-gray-900 leading-tight mt-1">Privacy Notice</h1>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => navigate(appUser ? (appUser.role === "admin" ? "/admin" : "/campaigns") : "/login")}
@@ -75,7 +75,7 @@ export default function PrivacyPage() {
           </div>
         </header>
 
-        <main className="mt-6 bg-white border border-gray-300 shadow-md px-8 py-10 md:px-12 md:py-12">
+        <main className="mt-6 bg-white border border-gray-300 shadow-md px-4 py-6 sm:px-8 sm:py-10 md:px-12 md:py-12">
           <div className="border-b border-gray-200 pb-7 mb-8">
             <h2 className="text-3xl font-bold text-gray-900">Data Protection and Your Rights</h2>
             <p className="mt-3 text-sm text-gray-500" style={{ fontFamily: "system-ui, sans-serif" }}>

@@ -5,11 +5,13 @@ import { loadEnv } from "vite";
 const API_ROUTES: Record<string, string> = {
   "/api/send-admin-deletion-email": "/api/send-admin-deletion-email.ts",
   "/api/send-password-reset-email": "/api/send-password-reset-email.ts",
+  "/api/enable-student-home-login": "/api/enable-student-home-login.ts",
 };
 
 type VercelLikeRequest = {
   method?: string;
   body?: unknown;
+  headers?: IncomingMessage["headers"];
 };
 
 type VercelLikeResponse = {
@@ -89,6 +91,7 @@ async function handleApiRequest(
     {
       method: req.method,
       body,
+      headers: req.headers,
     },
     createVercelResponse(res)
   );

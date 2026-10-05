@@ -38,6 +38,9 @@ export interface AppUser {
   role: UserRole;
   schoolId?: string;
   classId?: string; // for students
+  homeLoginEnabled?: boolean;
+  homeLoginUsername?: string;
+  homeLoginEnabledAt?: number;
   age?: number;
   photoUrl?: string;
   createdAt: number;

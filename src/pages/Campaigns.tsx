@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { CampaignsTableSkeleton } from "../components/LoadingSpinner";
@@ -18,6 +19,11 @@ import {
   updateUserPhoto,
   recordStudentAuthorityConsent,
 } from "../lib/firestore";
+import {
+  enableStudentHomeLogin,
+  generateStudentPassword,
+  suggestStudentUsername,
+} from "../lib/studentLogin";
 import { YEAR_OPTIONS } from "../lib/yearOptions";
 import {
   resolveVideoUrl,
@@ -97,6 +103,15 @@ const ROMAN_NICKNAME_SUGGESTIONS = [
   "The First Lance",
 ];
 
+function shuffleRomanNicknames(list: string[]) {
+  const shuffled = [...list];
+  for (let i = shuffled.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
 const ITEMS_PER_PAGE = 10;
 
 function getCampaignInfo(miles: number) {
@@ -137,6 +152,31 @@ interface StudentRow {
   campaignName: string;
   campaignProgress: number;
   completedCampaigns: number;
+  homeLoginEnabled?: boolean;
+  homeLoginUsername?: string;
+}
+
+// Phone outline from Heroicons (MIT) - https://heroicons.com
+function MobileLoginIcon({ enabled, className }: { enabled: boolean; className: string }) {
+  const label = enabled ? "Mobile login enabled" : "No mobile login";
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`shrink-0 ${enabled ? "text-roman-gold/70" : "text-stone-500"} ${className}`}
+      role="img"
+      aria-label={label}
+    >
+      <title>{label}</title>
+      <path d="M10.5 1.5H8.25A2.25 2.25 0 0 0 6 3.75v16.5a2.25 2.25 0 0 0 2.25 2.25h7.5A2.25 2.25 0 0 0 18 20.25V3.75a2.25 2.25 0 0 0-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" />
+      {!enabled && <path d="M3 3l18 18" strokeWidth={2} className="text-red-400" />}
+    </svg>
+  );
 }
 
 function sortStudentRows(rows: StudentRow[]): StudentRow[] {
@@ -149,7 +189,7 @@ function sortStudentRows(rows: StudentRow[]): StudentRow[] {
 }
 
 export default function Campaigns() {
-  const { appUser } = useAuth();
+  const { appUser, currentUser } = useAuth();
   const navigate = useNavigate();
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
@@ -169,6 +209,7 @@ export default function Campaigns() {
   const [successToast, setSuccessToast] = useState("");
   const [errorToast, setErrorToast] = useState("");
   const [openActionsForStudent, setOpenActionsForStudent] = useState<string | null>(null);
+  const [mobileActionsAnchor, setMobileActionsAnchor] = useState<{ top: number; left: number; openUp: boolean } | null>(null);
   const [showEditStudentModal, setShowEditStudentModal] = useState(false);
   const [selectedStudentForEdit, setSelectedStudentForEdit] = useState<StudentRow | null>(null);
   const [editName, setEditName] = useState("");
@@ -192,11 +233,22 @@ export default function Campaigns() {
   const formPhotoRef = useRef<HTMLInputElement>(null);
   const editPhotoRef = useRef<HTMLInputElement>(null);
   const actionsMenuRef = useRef<HTMLDivElement>(null);
+  const romanNicknameQueueRef = useRef<string[]>([]);
   const [className, setClassName] = useState("");
   const [classSaving, setClassSaving] = useState(false);
   const [classError, setClassError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isCompactSearchPlaceholder, setIsCompactSearchPlaceholder] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 639px)").matches
+  );
+  const [showHomeLoginModal, setShowHomeLoginModal] = useState(false);
+  const [selectedStudentForHomeLogin, setSelectedStudentForHomeLogin] = useState<StudentRow | null>(null);
+  const [homeLoginUsername, setHomeLoginUsername] = useState("");
+  const [homeLoginPassword, setHomeLoginPassword] = useState("");
+  const [homeLoginSaving, setHomeLoginSaving] = useState(false);
+  const [homeLoginError, setHomeLoginError] = useState("");
+  const [homeLoginCredentials, setHomeLoginCredentials] = useState<{ name: string; username: string; password: string } | null>(null);
 
   const yearOptions = YEAR_OPTIONS;
 
@@ -311,6 +363,7 @@ export default function Campaigns() {
       setHasAuthorityConsent(true);
       setShowAuthorityConsentModal(false);
       setAuthorityConsentChecked(false);
+      romanNicknameQueueRef.current = [];
       setShowAddModal(true);
     } catch (err) {
       console.error("Failed to save authority consent:", err);
@@ -323,6 +376,7 @@ export default function Campaigns() {
   function handleOpenAddStudent() {
     setFormError("");
     if (hasAuthorityConsent) {
+      romanNicknameQueueRef.current = [];
       setShowAddModal(true);
       return;
     }
@@ -330,13 +384,23 @@ export default function Campaigns() {
   }
 
   function handleSuggestRomanNickname() {
-    const availableSuggestions = ROMAN_NICKNAME_SUGGESTIONS.filter(
-      (nickname) => nickname.toLowerCase() !== formRomanNickname.trim().toLowerCase()
-    );
+    const current = formRomanNickname.trim().toLowerCase();
 
-    const source = availableSuggestions.length > 0 ? availableSuggestions : ROMAN_NICKNAME_SUGGESTIONS;
-    const randomIndex = Math.floor(Math.random() * source.length);
-    setFormRomanNickname(source[randomIndex]);
+    if (romanNicknameQueueRef.current.length === 0) {
+      romanNicknameQueueRef.current = shuffleRomanNicknames(ROMAN_NICKNAME_SUGGESTIONS);
+    }
+
+    let next = romanNicknameQueueRef.current.shift() ?? ROMAN_NICKNAME_SUGGESTIONS[0];
+    if (next.toLowerCase() === current) {
+      if (romanNicknameQueueRef.current.length === 0) {
+        romanNicknameQueueRef.current = shuffleRomanNicknames(
+          ROMAN_NICKNAME_SUGGESTIONS.filter((nickname) => nickname.toLowerCase() !== current)
+        );
+      }
+      next = romanNicknameQueueRef.current.shift() ?? next;
+    }
+
+    setFormRomanNickname(next);
   }
 
   function handleTopAddStudentClick() {
@@ -366,9 +430,13 @@ export default function Campaigns() {
 
   useEffect(() => {
     if (!appUser) return;
+    if (appUser.role === "student") {
+      navigate(`/campaigns/${appUser.uid}`, { replace: true });
+      return;
+    }
     setHasAuthorityConsent(Boolean(appUser.studentAuthorityConsentAt));
     loadData();
-  }, [appUser]);
+  }, [appUser, navigate]);
 
   useEffect(() => {
     let cancelled = false;
@@ -406,10 +474,11 @@ export default function Campaigns() {
     if (!openActionsForStudent) return;
 
     const handleClickOutside = (event: MouseEvent) => {
-      if (!actionsMenuRef.current) return;
-      if (!actionsMenuRef.current.contains(event.target as Node)) {
-        setOpenActionsForStudent(null);
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("[data-student-actions-trigger]") || target?.closest("[data-student-actions-menu]")) {
+        return;
       }
+      setOpenActionsForStudent(null);
     };
 
     window.addEventListener("mousedown", handleClickOutside);
@@ -417,8 +486,42 @@ export default function Campaigns() {
   }, [openActionsForStudent]);
 
   useEffect(() => {
+    if (!openActionsForStudent) {
+      setMobileActionsAnchor(null);
+      return;
+    }
+
+    const closeOnViewportChange = () => {
+      setOpenActionsForStudent(null);
+    };
+
+    window.addEventListener("scroll", closeOnViewportChange, true);
+    window.addEventListener("resize", closeOnViewportChange);
+    return () => {
+      window.removeEventListener("scroll", closeOnViewportChange, true);
+      window.removeEventListener("resize", closeOnViewportChange);
+    };
+  }, [openActionsForStudent]);
+
+  useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 639px)");
+    const handleChange = (event: MediaQueryListEvent) => {
+      setIsCompactSearchPlaceholder(event.matches);
+    };
+
+    setIsCompactSearchPlaceholder(mediaQuery.matches);
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", handleChange);
+      return () => mediaQuery.removeEventListener("change", handleChange);
+    }
+
+    mediaQuery.addListener(handleChange);
+    return () => mediaQuery.removeListener(handleChange);
+  }, []);
 
   useEffect(() => {
     if (!openActionsForStudent) return;
@@ -439,6 +542,68 @@ export default function Campaigns() {
     setDeleteRequestError("");
     setOpenActionsForStudent(null);
     setShowDeleteRequestModal(true);
+  }
+
+  function handleOpenHomeLogin(student: StudentRow) {
+    setSelectedStudentForHomeLogin(student);
+    setHomeLoginUsername(
+      student.homeLoginUsername ||
+        suggestStudentUsername(
+          student.name,
+          students
+            .filter((row) => row.uid !== student.uid && row.homeLoginUsername)
+            .map((row) => row.homeLoginUsername as string)
+        )
+    );
+    setHomeLoginPassword(generateStudentPassword());
+    setHomeLoginError("");
+    setHomeLoginCredentials(null);
+    setOpenActionsForStudent(null);
+    setShowHomeLoginModal(true);
+  }
+
+  async function handleEnableHomeLogin() {
+    if (!currentUser || !selectedStudentForHomeLogin) {
+      setHomeLoginError("Could not enable add login. Please try again.");
+      return;
+    }
+    if (homeLoginUsername.trim().length < 3) {
+      setHomeLoginError("Username must be at least 3 characters.");
+      return;
+    }
+    if (homeLoginPassword.trim().length < 6) {
+      setHomeLoginError("Password must be at least 6 characters.");
+      return;
+    }
+
+    setHomeLoginSaving(true);
+    setHomeLoginError("");
+    try {
+      const idToken = await currentUser.getIdToken();
+      const result = await enableStudentHomeLogin({
+        idToken,
+        studentId: selectedStudentForHomeLogin.uid,
+        username: homeLoginUsername,
+        password: homeLoginPassword.trim(),
+      });
+      const passwordToShow = homeLoginPassword.trim();
+      setStudents((prev) =>
+        prev.map((row) =>
+          row.uid === selectedStudentForHomeLogin.uid
+            ? { ...row, homeLoginEnabled: true, homeLoginUsername: result.username }
+            : row
+        )
+      );
+      setHomeLoginCredentials({
+        name: selectedStudentForHomeLogin.name,
+        username: result.username,
+        password: passwordToShow,
+      });
+    } catch (err) {
+      setHomeLoginError(err instanceof Error ? err.message : "Could not enable add login.");
+    } finally {
+      setHomeLoginSaving(false);
+    }
   }
 
   function handleOpenEditStudent(student: StudentRow) {
@@ -690,7 +855,7 @@ export default function Campaigns() {
             const totalMiles = milesByStudent.get(sid) || 0;
             rows.push({
               uid: sid,
-              name: user?.displayName || "⚠️ Missing Profile",
+              name: user?.displayName || "Missing Profile",
               romanNickname: user?.romanNickname,
               hasPendingDeletionRequest: pendingDeletionSet.has(sid),
               classId: cls.id,
@@ -698,6 +863,8 @@ export default function Campaigns() {
               photoUrl: user?.photoUrl,
               className: cls.name,
               totalMiles,
+              homeLoginEnabled: user?.homeLoginEnabled,
+              homeLoginUsername: user?.homeLoginUsername,
               ...getCampaignInfo(totalMiles),
             });
           }
@@ -741,8 +908,12 @@ export default function Campaigns() {
     currentPage * ITEMS_PER_PAGE
   );
 
+  if (appUser?.role === "student") {
+    return null;
+  }
+
   return (
-    <div className="h-screen text-stone-100 flex flex-col overflow-hidden bg-stone-950">
+    <div className="h-dvh text-stone-100 flex flex-col overflow-hidden bg-stone-950">
       <Navbar />
 
       {successToast && (
@@ -777,22 +948,25 @@ export default function Campaigns() {
 
       <div className="flex-1 min-h-0 flex overflow-hidden relative" style={{ backgroundImage: 'url(/full-background.png)', backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}>
         {/* Main content */}
-        <div className="flex-1 min-w-0 px-12 py-14 overflow-y-auto overflow-x-hidden flex flex-col items-center">
+        <div className="flex-1 min-w-0 px-4 py-6 overflow-y-auto overflow-x-hidden flex flex-col items-center sm:px-6 md:px-8 lg:px-12 lg:py-14">
           <div className="w-full max-w-360">
         <section
-          className="mb-8 w-full rounded-3xl border border-roman-gold/20 bg-stone-950/80 backdrop-blur-md shadow-[0_12px_40px_rgba(0,0,0,0.5)] overflow-hidden"
+          className="mb-5 lg:mb-8 w-full rounded-2xl lg:rounded-3xl border border-roman-gold/20 bg-stone-950/80 backdrop-blur-md shadow-[0_12px_40px_rgba(0,0,0,0.5)] overflow-hidden"
           aria-label="Introduction video"
         >
           <div className="h-px w-full bg-linear-to-r from-transparent via-roman-gold/40 to-transparent" />
-          <div className="grid grid-cols-[minmax(0,1fr)_minmax(240px,22rem)] gap-6 items-center p-6">
+          <div className="grid grid-cols-1 gap-3 items-center p-3 sm:p-5 lg:grid-cols-[minmax(0,1fr)_minmax(240px,22rem)] lg:gap-6 lg:p-6">
             <div className="min-w-0">
-              <p className="text-roman-gold/60 text-[10px] uppercase tracking-[0.35em] font-semibold mb-2">
+              <p className="hidden lg:block text-roman-gold/60 text-[10px] uppercase tracking-[0.35em] font-semibold mb-2">
                 Getting Started
               </p>
-              <h2 className="text-roman-gold font-serif text-2xl font-bold tracking-wide">
+              <h2 className="text-roman-gold font-serif text-lg sm:text-xl lg:text-2xl font-bold tracking-wide">
                 Introduction Video
               </h2>
-              <div className="text-stone-400 text-sm mt-2 leading-relaxed max-w-xl space-y-2">
+              <p className="lg:hidden text-stone-400 text-xs mt-1 leading-snug">
+                Watch this short intro, then add your students to begin.
+              </p>
+              <div className="hidden lg:block text-stone-400 text-sm mt-2 leading-relaxed max-w-xl space-y-2">
                 <p>
                   Greetings, young Centurion. I am Adonis Ricardo Jonas, and I will lead you on this virtual distance journey.
                 </p>
@@ -804,7 +978,7 @@ export default function Campaigns() {
                 </p>
               </div>
             </div>
-            <div className="aspect-video w-full rounded-2xl overflow-hidden border border-roman-gold/25 bg-stone-900 shadow-[inset_0_0_24px_rgba(0,0,0,0.35)]">
+            <div className="aspect-video w-full rounded-xl lg:rounded-2xl overflow-hidden border border-roman-gold/25 bg-stone-900 shadow-[inset_0_0_24px_rgba(0,0,0,0.35)]">
               <video
                 key={introVideoSrc}
                 className="h-full w-full object-contain"
@@ -824,15 +998,15 @@ export default function Campaigns() {
           </div>
         </section>
 
-        <div className="flex items-center justify-between gap-3 mb-6">
+        <div className="flex flex-col gap-4 mb-6 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h1 className="text-stone-950 text-3xl font-bold mt-2 [text-shadow:0_2px_14px_rgba(255,255,255,0.55)]">
+            <h1 className="text-stone-950 text-2xl sm:text-3xl font-bold mt-2 [text-shadow:0_2px_14px_rgba(255,255,255,0.55)]">
               Students
             </h1>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="relative min-w-[24rem]">
+          <div className="flex flex-row items-center gap-2 sm:gap-3 w-full lg:w-auto">
+            <div className="relative min-w-0 flex-1 lg:min-w-[24rem]">
               <div className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-roman-gold/80">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M8.5 3a5.5 5.5 0 014.392 8.812l3.648 3.649a1 1 0 01-1.414 1.414l-3.649-3.648A5.5 5.5 0 118.5 3zm0 2a3.5 3.5 0 100 7 3.5 3.5 0 000-7z" clipRule="evenodd" />
@@ -842,7 +1016,7 @@ export default function Campaigns() {
                 type="text"
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Search by student, year, or campaign"
+                placeholder={isCompactSearchPlaceholder ? "Search by student" : "Search by student, year, or campaign"}
                 className="w-full rounded-2xl border border-stone-800/50 bg-stone-950/88 py-3 pl-12 pr-12 text-sm font-medium text-stone-100 placeholder:text-stone-500 shadow-[0_14px_34px_rgba(0,0,0,0.28)] outline-none transition-all focus:border-roman-gold/70 focus:bg-stone-950"
                 aria-label="Search students"
               />
@@ -866,8 +1040,8 @@ export default function Campaigns() {
               onClick={handleTopAddStudentClick}
               className={
                 students.length >= 40
-                  ? "inline-flex items-center gap-2 rounded-xl border border-red-500/50 bg-stone-950/70 px-5 py-3 text-sm font-bold uppercase tracking-[0.2em] text-red-400 shadow-[0_4px_15px_rgba(239,68,68,0.15)] cursor-not-allowed opacity-90 transition-all hover:bg-stone-950/90 active:scale-100"
-                  : "inline-flex items-center gap-2 rounded-xl border border-roman-gold/50 bg-stone-950/85 px-5 py-3 text-sm font-bold uppercase tracking-[0.2em] text-roman-gold shadow-[0_12px_30px_rgba(0,0,0,0.35)] transition-all hover:bg-stone-900 hover:scale-[1.03] active:scale-[0.97]"
+                  ? "inline-flex items-center justify-center gap-2 rounded-xl border border-red-500/50 bg-stone-950/70 px-3 sm:px-5 py-3 text-[10px] sm:text-sm font-bold uppercase tracking-wider sm:tracking-[0.2em] text-red-400 shadow-[0_4px_15px_rgba(239,68,68,0.15)] cursor-not-allowed opacity-90 transition-all hover:bg-stone-950/90 active:scale-100 shrink-0 whitespace-nowrap"
+                  : "inline-flex items-center justify-center gap-2 rounded-xl border border-roman-gold/50 bg-stone-950/85 px-3 sm:px-5 py-3 text-[10px] sm:text-sm font-bold uppercase tracking-wider sm:tracking-[0.2em] text-roman-gold shadow-[0_12px_30px_rgba(0,0,0,0.35)] transition-all hover:bg-stone-900 hover:scale-[1.03] active:scale-[0.97] shrink-0 whitespace-nowrap"
               }
               title={students.length >= 40 ? "Maximum capacity of 40 students reached." : "Add a new student to the roster"}
             >
@@ -930,8 +1104,105 @@ export default function Campaigns() {
             </button>
           </div>
         ) : (
-          <div className="rounded-3xl border border-roman-gold/20 overflow-visible bg-stone-950/90 shadow-[0_16px_60px_rgba(0,0,0,0.8)] mt-4">
-            <table className="w-full text-left">
+          <div className="rounded-3xl border border-roman-gold/20 overflow-hidden xl:overflow-visible bg-stone-950/90 shadow-[0_16px_60px_rgba(0,0,0,0.8)] mt-4">
+            <div className="xl:hidden overflow-hidden rounded-3xl divide-y divide-roman-gold/10">
+              {paginatedStudents.map((s) => (
+                <div
+                  key={`${s.uid}-${s.className}-card`}
+                  onClick={() => navigate(`/campaigns/${s.uid}`)}
+                  className={`p-4 sm:p-5 cursor-pointer ${
+                    s.hasPendingDeletionRequest
+                      ? "bg-red-950/20"
+                      : "bg-stone-950/40"
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={`w-14 h-14 rounded-full border overflow-hidden flex items-center justify-center shrink-0 ${
+                      s.hasPendingDeletionRequest ? "border-red-500/30 bg-red-950/40" : "border-roman-gold/20 bg-stone-800"
+                    }`}>
+                      {s.photoUrl
+                        ? <img src={s.photoUrl} alt={s.name} className={`w-full h-full object-cover ${s.hasPendingDeletionRequest ? "opacity-60 grayscale" : ""}`} />
+                        : <img src="/profile-pics.png" alt={s.name} className={`w-full h-full object-cover opacity-60 ${s.hasPendingDeletionRequest ? "grayscale" : ""}`} />
+                      }
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className={`flex items-center gap-2 font-medium text-xl leading-tight ${s.hasPendingDeletionRequest ? "text-stone-300" : "text-stone-100"}`}>
+                        <span className="truncate">{s.name}</span>
+                        <MobileLoginIcon enabled={Boolean(s.homeLoginEnabled)} className="w-4.5 h-4.5" />
+                      </p>
+                      <p className="text-stone-400 text-sm mt-1">{s.className} · #{s.campaignNumber} {s.campaignName}</p>
+                      {s.homeLoginUsername && (
+                        <p className="text-roman-gold/80 text-sm mt-1 font-semibold">@{s.homeLoginUsername}</p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      data-student-actions-trigger
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (openActionsForStudent === s.uid) {
+                          setOpenActionsForStudent(null);
+                          return;
+                        }
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const menuWidth = 224;
+                        const menuHeight = 200;
+                        const openUp = window.innerHeight - rect.bottom < menuHeight && rect.top > menuHeight;
+                        setMobileActionsAnchor({
+                          top: openUp ? rect.top - 8 : rect.bottom + 8,
+                          left: Math.max(12, Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - 12)),
+                          openUp,
+                        });
+                        setOpenActionsForStudent(s.uid);
+                      }}
+                      className={`w-10 h-10 rounded-lg border text-xl leading-none shrink-0 ${openActionsForStudent === s.uid ? "border-roman-gold bg-roman-gold/15 text-roman-gold" : "border-roman-gold/40 text-roman-gold"}`}
+                      aria-label="Open student actions"
+                    >
+                      ⋮
+                    </button>
+                  </div>
+                  <div className="mt-3 flex items-center gap-3">
+                    <div className="flex-1 h-2 rounded-full bg-stone-700/40 overflow-hidden">
+                      <div className="h-full bg-roman-gold rounded-full" style={{ width: `${s.campaignProgress}%` }} />
+                    </div>
+                    <span className="text-roman-gold/80 text-sm font-mono">{s.campaignProgress}%</span>
+                  </div>
+                  {openActionsForStudent === s.uid && mobileActionsAnchor && createPortal(
+                    <div
+                      data-student-actions-menu
+                      role="menu"
+                      className={`fixed z-90 w-56 rounded-2xl border border-roman-gold/25 bg-stone-900/95 shadow-[0_16px_40px_rgba(0,0,0,0.7)] backdrop-blur-xl overflow-hidden ring-1 ring-white/5 actions-dropdown-in ${mobileActionsAnchor.openUp ? "origin-bottom-right" : "origin-top-right"}`}
+                      style={mobileActionsAnchor.openUp
+                        ? { bottom: `${window.innerHeight - mobileActionsAnchor.top}px`, left: `${mobileActionsAnchor.left}px` }
+                        : { top: `${mobileActionsAnchor.top}px`, left: `${mobileActionsAnchor.left}px` }
+                      }
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {!s.hasPendingDeletionRequest && (
+                        <button type="button" onClick={() => handleOpenEditStudent(s)} className="w-full text-left px-4 py-3 text-stone-200 text-sm">Edit Student</button>
+                      )}
+                      {!s.hasPendingDeletionRequest && (
+                        <button type="button" onClick={() => handleOpenHomeLogin(s)} className="w-full text-left px-4 py-3 text-stone-200 text-sm border-t border-stone-800">{s.homeLoginEnabled ? "Reset Password" : "Add Login"}</button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => s.hasPendingDeletionRequest ? handleOpenCancelDeleteRequest(s) : handleOpenDeleteRequest(s)}
+                        className={`w-full text-left px-4 py-3 text-sm border-t border-stone-800 ${s.hasPendingDeletionRequest ? "text-amber-400" : "text-red-400"}`}
+                      >
+                        {s.hasPendingDeletionRequest ? "Cancel Request" : "Delete Student"}
+                      </button>
+                    </div>,
+                    document.body
+                  )}
+                </div>
+              ))}
+              {filtered.length < 40 && currentPage === totalPages && (
+                <button type="button" onClick={handleOpenAddStudent} className="w-full px-4 py-6 text-roman-gold/70 text-sm uppercase tracking-widest font-bold last:rounded-b-3xl">
+                  + Add Student ({filtered.length}/40)
+                </button>
+              )}
+            </div>
+            <table className="w-full text-left hidden xl:table">
               <thead>
                 <tr className="border-b border-roman-gold/20">
                   <th className="pl-8 pr-10 py-6 text-sm uppercase tracking-widest text-roman-gold/80 font-bold w-136 bg-stone-900/90 rounded-tl-3xl shadow-sm">Name</th>
@@ -963,13 +1234,14 @@ export default function Campaigns() {
                           }
                         </div>
                         <div className="min-w-0">
-                          <p className={`font-medium text-3xl leading-tight ${s.hasPendingDeletionRequest ? 'text-stone-300' : 'text-stone-100'}`}>{s.name}</p>
+                          <p className={`flex items-center gap-2.5 font-medium text-3xl leading-tight ${s.hasPendingDeletionRequest ? 'text-stone-300' : 'text-stone-100'}`}>
+                            <span className="truncate">{s.name}</span>
+                            <MobileLoginIcon enabled={Boolean(s.homeLoginEnabled)} className="w-6 h-6" />
+                          </p>
+                          {s.homeLoginUsername && (
+                            <p className="text-stone-400 text-base mt-1.5 font-semibold">@{s.homeLoginUsername}</p>
+                          )}
                           <div className="flex flex-wrap items-center gap-2 mt-2.5">
-                            {s.romanNickname && (
-                              <span className="inline-block px-3 py-1 rounded-full border border-roman-gold/30 bg-roman-gold/10 text-roman-gold/90 text-xs font-bold uppercase tracking-[0.2em] shadow-[0_2px_10px_rgba(235,191,90,0.15)] flex-none">
-                                {s.romanNickname}
-                              </span>
-                            )}
                             {s.hasPendingDeletionRequest && (
                               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md border border-red-500/30 bg-red-500/10 text-red-400 text-xs font-bold uppercase tracking-wider overflow-hidden group/badge flex-none relative">
                                 <span className="absolute inset-0 bg-red-400/10 animate-pulse pointer-events-none"></span>
@@ -1026,6 +1298,7 @@ export default function Campaigns() {
                       <div className={`relative inline-flex ${openActionsForStudent === s.uid ? "z-50" : "z-0"}`}>
                         <button
                           type="button"
+                          data-student-actions-trigger
                           onClick={(e) => {
                             e.stopPropagation();
                             setOpenActionsForStudent((current) => current === s.uid ? null : s.uid);
@@ -1041,9 +1314,10 @@ export default function Campaigns() {
                         {openActionsForStudent === s.uid && (
                           <div
                             ref={actionsMenuRef}
+                            data-student-actions-menu
                             id={`student-actions-${s.uid}`}
                             role="menu"
-                            className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-48 rounded-2xl border border-roman-gold/25 bg-stone-900/95 shadow-[0_16px_40px_rgba(0,0,0,0.7)] backdrop-blur-xl overflow-hidden origin-top-right ring-1 ring-white/5"
+                            className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-56 rounded-2xl border border-roman-gold/25 bg-stone-900/95 shadow-[0_16px_40px_rgba(0,0,0,0.7)] backdrop-blur-xl overflow-hidden origin-top-right ring-1 ring-white/5 actions-dropdown-in"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <div className="px-4 py-3 border-b border-stone-700/50 bg-stone-950/40 text-[10px] font-bold uppercase tracking-widest text-roman-gold/70 text-left">
@@ -1061,6 +1335,19 @@ export default function Campaigns() {
                                 <span>Edit Student</span>
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-stone-500 group-hover:text-roman-gold/80 transition-colors" viewBox="0 0 20 20" fill="currentColor">
                                   <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                                </svg>
+                              </button>
+                            )}
+                            {!s.hasPendingDeletionRequest && (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenHomeLogin(s)}
+                                role="menuitem"
+                                className="group w-full text-left px-4 py-3 text-stone-200 text-sm font-medium hover:bg-roman-gold/10 hover:text-roman-gold transition-colors flex items-center justify-between border-t border-stone-800/80"
+                              >
+                                <span>{s.homeLoginEnabled ? "Reset Password" : "Add Login"}</span>
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-stone-500 group-hover:text-roman-gold/80 transition-colors" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M10 2a4 4 0 00-4 4v1H5a2 2 0 00-2 2v7a2 2 0 002 2h10a2 2 0 002-2V9a2 2 0 00-2-2h-1V6a4 4 0 00-4-4zm2 5V6a2 2 0 10-4 0v1h4z" clipRule="evenodd" />
                                 </svg>
                               </button>
                             )}
@@ -1115,7 +1402,7 @@ export default function Campaigns() {
 
         {/* Summary and Pagination bar */}
         {!loading && filtered.length > 0 && (
-          <div className="mt-6 flex items-center justify-between text-base px-2 py-1">
+          <div className="mt-6 flex flex-col gap-4 text-sm sm:text-base px-2 py-1 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-stone-200 font-extrabold tracking-wide">
               <span>{filtered.length} student{filtered.length !== 1 ? "s" : ""}</span>
               <span className="mx-4 text-stone-600">|</span>
@@ -1279,6 +1566,121 @@ export default function Campaigns() {
                   {removingDeleteRequestForStudentId === selectedStudentForCancelDeleteRequest.uid ? "Canceling..." : "Cancel Request"}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Login / Reset Password Modal */}
+      {showHomeLoginModal && selectedStudentForHomeLogin && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-stone-950/80 backdrop-blur-sm"
+            onClick={() => {
+              if (homeLoginSaving) return;
+              setShowHomeLoginModal(false);
+              setSelectedStudentForHomeLogin(null);
+              setHomeLoginCredentials(null);
+            }}
+          />
+          <div className="relative bg-stone-900 border border-roman-gold/20 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-[addStudentModalZoomIn_180ms_cubic-bezier(0.2,0.8,0.2,1)]">
+            <div className="h-px w-full bg-linear-to-r from-transparent via-roman-gold/50 to-transparent" />
+            <div className="px-8 py-8">
+              <h2 className="text-roman-gold font-serif text-2xl font-bold mb-2 tracking-wide">
+                {selectedStudentForHomeLogin.homeLoginEnabled ? "Reset Password" : "Add Login"}
+              </h2>
+              <p className="text-stone-400 text-sm mb-6">
+                {selectedStudentForHomeLogin.homeLoginEnabled
+                  ? `${selectedStudentForHomeLogin.name} signs in at home as @${selectedStudentForHomeLogin.homeLoginUsername}. The current password cannot be shown. Set a new one and write it down.`
+                  : `Give ${selectedStudentForHomeLogin.name} a login and password so they can complete campaigns from home. You can still log miles at school.`}
+              </p>
+
+              {homeLoginCredentials ? (
+                <div className="space-y-4">
+                  <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-emerald-100 text-sm">
+                    Write these down and send them home. The password will not be shown again.
+                  </div>
+                  <div className="rounded-lg border border-stone-700/70 bg-stone-800/60 px-4 py-3 space-y-2">
+                    <p className="text-stone-100 font-semibold text-lg">@{homeLoginCredentials.username}</p>
+                    <p className="text-stone-400 text-xs uppercase tracking-widest pt-2">Password</p>
+                    <p className="text-stone-100 font-semibold text-lg">{homeLoginCredentials.password}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowHomeLoginModal(false);
+                      setSelectedStudentForHomeLogin(null);
+                      setHomeLoginCredentials(null);
+                    }}
+                    className="w-full py-3 rounded-xl bg-roman-gold text-stone-950 font-semibold hover:brightness-110 transition-all"
+                  >
+                    Done
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    {selectedStudentForHomeLogin.homeLoginEnabled ? (
+                      <p className="rounded-lg border border-stone-700/70 bg-stone-800/60 px-4 py-3 text-stone-100 font-semibold text-lg">
+                        @{selectedStudentForHomeLogin.homeLoginUsername}
+                      </p>
+                    ) : (
+                      <div className="flex items-center rounded-lg border border-stone-700 bg-stone-800 focus-within:border-roman-gold/60">
+                        <span className="pl-4 text-stone-400 font-semibold text-lg">@</span>
+                        <input
+                          type="text"
+                          value={homeLoginUsername}
+                          onChange={(e) => setHomeLoginUsername(e.target.value.toLowerCase())}
+                          aria-label="Login"
+                          className="w-full bg-transparent px-2 py-3 text-stone-100 font-semibold text-lg focus:outline-none"
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-stone-400 text-xs uppercase tracking-widest mb-2">
+                      {selectedStudentForHomeLogin.homeLoginEnabled ? "New Password" : "Password"}
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={homeLoginPassword}
+                        onChange={(e) => setHomeLoginPassword(e.target.value)}
+                        className="flex-1 bg-stone-800 border border-stone-700 rounded-lg px-4 py-3 text-stone-100 focus:outline-none focus:border-roman-gold/60"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setHomeLoginPassword(generateStudentPassword())}
+                        className="px-3 rounded-lg border border-stone-600 text-stone-300 text-xs uppercase tracking-wider hover:border-roman-gold/50 hover:text-roman-gold"
+                      >
+                        New
+                      </button>
+                    </div>
+                  </div>
+                  {homeLoginError && <p className="text-red-300 text-sm">{homeLoginError}</p>}
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (homeLoginSaving) return;
+                        setShowHomeLoginModal(false);
+                        setSelectedStudentForHomeLogin(null);
+                      }}
+                      className="flex-1 py-3 rounded-xl border border-stone-700 text-stone-400 hover:text-stone-200 hover:border-stone-500 transition-all"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleEnableHomeLogin()}
+                      disabled={homeLoginSaving}
+                      className="flex-1 py-3 rounded-xl bg-roman-gold text-stone-950 font-semibold hover:brightness-110 transition-all disabled:opacity-50"
+                    >
+                      {homeLoginSaving ? "Saving..." : selectedStudentForHomeLogin.homeLoginEnabled ? "Reset Password" : "Enable Login"}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

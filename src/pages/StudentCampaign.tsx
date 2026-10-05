@@ -38,8 +38,12 @@ export default function StudentCampaign() {
   // const [photoUploading, setPhotoUploading] = useState(false);
   const [imgError, setImgError] = useState<Set<number>>(new Set());
   const [showGrandFinale, setShowGrandFinale] = useState(false);
+  const [mobileHeroVideo, setMobileHeroVideo] = useState<{ src: string; campaignNumber: number; isEnd: boolean } | null>(null);
+  const [mobileVideoRatio, setMobileVideoRatio] = useState("16 / 9");
+  const [showMobilePlayOverlay, setShowMobilePlayOverlay] = useState(true);
   const videoElementRef = useRef<HTMLVideoElement | null>(null);
-  // const photoInputRef = useRef<HTMLInputElement>(null);
+  const mobileHeroVideoRef = useRef<HTMLVideoElement | null>(null);
+  const selectedCampaignTabRef = useRef<HTMLButtonElement | null>(null);
 
   // async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
   //   const file = e.target.files?.[0];
@@ -57,6 +61,7 @@ export default function StudentCampaign() {
   async function handleLogMiles(campaignNumber: number, milesRequired: number) {
     const input = parseFloat(mileInput);
     if (!input || input <= 0 || !uid || !student) return;
+    if (appUser?.role === "student" && appUser.uid !== uid) return;
     const already = campaignMiles[campaignNumber] ?? 0;
     const remaining = milesRequired - already;
     const toLog = roundMiles(Math.min(input, remaining));
@@ -89,7 +94,11 @@ export default function StudentCampaign() {
   }
 
   useEffect(() => {
-    if (!uid) return;
+    if (!uid || !appUser) return;
+    if (appUser.role === "student" && appUser.uid !== uid) {
+      navigate(`/campaigns/${appUser.uid}`, { replace: true });
+      return;
+    }
     const studentUid = uid;
     async function loadData() {
       setLoading(true);
@@ -143,7 +152,7 @@ export default function StudentCampaign() {
       }
     }
     loadData();
-  }, [uid, appUser?.role, appUser?.schoolId]);
+  }, [uid, appUser, navigate]);
 
   const totalMiles = CAMPAIGNS.reduce((sum, c) => sum + Math.min(campaignMiles[c.number] ?? 0, c.milesRequired), 0);
 
@@ -235,10 +244,7 @@ export default function StudentCampaign() {
     });
   }, [isPlayingVideo, videoModal]);
 
-  async function handleVideoEnded() {
-    if (!videoModal) return;
-
-    const completedVideo = videoModal;
+  async function completeCampaignVideo(completedVideo: { campaignNumber: number; isEnd?: boolean }) {
     if (completedVideo.isEnd) {
       const isFirstEndVideoWatch = !watchedEndVideos.has(completedVideo.campaignNumber);
       setWatchedEndVideos((prev) => new Set(prev).add(completedVideo.campaignNumber));
@@ -249,7 +255,13 @@ export default function StudentCampaign() {
           }
         : prev);
       if (isFirstEndVideoWatch) {
-        setAwardModalCampaign(completedVideo.campaignNumber);
+        if (appUser?.role === "student") {
+          if (completedVideo.campaignNumber === CAMPAIGNS.length) {
+            setShowGrandFinale(true);
+          }
+        } else {
+          setAwardModalCampaign(completedVideo.campaignNumber);
+        }
       }
     } else {
       setWatchedCampaigns((prev) => new Set(prev).add(completedVideo.campaignNumber));
@@ -260,8 +272,6 @@ export default function StudentCampaign() {
           }
         : prev);
     }
-    setVideoModal(null);
-    setIsPlayingVideo(false);
 
     if (!uid) return;
 
@@ -275,25 +285,100 @@ export default function StudentCampaign() {
     }
   }
 
+  async function handleVideoEnded() {
+    if (!videoModal) return;
+    const completedVideo = videoModal;
+    setVideoModal(null);
+    setIsPlayingVideo(false);
+    await completeCampaignVideo(completedVideo);
+  }
+
+  useEffect(() => {
+    selectedCampaignTabRef.current?.scrollIntoView({
+      inline: "center",
+      block: "nearest",
+      behavior: "smooth",
+    });
+  }, [selectedCampaign]);
+
   const campaign = CAMPAIGNS[selectedCampaign - 1];
   const status = campaign ? getCampaignStatus(campaign) : "locked";
   const myMiles = campaignMiles[selectedCampaign] ?? 0;
   const progress = campaign ? Math.min(100, Math.round((myMiles / campaign.milesRequired) * 100)) : 0;
   const isIntroVideoLoading = videoLoadingKey === getVideoLoadingKey(selectedCampaign);
   const isEndVideoLoading = videoLoadingKey === getVideoLoadingKey(selectedCampaign, true);
+  const showMobileHeroVideo = Boolean(mobileHeroVideo && status !== "locked");
+  const showCompletedVideoActions = Boolean(
+    campaign &&
+    watchedCampaigns.has(selectedCampaign) &&
+    myMiles >= campaign.milesRequired &&
+    watchedEndVideos.has(selectedCampaign),
+  );
+
+  useEffect(() => {
+    if (!campaign || status === "locked" || typeof window === "undefined") {
+      setMobileHeroVideo(null);
+      return;
+    }
+
+    const media = window.matchMedia("(min-width: 1024px)");
+    let cancelled = false;
+    let requestId = 0;
+
+    const load = () => {
+      if (media.matches) {
+        setMobileHeroVideo(null);
+        return;
+      }
+
+      const isEnd = watchedCampaigns.has(campaign.number)
+        && myMiles >= campaign.milesRequired
+        && !watchedEndVideos.has(campaign.number);
+      const id = ++requestId;
+
+      setMobileVideoRatio("16 / 9");
+      setShowMobilePlayOverlay(true);
+      setMobileHeroVideo({
+        src: getCampaignVideoFallbackSrc(campaign.number, isEnd),
+        campaignNumber: campaign.number,
+        isEnd,
+      });
+
+      void (async () => {
+        try {
+          const src = await resolveVideoUrl(
+            isEnd ? campaign.endVideoStoragePath : campaign.startVideoStoragePath,
+            isEnd ? campaign.endVideo : campaign.startVideo,
+          );
+          if (!cancelled && id === requestId && !media.matches) {
+            setMobileHeroVideo({ src, campaignNumber: campaign.number, isEnd });
+          }
+        } catch {
+          // The bundled campaign video is already in place.
+        }
+      })();
+    };
+
+    load();
+    media.addEventListener("change", load);
+    return () => {
+      cancelled = true;
+      media.removeEventListener("change", load);
+    };
+  }, [campaign, status, myMiles, watchedCampaigns, watchedEndVideos]);
 
   return (
-    <div className="h-screen bg-stone-900 text-stone-100 flex flex-col overflow-hidden">
+    <div className="h-dvh bg-stone-900 text-stone-100 flex flex-col overflow-hidden">
       <Navbar />
 
-      <div className="flex-1 min-h-0 flex overflow-hidden relative">
-        <div className="flex-1 min-h-0 w-full overflow-hidden">
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden relative">
+        <div className="flex-1 min-h-0 w-full overflow-y-auto lg:overflow-hidden">
           {loading ? (
-            <div className="px-14 py-10">
+            <div className="px-4 py-6 md:px-10 lg:px-14 lg:py-10">
               <StudentCampaignSkeleton />
             </div>
           ) : loadError ? (
-            <div className="px-14 py-10 h-full flex items-center justify-center">
+            <div className="px-4 py-6 md:px-10 lg:px-14 lg:py-10 h-full flex items-center justify-center">
               <div className="roman-card rounded-2xl px-8 py-8 max-w-lg w-full text-center">
                 <h2 className="text-roman-gold font-serif text-2xl font-bold mb-3">Student Data Unavailable</h2>
                 <p className="text-stone-400 mb-6">{loadError}</p>
@@ -306,17 +391,21 @@ export default function StudentCampaign() {
               </div>
             </div>
           ) : (
-            <div className="flex flex-col h-full">
+            <div className="flex flex-col min-h-0 lg:h-full">
               {/* Top bar: back, student info, navigation */}
-              <div className="px-10 pt-6 pb-4 border-b border-stone-800/60 flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-5">
-                  <button
-                    onClick={() => navigate("/campaigns")}
-                    className="text-stone-500 hover:text-roman-gold transition-colors text-sm uppercase tracking-wider font-semibold cursor-pointer"
-                  >
-                    ← Back
-                  </button>
-                  <div className="w-px h-8 bg-stone-700/50" />
+              <div className="px-4 md:px-10 pt-3 pb-3 lg:pt-4 lg:pb-4 border-b border-stone-800/60 flex flex-col gap-4 shrink-0 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex items-center gap-3 sm:gap-5 min-w-0">
+                  {appUser?.role !== "student" && (
+                    <button
+                      onClick={() => navigate("/campaigns")}
+                      className="text-stone-500 hover:text-roman-gold transition-colors text-sm uppercase tracking-wider font-semibold cursor-pointer"
+                    >
+                      ← Back
+                    </button>
+                  )}
+                  {appUser?.role !== "student" && (
+                    <div className="w-px h-8 bg-stone-700/50" />
+                  )}
                   {/* Avatar */}
                   <div className="relative shrink-0">
                     <div className="w-14 h-14 rounded-full border-2 border-roman-gold/50 overflow-hidden bg-stone-800 flex items-center justify-center">
@@ -327,14 +416,21 @@ export default function StudentCampaign() {
                       )}
                     </div>
                   </div>
-                  <div>
-                    <p className="text-roman-gold font-serif font-bold text-3xl leading-tight">{student?.displayName ?? "Unknown Warrior"}</p>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 min-w-0">
+                      <p className="min-w-0 text-roman-gold font-serif font-bold text-2xl sm:text-3xl leading-tight truncate">{student?.displayName ?? "Unknown Warrior"}</p>
+                      {student?.romanNickname && (
+                        <p className="lg:hidden max-w-full text-roman-gold/70 text-sm italic font-serif leading-tight break-words">{student.romanNickname}</p>
+                      )}
+                    </div>
+                    {student?.romanNickname && (
+                      <p className="hidden lg:block text-roman-gold/70 text-sm italic font-serif truncate mt-0.5">{student.romanNickname}</p>
+                    )}
                     <p className="text-stone-400 text-sm mt-0.5">{totalMiles.toFixed(1)} / {TOTAL_MILES} total miles</p>
                   </div>
                 </div>
 
-                {/* Campaign step indicators */}
-                <div className="flex items-center gap-1.5">
+                <div className="hidden lg:flex items-center gap-1.5 flex-wrap">
                   {CAMPAIGNS.map((c) => {
                     const s = getCampaignStatus(c);
                     const isSelected = c.number === selectedCampaign;
@@ -362,9 +458,142 @@ export default function StudentCampaign() {
 
               {/* Main campaign content */}
               {campaign && (
-                <div className="flex-1 flex flex-col lg:flex-row min-h-0">
+                <div className="flex-1 flex flex-col lg:flex-row min-h-0 lg:overflow-hidden">
                   {/* Left: Campaign image */}
-                  <div className="lg:w-1/2 shrink-0 relative bg-stone-950 flex items-center justify-center overflow-hidden">
+                  <div className="lg:w-1/2 shrink-0 flex flex-col">
+                    <div className="lg:hidden relative bg-stone-950">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const previous = selectedCampaign <= 1 ? CAMPAIGNS.length : selectedCampaign - 1;
+                          setSelectedCampaign(previous);
+                          setMileInput("");
+                        }}
+                        className="absolute inset-y-0 left-0 z-10 w-10 flex items-center justify-center bg-linear-to-r from-stone-950 via-stone-950/90 to-transparent"
+                        aria-label="Previous campaign"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5 text-roman-gold/80" aria-hidden="true">
+                          <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                      <div className="overflow-x-auto hide-scrollbar">
+                      <div className="flex items-stretch w-max">
+                        {CAMPAIGNS.map((c) => {
+                          const s = getCampaignStatus(c);
+                          const isSelected = c.number === selectedCampaign;
+                          return (
+                            <button
+                              key={c.number}
+                              ref={isSelected ? selectedCampaignTabRef : undefined}
+                              onClick={() => { setSelectedCampaign(c.number); setMileInput(""); }}
+                              title={`Campaign ${c.number}: ${c.name}`}
+                              className={`shrink-0 text-xs font-bold transition-colors cursor-pointer ${
+                                isSelected
+                                  ? "h-12 w-screen px-10 text-roman-gold flex items-center justify-center gap-2"
+                                  : `w-10 h-12 ${
+                                      s === "complete"
+                                        ? "text-roman-gold"
+                                        : s === "active"
+                                        ? "text-roman-gold/80"
+                                        : "text-stone-600"
+                                    }`
+                              }`}
+                            >
+                              {isSelected ? (
+                                <>
+                                  <span>{c.number}</span>
+                                  <span className="truncate font-serif text-base font-bold">{c.name}</span>
+                                </>
+                              ) : (
+                                s === "complete" ? "\u2713" : c.number
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = selectedCampaign >= CAMPAIGNS.length ? 1 : selectedCampaign + 1;
+                          setSelectedCampaign(next);
+                          setMileInput("");
+                        }}
+                        className="absolute inset-y-0 right-0 z-10 w-10 flex items-center justify-center bg-linear-to-l from-stone-950 via-stone-950/90 to-transparent"
+                        aria-label="Next campaign"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5 text-roman-gold/80" aria-hidden="true">
+                          <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                    </div>
+                    <div className="lg:hidden h-px w-full bg-linear-to-r from-transparent via-roman-gold/50 to-transparent" />
+                    <div className="lg:hidden relative bg-stone-950">
+                      {status === "locked" ? (
+                        <div className="flex h-44 items-center justify-center">
+                          <div className="flex flex-col items-center gap-3">
+                            <div className="w-16 h-16 rounded-full bg-stone-950/70 border border-roman-gold/30 flex items-center justify-center">
+                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-8 h-8 text-roman-gold" aria-hidden="true">
+                                <path fillRule="evenodd" d="M12 1.5a5.25 5.25 0 00-5.25 5.25v3a3 3 0 00-3 3v6.75a3 3 0 003 3h10.5a3 3 0 003-3v-6.75a3 3 0 00-3-3v-3c0-2.9-2.35-5.25-5.25-5.25zm3.75 8.25v-3a3.75 3.75 0 10-7.5 0v3h7.5z" clipRule="evenodd" />
+                              </svg>
+                            </div>
+                            <p className="text-stone-500 text-xs uppercase tracking-[0.3em] font-semibold">Locked</p>
+                          </div>
+                        </div>
+                      ) : showMobileHeroVideo && mobileHeroVideo ? (
+                        <div className="relative w-full bg-black" style={{ aspectRatio: mobileVideoRatio }}>
+                          <video
+                            key={`${mobileHeroVideo.src}-${mobileHeroVideo.isEnd}`}
+                            ref={mobileHeroVideoRef}
+                            className="block h-full w-full bg-black object-contain"
+                            controls={!showMobilePlayOverlay}
+                            playsInline
+                            preload="metadata"
+                            onLoadedMetadata={(event) => {
+                              const video = event.currentTarget;
+                              if (video.videoWidth && video.videoHeight) {
+                                setMobileVideoRatio(`${video.videoWidth} / ${video.videoHeight}`);
+                              }
+                            }}
+                            onPlay={() => setShowMobilePlayOverlay(false)}
+                            onError={() => {
+                              const fallbackSrc = getCampaignVideoFallbackSrc(mobileHeroVideo.campaignNumber, mobileHeroVideo.isEnd);
+                              if (mobileHeroVideo.src !== fallbackSrc) {
+                                setMobileHeroVideo({ ...mobileHeroVideo, src: fallbackSrc });
+                              }
+                            }}
+                            onEnded={() => void completeCampaignVideo(mobileHeroVideo)}
+                          >
+                            <source src={mobileHeroVideo.src} type={getVideoMimeType(mobileHeroVideo.src)} />
+                          </video>
+                          {showMobilePlayOverlay && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const video = mobileHeroVideoRef.current;
+                                if (!video) return;
+                                void video.play().catch((error) => {
+                                  console.error("Failed to start campaign video:", error);
+                                });
+                              }}
+                              className="absolute inset-0 z-10 flex cursor-pointer items-center justify-center bg-transparent"
+                              aria-label={mobileHeroVideo.isEnd ? "Play end video" : "Play intro video"}
+                            >
+                              <span className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-roman-gold bg-stone-950/75 shadow-[0_0_40px_rgba(212,175,55,0.35)]">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="ml-1 h-7 w-7 text-roman-gold" aria-hidden="true">
+                                  <path d="M8 5v14l11-7z" />
+                                </svg>
+                              </span>
+                            </button>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex h-44 items-center justify-center">
+                          <p className="text-stone-500 text-xs uppercase tracking-[0.3em] font-semibold">Loading video</p>
+                        </div>
+                      )}
+                    </div>
+                    <div className="relative hidden min-h-0 flex-1 items-center justify-center overflow-hidden bg-stone-950 lg:flex">
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(212,175,55,0.06),transparent_70%)]" />
                     {!imgError.has(campaign.number) ? (
                       <img
@@ -381,20 +610,18 @@ export default function StudentCampaign() {
                         <p className="text-roman-gold/40 text-sm uppercase tracking-[0.3em] font-semibold">Image here</p>
                       </div>
                     )}
-                    {/* Lock overlay for locked campaigns */}
                     {status === "locked" && (
                       <div className="absolute inset-0 flex items-center justify-center">
                         <div className="flex flex-col items-center gap-3">
-                          <div className="w-20 h-20 rounded-full bg-stone-950/70 border border-stone-700/60 flex items-center justify-center backdrop-blur-sm">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-9 h-9 text-stone-400">
-                              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                          <div className="w-20 h-20 rounded-full bg-stone-950/70 border border-roman-gold/30 flex items-center justify-center backdrop-blur-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-9 h-9 text-roman-gold" aria-hidden="true">
+                              <path fillRule="evenodd" d="M12 1.5a5.25 5.25 0 00-5.25 5.25v3a3 3 0 00-3 3v6.75a3 3 0 003 3h10.5a3 3 0 003-3v-6.75a3 3 0 00-3-3v-3c0-2.9-2.35-5.25-5.25-5.25zm3.75 8.25v-3a3.75 3.75 0 10-7.5 0v3h7.5z" clipRule="evenodd" />
                             </svg>
                           </div>
                           <p className="text-stone-500 text-xs uppercase tracking-[0.3em] font-semibold">Locked</p>
                         </div>
                       </div>
                     )}
-                    {/* Campaign number overlay */}
                     <div className="absolute top-6 left-6 flex items-center gap-3">
                       <div className={`w-12 h-12 rounded-full flex items-center justify-center font-serif font-bold text-xl ${
                         status === "complete"
@@ -406,27 +633,28 @@ export default function StudentCampaign() {
                         {status === "complete" ? "\u2713" : campaign.number}
                       </div>
                     </div>
+                    </div>
                   </div>
 
                   {/* Right: Campaign details */}
-                  <div className="lg:w-1/2 flex flex-col px-12 py-10 overflow-y-auto">
+                  <div className="lg:w-1/2 flex-1 min-h-0 flex flex-col px-5 py-4 sm:px-8 lg:px-12 lg:py-10 overflow-visible lg:overflow-y-auto">
                     <div className="flex-1 flex flex-col justify-center max-w-lg mx-auto w-full">
                       {/* Title area */}
-                      <div className="mb-10">
-                        <p className="text-roman-gold/50 text-sm uppercase tracking-[0.4em] font-semibold mb-4">
+                      <div className="mb-4 lg:mb-10">
+                        <p className="text-roman-gold/50 text-xs sm:text-sm uppercase tracking-[0.4em] font-semibold mb-2 lg:mb-4">
                           Campaign {campaign.number} of 12
                         </p>
-                        <h1 className="text-stone-50 font-serif text-6xl font-bold leading-[1.05] mb-3">
+                        <h1 className="text-stone-50 font-serif text-2xl sm:text-4xl lg:text-6xl font-bold leading-[1.05] mb-2 lg:mb-3">
                           {campaign.name}
                         </h1>
-                        <p className="text-roman-gold/70 text-2xl italic font-serif">{campaign.subtitle}</p>
+                        <p className="text-roman-gold/70 text-base sm:text-2xl italic font-serif">{campaign.subtitle}</p>
                       </div>
 
                       {/* Description */}
-                      <p className="text-stone-400 text-lg leading-relaxed mb-10">{campaign.description}</p>
+                      <p className="text-stone-400 text-sm sm:text-base lg:text-lg leading-relaxed mb-4 lg:mb-10">{campaign.description}</p>
 
                       {/* Progress */}
-                      <div className="mb-8">
+                      <div className="mb-4 lg:mb-8">
                         <div className="flex items-baseline justify-between mb-2.5">
                           <p className="text-stone-100 font-serif text-2xl font-bold">
                             {myMiles}<span className="text-stone-500 text-sm font-sans font-normal ml-1">/ {campaign.milesRequired} mi</span>
@@ -446,15 +674,18 @@ export default function StudentCampaign() {
                       {/* Action area */}
                       {status === "locked" ? (
                         <div className="py-8 text-center">
-                          <span className="text-5xl mb-4 block opacity-40">{"\uD83D\uDD12"}</span>
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-12 h-12 mx-auto mb-4 text-roman-gold/50" aria-hidden="true">
+                            <path fillRule="evenodd" d="M12 1.5a5.25 5.25 0 00-5.25 5.25v3a3 3 0 00-3 3v6.75a3 3 0 003 3h10.5a3 3 0 003-3v-6.75a3 3 0 00-3-3v-3c0-2.9-2.35-5.25-5.25-5.25zm3.75 8.25v-3a3.75 3.75 0 10-7.5 0v3h7.5z" clipRule="evenodd" />
+                          </svg>
                           <p className="text-stone-500 text-sm leading-relaxed max-w-xs mx-auto">Complete the previous campaign and watch its end video to unlock this one.</p>
                         </div>
                       ) : !watchedCampaigns.has(selectedCampaign) ? (
                         <div className="text-center py-4">
+                          <p className="lg:hidden text-stone-500 text-sm leading-relaxed">Play the video above to begin this campaign.</p>
                           <button
                             onClick={() => void openVideoModal(campaign.number)}
                             disabled={Boolean(videoLoadingKey)}
-                            className="group relative overflow-hidden px-10 py-4 rounded-2xl border border-roman-gold/70 bg-linear-to-r from-roman-gold/90 via-amber-300 to-roman-gold/90 text-stone-950 text-sm uppercase tracking-[0.2em] font-bold shadow-[0_0_25px_rgba(212,175,55,0.45)] hover:brightness-110 hover:shadow-[0_0_35px_rgba(212,175,55,0.7)] active:scale-[0.98] transition-all animate-pulse cursor-pointer"
+                            className="hidden lg:inline-flex group relative overflow-hidden px-6 sm:px-10 py-3 sm:py-4 rounded-2xl border border-roman-gold/70 bg-linear-to-r from-roman-gold/90 via-amber-300 to-roman-gold/90 text-stone-950 text-xs sm:text-sm uppercase tracking-[0.2em] font-bold shadow-[0_0_25px_rgba(212,175,55,0.45)] hover:brightness-110 hover:shadow-[0_0_35px_rgba(212,175,55,0.7)] active:scale-[0.98] transition-all animate-pulse cursor-pointer"
                           >
                             <span className="absolute inset-0 bg-linear-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
                             <span className="relative flex items-center gap-3">
@@ -462,38 +693,46 @@ export default function StudentCampaign() {
                               <span>{isIntroVideoLoading ? "Loading Video..." : "Watch Intro & Begin"}</span>
                             </span>
                           </button>
-                          <p className="text-stone-600 text-xs mt-4 uppercase tracking-widest">Watch the intro video to start logging miles</p>
+                          <p className="hidden lg:block text-stone-600 text-xs mt-4 uppercase tracking-widest">Watch the intro video to start logging miles</p>
                           {videoError && <p className="text-red-400 text-xs mt-3">{videoError}</p>}
                         </div>
                       ) : myMiles < campaign.milesRequired ? (
-                        <div>
-                          <p className="text-stone-500 text-xs uppercase tracking-[0.25em] font-semibold mb-3">Log Miles</p>
-                          <div className="flex items-center gap-3">
+                        <div className="rounded-xl border border-stone-700/50 bg-stone-800/30 p-3 lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0">
+                          <div className="mb-2 flex items-center justify-between lg:mb-3">
+                            <p className="text-stone-500 text-xs uppercase tracking-[0.25em] font-semibold">Log Miles</p>
+                            <p className="text-stone-500 text-xs lg:hidden">
+                              {roundMiles(campaign.milesRequired - myMiles)} remaining
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 lg:gap-3">
                             <input
                               type="number"
                               min="0"
                               step="0.1"
+                              inputMode="decimal"
                               placeholder="Miles run..."
                               value={mileInput}
                               onChange={(e) => setMileInput(e.target.value)}
-                              className="flex-1 px-4 py-3 rounded-xl bg-stone-800/60 border border-stone-700/60 text-stone-100 text-base placeholder:text-stone-600 focus:outline-none focus:border-roman-gold/50 transition-colors"
+                              aria-label="Miles run"
+                              className="min-w-0 flex-1 rounded-lg border border-stone-700/60 bg-stone-900/60 px-3 py-2.5 text-base text-stone-100 placeholder:text-stone-600 focus:border-roman-gold/50 focus:outline-none transition-colors lg:rounded-xl lg:bg-stone-800/60 lg:px-4 lg:py-3"
                             />
                             <button
                               onClick={() => handleLogMiles(campaign.number, campaign.milesRequired)}
                               disabled={submitting}
-                              className="px-6 py-3 rounded-xl bg-roman-gold/15 border border-roman-gold/40 text-roman-gold text-sm uppercase tracking-wider font-bold hover:bg-roman-gold/25 transition-colors cursor-pointer disabled:opacity-50"
+                              className="shrink-0 rounded-lg border border-roman-gold/40 bg-roman-gold/15 px-4 py-2.5 text-sm font-bold uppercase tracking-wider text-roman-gold hover:bg-roman-gold/25 transition-colors cursor-pointer disabled:opacity-50 lg:rounded-xl lg:px-6 lg:py-3"
                             >
                               {submitting ? "Saving..." : "Log"}
                             </button>
                           </div>
-                          <p className="text-stone-600 text-xs mt-2">{roundMiles(campaign.milesRequired - myMiles)} miles remaining</p>
+                          <p className="hidden text-stone-600 text-xs mt-2 lg:block">{roundMiles(campaign.milesRequired - myMiles)} miles remaining</p>
                         </div>
                       ) : !watchedEndVideos.has(selectedCampaign) ? (
                         <div className="text-center py-4">
+                          <p className="lg:hidden text-stone-500 text-sm leading-relaxed">Play the video above to complete this campaign.</p>
                           <button
                             onClick={() => void openVideoModal(campaign.number, true)}
                             disabled={Boolean(videoLoadingKey)}
-                            className="group relative overflow-hidden px-10 py-4 rounded-2xl border border-roman-gold/70 bg-linear-to-r from-roman-gold/90 via-amber-300 to-roman-gold/90 text-stone-950 text-sm uppercase tracking-[0.2em] font-bold shadow-[0_0_25px_rgba(212,175,55,0.45)] hover:brightness-110 hover:shadow-[0_0_35px_rgba(212,175,55,0.7)] active:scale-[0.98] transition-all animate-pulse cursor-pointer"
+                            className="hidden lg:inline-flex group relative overflow-hidden px-6 sm:px-10 py-3 sm:py-4 rounded-2xl border border-roman-gold/70 bg-linear-to-r from-roman-gold/90 via-amber-300 to-roman-gold/90 text-stone-950 text-xs sm:text-sm uppercase tracking-[0.2em] font-bold shadow-[0_0_25px_rgba(212,175,55,0.45)] hover:brightness-110 hover:shadow-[0_0_35px_rgba(212,175,55,0.7)] active:scale-[0.98] transition-all animate-pulse cursor-pointer"
                           >
                             <span className="absolute inset-0 bg-linear-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
                             <span className="relative flex items-center gap-3">
@@ -501,7 +740,7 @@ export default function StudentCampaign() {
                               <span>{isEndVideoLoading ? "Loading Video..." : "Watch End Video"}</span>
                             </span>
                           </button>
-                          <p className="text-stone-600 text-xs mt-4 uppercase tracking-widest">Watch the closing video to complete the campaign</p>
+                          <p className="hidden lg:block text-stone-600 text-xs mt-4 uppercase tracking-widest">Watch the closing video to complete the campaign</p>
                           {videoError && <p className="text-red-400 text-xs mt-3">{videoError}</p>}
                         </div>
                       ) : (
@@ -509,21 +748,20 @@ export default function StudentCampaign() {
                           <span className="text-5xl mb-4 block">{"\uD83C\uDFC6"}</span>
                           <p className="text-roman-gold font-serif font-bold text-xl mb-8">Campaign Complete!</p>
                           
-                          {/* Video Access */}
-                          <div className="pt-6 border-t border-stone-800/50 text-center">
+                          <div className="hidden lg:block pt-6 border-t border-stone-800/50 text-center">
                             <p className="text-stone-500 text-xs uppercase tracking-[0.25em] font-semibold mb-4">Video Access</p>
                             <div className="flex flex-wrap items-center justify-center gap-4">
                               <button
                                 onClick={() => void openVideoModal(campaign.number)}
                                 disabled={Boolean(videoLoadingKey)}
-                                className="px-5 py-2.5 rounded-xl border border-roman-gold/30 text-roman-gold text-xs uppercase tracking-wider font-semibold hover:bg-roman-gold/10 transition-colors cursor-pointer"
+                                className="px-5 py-2.5 rounded-xl border border-roman-gold/30 text-roman-gold text-xs uppercase tracking-wider font-semibold hover:bg-roman-gold/10 transition-colors cursor-pointer disabled:opacity-50"
                               >
                                 {isIntroVideoLoading ? "Loading Intro..." : "Watch Intro Video"}
                               </button>
                               <button
                                 onClick={() => void openVideoModal(campaign.number, true)}
                                 disabled={Boolean(videoLoadingKey)}
-                                className="px-5 py-2.5 rounded-xl border border-roman-gold/30 text-roman-gold text-xs uppercase tracking-wider font-semibold hover:bg-roman-gold/10 transition-colors cursor-pointer"
+                                className="px-5 py-2.5 rounded-xl border border-roman-gold/30 text-roman-gold text-xs uppercase tracking-wider font-semibold hover:bg-roman-gold/10 transition-colors cursor-pointer disabled:opacity-50"
                               >
                                 {isEndVideoLoading ? "Loading End..." : "Watch End Video"}
                               </button>
@@ -535,7 +773,7 @@ export default function StudentCampaign() {
                     </div>
 
                     {/* Bottom navigation */}
-                    <div className="flex items-center justify-between pt-6 mt-auto border-t border-stone-800/50">
+                    <div className="hidden lg:flex items-center justify-between pt-6 mt-auto border-t border-stone-800/50">
                       <button
                         onClick={() => { setSelectedCampaign((p) => Math.max(1, p - 1)); setMileInput(""); }}
                         disabled={selectedCampaign <= 1}
@@ -560,6 +798,27 @@ export default function StudentCampaign() {
             </div>
           )}
         </div>
+        {showCompletedVideoActions && campaign && (
+          <div className="lg:hidden shrink-0 border-t border-stone-800/60 bg-stone-900 px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            {videoError && <p className="text-red-400 text-xs text-center mb-2">{videoError}</p>}
+            <div className="flex gap-2">
+              <button
+                onClick={() => void openVideoModal(campaign.number)}
+                disabled={Boolean(videoLoadingKey)}
+                className="flex-1 rounded-xl border border-roman-gold/70 bg-roman-gold/15 px-2 py-3.5 text-[11px] font-bold uppercase tracking-wide text-roman-gold shadow-[0_0_18px_rgba(212,175,55,0.22)] hover:bg-roman-gold/25 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {isIntroVideoLoading ? "Loading..." : "Watch Intro Video"}
+              </button>
+              <button
+                onClick={() => void openVideoModal(campaign.number, true)}
+                disabled={Boolean(videoLoadingKey)}
+                className="flex-1 rounded-xl border border-roman-gold/70 bg-roman-gold/15 px-2 py-3.5 text-[11px] font-bold uppercase tracking-wide text-roman-gold shadow-[0_0_18px_rgba(212,175,55,0.22)] hover:bg-roman-gold/25 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {isEndVideoLoading ? "Loading..." : "Watch End Video"}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Video modal */}
@@ -647,7 +906,7 @@ export default function StudentCampaign() {
       )}
 
       {/* Award modal */}
-      {awardModalCampaign !== null && (
+      {awardModalCampaign !== null && appUser?.role !== "student" && (
         <div className="fixed inset-0 z-60 bg-black/80 backdrop-blur-sm flex items-center justify-center px-6">
           <div className="w-full max-w-2xl rounded-4xl border border-roman-gold/35 bg-[radial-gradient(circle_at_top,rgba(212,175,55,0.18),rgba(28,25,23,0.96)_45%),linear-gradient(180deg,rgba(41,37,36,0.98),rgba(12,10,9,0.98))] p-8 shadow-[0_30px_120px_rgba(0,0,0,0.7)]">
             <div className="text-center">
@@ -738,7 +997,9 @@ export default function StudentCampaign() {
               <button
                 onClick={() => {
                   setShowGrandFinale(false);
-                  navigate("/campaigns", { replace: true });
+                  if (appUser?.role !== "student") {
+                    navigate("/campaigns", { replace: true });
+                  }
                 }}
                 className="mt-4 px-8 py-3 rounded-xl border border-roman-gold/40 bg-roman-gold/15 text-roman-gold text-sm uppercase tracking-[0.2em] font-bold hover:bg-roman-gold/25 transition-colors cursor-pointer"
               >

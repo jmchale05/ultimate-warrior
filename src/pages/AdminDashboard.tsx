@@ -225,10 +225,12 @@ export default function AdminDashboard() {
     if (!openActionsForSchool) return;
 
     const handleClickOutside = (event: MouseEvent) => {
-      if (!actionsMenuRef.current?.contains(event.target as Node)) {
-        setOpenActionsForSchool(null);
-        setDesktopSchoolActionsAnchor(null);
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("[data-school-actions-trigger]") || target?.closest("[data-school-actions-menu]")) {
+        return;
       }
+      setOpenActionsForSchool(null);
+      setDesktopSchoolActionsAnchor(null);
     };
 
     window.addEventListener("mousedown", handleClickOutside);
@@ -828,7 +830,7 @@ export default function AdminDashboard() {
   if (loadError) {
     return (
       <div
-        className="h-screen text-stone-100 flex flex-col overflow-hidden bg-stone-900"
+        className="h-dvh text-stone-100 flex flex-col overflow-hidden bg-stone-900"
         style={{
           backgroundImage: "linear-gradient(rgba(12, 10, 8, 0.5), rgba(12, 10, 8, 0.6)), url('/admin-page.png')",
           backgroundSize: "cover",
@@ -837,7 +839,7 @@ export default function AdminDashboard() {
         }}
       >
         <Navbar />
-        <div className="flex-1 min-h-0 w-full px-14 py-10 overflow-y-auto overflow-x-hidden flex items-center justify-center">
+        <div className="flex-1 min-h-0 w-full px-4 py-8 overflow-y-auto overflow-x-hidden flex items-center justify-center sm:px-6 lg:px-14 lg:py-10">
           <div className="roman-card rounded-2xl px-8 py-8 max-w-lg w-full text-center">
             <h2 className="text-roman-gold font-serif text-2xl font-bold mb-3">Admin Data Unavailable</h2>
             <p className="text-stone-400 mb-6">{loadError}</p>
@@ -855,7 +857,7 @@ export default function AdminDashboard() {
 
   return (
     <div
-      className="h-screen text-stone-100 flex flex-col overflow-hidden bg-stone-900"
+      className="h-dvh text-stone-100 flex flex-col overflow-hidden bg-stone-900"
       style={{
         backgroundImage: "linear-gradient(rgba(12, 10, 8, 0.5), rgba(12, 10, 8, 0.6)), url('/admin-page.png')",
         backgroundSize: "cover",
@@ -1005,7 +1007,8 @@ export default function AdminDashboard() {
             )}
 
             <div className="rounded-xl border border-stone-700/50 bg-stone-950/80 backdrop-blur-xl overflow-hidden shadow-xl">
-              <table className="w-full text-left">
+              <div className="overflow-x-auto">
+              <table className="w-full min-w-[56rem] text-left">
                 <thead>
                   <tr className="bg-stone-800/80 border-b border-stone-600/50">
                     <th className="px-6 py-4 text-sm uppercase tracking-wider text-stone-400 font-semibold w-56">Student</th>
@@ -1077,8 +1080,9 @@ export default function AdminDashboard() {
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
-            </>
+              </>
             ) : (
               <div className="rounded-xl border border-stone-600/50 bg-stone-800/55 px-6 py-12 text-center text-stone-400 text-lg">
                 <p>No pending deletion requests.</p>
@@ -1203,6 +1207,7 @@ export default function AdminDashboard() {
                       <div className="relative shrink-0">
                         <button
                           type="button"
+                          data-school-actions-trigger
                           onClick={(e) => {
                             e.stopPropagation();
                             setOpenActionsForSchool((current) => current === s.school.id ? null : s.school.id);
@@ -1218,9 +1223,10 @@ export default function AdminDashboard() {
                         {openActionsForSchool === s.school.id && (
                           <div
                             ref={actionsMenuRef}
+                            data-school-actions-menu
                             id={`school-card-actions-${s.school.id}`}
                             role="menu"
-                            className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-44 rounded-xl border border-roman-gold/25 bg-stone-950/95 shadow-[0_16px_40px_rgba(0,0,0,0.55)] backdrop-blur-md overflow-hidden origin-top-right"
+                            className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-44 rounded-xl border border-roman-gold/25 bg-stone-950/95 shadow-[0_16px_40px_rgba(0,0,0,0.55)] backdrop-blur-md overflow-hidden origin-top-right actions-dropdown-in"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <div className="px-3 py-2 border-b border-stone-800/80 text-[11px] uppercase tracking-wider text-stone-500 text-left">
@@ -1331,7 +1337,7 @@ export default function AdminDashboard() {
                                     <button
                                       type="button"
                                       onClick={() => handleOpenEditStudent(student)}
-                                      className="text-roman-gold hover:text-roman-gold/80 transition-colors opacity-0 group-hover:opacity-100"
+                                      className="text-roman-gold hover:text-roman-gold/80 transition-colors opacity-100 xl:opacity-0 xl:group-hover:opacity-100"
                                       title="Edit student"
                                       aria-label="Edit student"
                                     >
@@ -1461,6 +1467,7 @@ export default function AdminDashboard() {
                           <div className={`relative inline-flex ${openActionsForSchool === s.school.id ? "z-50" : "z-0"}`}>
                             <button
                               type="button"
+                              data-school-actions-trigger
                               onClick={(e) => toggleDesktopSchoolActions(e, s.school.id)}
                               className={`w-10 h-10 rounded-lg border text-xl leading-none transition-colors ${openActionsForSchool === s.school.id ? "border-roman-gold bg-roman-gold/15 text-roman-gold" : "border-roman-gold/40 text-roman-gold hover:bg-roman-gold/10"}`}
                               aria-label="Open school actions"
@@ -1473,9 +1480,10 @@ export default function AdminDashboard() {
                             {openActionsForSchool === s.school.id && desktopSchoolActionsAnchor && createPortal(
                               <div
                                 ref={actionsMenuRef}
+                                data-school-actions-menu
                                 id={`school-actions-${s.school.id}`}
                                 role="menu"
-                                className={`fixed z-90 w-44 rounded-xl border border-roman-gold/25 bg-stone-950/95 shadow-[0_16px_40px_rgba(0,0,0,0.55)] backdrop-blur-md overflow-hidden ${desktopSchoolActionsAnchor.openUp ? "-translate-y-full origin-bottom-right" : "origin-top-right"}`}
+                                className={`fixed z-90 w-44 rounded-xl border border-roman-gold/25 bg-stone-950/95 shadow-[0_16px_40px_rgba(0,0,0,0.55)] backdrop-blur-md overflow-hidden ${desktopSchoolActionsAnchor.openUp ? "origin-bottom-right actions-dropdown-in-up" : "origin-top-right actions-dropdown-in"}`}
                                 style={{ top: `${desktopSchoolActionsAnchor.top}px`, left: `${desktopSchoolActionsAnchor.left}px` }}
                                 onClick={(e) => e.stopPropagation()}
                               >
@@ -1557,7 +1565,7 @@ export default function AdminDashboard() {
                                             <button
                                               type="button"
                                               onClick={() => handleOpenEditStudent(student)}
-                                              className="text-roman-gold hover:text-roman-gold/80 transition-colors opacity-0 group-hover:opacity-100"
+                                              className="text-roman-gold hover:text-roman-gold/80 transition-colors opacity-100 xl:opacity-0 xl:group-hover:opacity-100"
                                               title="Edit student"
                                               aria-label="Edit student"
                                             >

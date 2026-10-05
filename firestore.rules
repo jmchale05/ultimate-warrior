@@ -97,6 +97,10 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    match /studentLoginUsernames/{username} {
+      allow read, write: if false;
+    }
+
     match /adminSignupTokens/{uid} {
       allow create: if isAuthed() &&
         request.auth.uid == uid &&

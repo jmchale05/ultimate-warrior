@@ -210,6 +210,22 @@ export async function getUserDoc(uid: string): Promise<AppUser | null> {
   return snap.exists() ? (snap.data() as AppUser) : null;
 }
 
+export async function updateOwnUserProfile(
+  uid: string,
+  input: { displayName: string; suffix?: string; romanNickname?: string }
+): Promise<void> {
+  const updates: Record<string, unknown> = {
+    displayName: input.displayName,
+  };
+  if (input.suffix !== undefined) {
+    updates.suffix = input.suffix.trim() ? input.suffix.trim() : deleteField();
+  }
+  if (input.romanNickname !== undefined) {
+    updates.romanNickname = input.romanNickname.trim() ? input.romanNickname.trim() : deleteField();
+  }
+  await updateDoc(doc(db, "users", uid), updates);
+}
+
 export async function getUsersByIds(uids: string[]): Promise<AppUser[]> {
   if (uids.length === 0) return [];
   const results = await Promise.all(uids.map((uid) => getUserDoc(uid)));
