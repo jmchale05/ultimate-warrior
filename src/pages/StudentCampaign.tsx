@@ -329,6 +329,7 @@ export default function StudentCampaign() {
     myMiles >= campaign.milesRequired &&
     !watchedEndVideos.has(selectedCampaign),
   );
+  const needsMobileWatchAction = showMobileStartVideo || showMobileEndVideo;
   const showCompletedVideoActions = Boolean(
     campaign &&
     watchedCampaigns.has(selectedCampaign) &&
@@ -567,7 +568,7 @@ export default function StudentCampaign() {
                             key={`${mobileHeroVideo.src}-${mobileHeroVideo.isEnd}`}
                             ref={mobileHeroVideoRef}
                             className="block h-full w-full bg-black object-contain"
-                            controls={!showMobilePlayOverlay}
+                            controls={!(needsMobileWatchAction && showMobilePlayOverlay)}
                             playsInline
                             preload="metadata"
                             onLoadedMetadata={(event) => {
@@ -587,7 +588,7 @@ export default function StudentCampaign() {
                           >
                             <source src={mobileHeroVideo.src} type={getVideoMimeType(mobileHeroVideo.src)} />
                           </video>
-                          {showMobilePlayOverlay && (
+                          {needsMobileWatchAction && showMobilePlayOverlay && (
                             <button
                               type="button"
                               onClick={playMobileHeroVideo}
@@ -809,7 +810,7 @@ export default function StudentCampaign() {
             </div>
           )}
         </div>
-        {(showMobileStartVideo || showMobileEndVideo) && (
+        {needsMobileWatchAction && (
           <div className="lg:hidden shrink-0 border-t border-stone-800/60 bg-stone-900 px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             {showMobilePlayOverlay ? (
               <button
