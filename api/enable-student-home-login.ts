@@ -1,4 +1,5 @@
-import { ConfigurationError, getAdminAuth, getAdminDb } from "../server/firebaseAdmin";
+import { cert, getApp, getApps, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
 
 const STUDENT_HOME_LOGIN_DOMAIN = "students.tuwc.online";
 
@@ -21,6 +22,130 @@ type VercelResponse = {
   setHeader: (name: string, value: string) => void;
 };
 
+type FirestoreValue = {
+  stringValue?: string;
+  booleanValue?: boolean;
+  integerValue?: string;
+  nullValue?: null;
+};
+
+type FirestoreDoc = {
+  fields?: Record<string, FirestoreValue>;
+};
+
+class ConfigurationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ConfigurationError";
+  }
+}
+
+function getFirebasePrivateKey(): string | undefined {
+  const rawKey = process.env.FIREBASE_PRIVATE_KEY;
+  if (!rawKey) return undefined;
+
+  return rawKey
+    .trim()
+    .replace(/^['"]|['"]$/g, "")
+    .replace(/\\n/g, "\n");
+}
+
+function ensureFirebaseAdmin() {
+  if (getApps().length > 0) return;
+
+  const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const privateKey = getFirebasePrivateKey();
+
+  if (!projectId || !clientEmail || !privateKey) {
+    const missing = [
+      !projectId ? "FIREBASE_PROJECT_ID" : undefined,
+      !clientEmail ? "FIREBASE_CLIENT_EMAIL" : undefined,
+      !privateKey ? "FIREBASE_PRIVATE_KEY" : undefined,
+    ].filter(Boolean);
+
+    throw new ConfigurationError(`Firebase Admin credentials are missing: ${missing.join(", ")}`);
+  }
+
+  if (!privateKey.includes("BEGIN PRIVATE KEY") || !privateKey.includes("END PRIVATE KEY")) {
+    throw new ConfigurationError("FIREBASE_PRIVATE_KEY is not a valid service-account private key");
+  }
+
+  try {
+    initializeApp({
+      credential: cert({
+        projectId,
+        clientEmail,
+        privateKey,
+      }),
+    });
+  } catch (err) {
+    console.error("Failed to initialize Firebase Admin:", err);
+    throw new ConfigurationError("Firebase Admin credentials could not initialize. Check FIREBASE_PRIVATE_KEY formatting in Vercel.");
+  }
+}
+
+function firebaseProjectId(): string {
+  const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID;
+  if (!projectId) {
+    throw new ConfigurationError("Firebase Admin credentials are missing: FIREBASE_PROJECT_ID");
+  }
+  return projectId;
+}
+
+async function firebaseAccessToken(): Promise<string> {
+  ensureFirebaseAdmin();
+  const credential = getApp().options.credential;
+  if (!credential) {
+    throw new ConfigurationError("Firebase Admin credentials could not initialize.");
+  }
+  const token = await credential.getAccessToken();
+  return token.access_token;
+}
+
+function documentName(projectId: string, path: string): string {
+  return `projects/${projectId}/databases/(default)/documents/${path}`;
+}
+
+function readString(doc: FirestoreDoc | null, field: string): string | undefined {
+  const value = doc?.fields?.[field]?.stringValue;
+  return typeof value === "string" && value ? value : undefined;
+}
+
+async function firestoreGet(accessToken: string, projectId: string, path: string): Promise<FirestoreDoc | null> {
+  const response = await fetch(`https://firestore.googleapis.com/v1/${documentName(projectId, path)}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    console.error("Firestore read failed:", response.status, await response.text());
+    throw new Error(`Firestore read failed (${response.status}).`);
+  }
+  return await response.json() as FirestoreDoc;
+}
+
+async function firestoreCommit(
+  accessToken: string,
+  projectId: string,
+  writes: Array<Record<string, unknown>>
+): Promise<void> {
+  const response = await fetch(
+    `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:commit`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ writes }),
+    }
+  );
+  if (!response.ok) {
+    console.error("Firestore write failed:", response.status, await response.text());
+    throw new Error(`Firestore write failed (${response.status}).`);
+  }
+}
+
 function getHeader(req: VercelRequest, name: string): string {
   const value = req.headers?.[name] ?? req.headers?.[name.toLowerCase()];
   if (Array.isArray(value)) return value[0] ?? "";
@@ -36,7 +161,8 @@ function studentEmail(username: string): string {
 }
 
 async function allocateUsername(
-  db: ReturnType<typeof getAdminDb>,
+  accessToken: string,
+  projectId: string,
   requested: string,
   studentId: string
 ): Promise<string> {
@@ -46,10 +172,8 @@ async function allocateUsername(
   let candidate = requested;
 
   for (let attempt = 0; attempt < 999; attempt += 1) {
-    const snap = await db.collection("studentLoginUsernames").doc(candidate).get();
-    if (!snap.exists || snap.data()?.studentId === studentId) {
-      return candidate;
-    }
+    const snap = await firestoreGet(accessToken, projectId, `studentLoginUsernames/${candidate}`);
+    if (!snap || readString(snap, "studentId") === studentId) return candidate;
     n += 1;
     candidate = `${base}${n}`;
   }
@@ -92,45 +216,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
 
-    const adminAuth = getAdminAuth();
-    const db = getAdminDb();
+    ensureFirebaseAdmin();
+    const adminAuth = getAuth();
+    const projectId = firebaseProjectId();
+    const accessToken = await firebaseAccessToken();
     const decoded = await adminAuth.verifyIdToken(token);
-    const callerSnap = await db.collection("users").doc(decoded.uid).get();
-    const caller = callerSnap.data() as { role?: string; schoolId?: string } | undefined;
+    const callerSnap = await firestoreGet(accessToken, projectId, `users/${decoded.uid}`);
+    const callerRole = readString(callerSnap, "role");
+    const callerSchoolId = readString(callerSnap, "schoolId");
 
-    if (!caller || (caller.role !== "teacher" && caller.role !== "admin")) {
+    if (!callerSnap || (callerRole !== "teacher" && callerRole !== "admin")) {
       res.status(403).json({ error: "Only teachers can enable home login." });
       return;
     }
 
-    const studentRef = db.collection("users").doc(studentId);
-    const studentSnap = await studentRef.get();
-    if (!studentSnap.exists) {
+    const studentSnap = await firestoreGet(accessToken, projectId, `users/${studentId}`);
+    if (!studentSnap) {
       res.status(404).json({ error: "Student not found." });
       return;
     }
 
-    const student = studentSnap.data() as {
-      role?: string;
-      schoolId?: string;
-      homeLoginUsername?: string;
-      displayName?: string;
-    };
+    const studentRole = readString(studentSnap, "role");
+    const studentSchoolId = readString(studentSnap, "schoolId");
+    const displayName = readString(studentSnap, "displayName");
+    const previousUsername = readString(studentSnap, "homeLoginUsername");
 
-    if (student.role !== "student") {
+    if (studentRole !== "student") {
       res.status(400).json({ error: "Home login can only be enabled for students." });
       return;
     }
 
-    if (caller.role === "teacher" && caller.schoolId !== student.schoolId) {
+    if (callerRole === "teacher" && callerSchoolId !== studentSchoolId) {
       res.status(403).json({ error: "This student is not in your school." });
       return;
     }
 
-    const username = await allocateUsername(db, requestedUsername, studentId);
-    const usernameRef = db.collection("studentLoginUsernames").doc(username);
+    const username = await allocateUsername(accessToken, projectId, requestedUsername, studentId);
     const email = studentEmail(username);
-    const previousUsername = student.homeLoginUsername;
 
     try {
       await adminAuth.getUser(studentId);
@@ -143,23 +265,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         email,
         password,
         emailVerified: true,
-        displayName: student.displayName,
+        ...(displayName ? { displayName } : {}),
         disabled: false,
       });
     }
 
-    const batch = db.batch();
+    const writes: Array<Record<string, unknown>> = [];
     if (previousUsername && previousUsername !== username) {
-      batch.delete(db.collection("studentLoginUsernames").doc(previousUsername));
+      writes.push({ delete: documentName(projectId, `studentLoginUsernames/${previousUsername}`) });
     }
-    batch.set(usernameRef, { studentId, createdAt: Date.now() });
-    batch.update(studentRef, {
-      email,
-      homeLoginEnabled: true,
-      homeLoginUsername: username,
-      homeLoginEnabledAt: Date.now(),
+    writes.push({
+      update: {
+        name: documentName(projectId, `studentLoginUsernames/${username}`),
+        fields: {
+          studentId: { stringValue: studentId },
+          createdAt: { integerValue: String(Date.now()) },
+        },
+      },
     });
-    await batch.commit();
+    writes.push({
+      update: {
+        name: documentName(projectId, `users/${studentId}`),
+        fields: {
+          email: { stringValue: email },
+          homeLoginEnabled: { booleanValue: true },
+          homeLoginUsername: { stringValue: username },
+          homeLoginEnabledAt: { integerValue: String(Date.now()) },
+        },
+      },
+      updateMask: {
+        fieldPaths: ["email", "homeLoginEnabled", "homeLoginUsername", "homeLoginEnabledAt"],
+      },
+    });
+    await firestoreCommit(accessToken, projectId, writes);
 
     res.status(200).json({
       username,
