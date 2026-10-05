@@ -429,10 +429,15 @@ export default function StudentCampaign() {
                 <div className="flex items-center gap-3 sm:gap-5 min-w-0">
                   {appUser?.role === "student" ? (
                     <button
+                      type="button"
                       onClick={() => navigate("/home")}
-                      className="text-stone-500 hover:text-roman-gold transition-colors text-sm uppercase tracking-wider font-semibold cursor-pointer"
+                      className="flex h-10 w-10 items-center justify-center rounded-full text-roman-gold hover:bg-roman-gold/10 transition-colors cursor-pointer"
+                      aria-label="Home"
                     >
-                      ← Home
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6" aria-hidden="true">
+                        <path d="M11.47 3.84a.75.75 0 011.06 0l8.69 8.69a.75.75 0 101.06-1.06l-8.69-8.69a2.25 2.25 0 00-3.18 0l-8.69 8.69a.75.75 0 001.06 1.06l8.69-8.69z" />
+                        <path d="M12 5.43l7.5 7.5V19.5a1.5 1.5 0 01-1.5 1.5h-4.5v-6h-3v6H6a1.5 1.5 0 01-1.5-1.5v-6.57l7.5-7.5z" />
+                      </svg>
                     </button>
                   ) : (
                     <button
