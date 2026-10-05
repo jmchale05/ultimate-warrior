@@ -42,6 +42,7 @@ export default function StudentCampaign() {
   const [mobileHeroVideo, setMobileHeroVideo] = useState<{ src: string; campaignNumber: number; isEnd: boolean } | null>(null);
   const [mobileVideoRatio, setMobileVideoRatio] = useState("16 / 9");
   const [showMobilePlayOverlay, setShowMobilePlayOverlay] = useState(true);
+  const [mobileVideoFinished, setMobileVideoFinished] = useState(false);
   const videoElementRef = useRef<HTMLVideoElement | null>(null);
   const mobileHeroVideoRef = useRef<HTMLVideoElement | null>(null);
   const selectedCampaignTabRef = useRef<HTMLButtonElement | null>(null);
@@ -370,6 +371,7 @@ export default function StudentCampaign() {
 
       setMobileVideoRatio("16 / 9");
       setShowMobilePlayOverlay(true);
+      setMobileVideoFinished(false);
       setMobileHeroVideo({
         src: getCampaignVideoFallbackSrc(campaign.number, isEnd),
         campaignNumber: campaign.number,
@@ -587,14 +589,17 @@ export default function StudentCampaign() {
                                 setMobileVideoRatio(`${video.videoWidth} / ${video.videoHeight}`);
                               }
                             }}
-                            onPlay={() => setShowMobilePlayOverlay(false)}
+                            onPlay={() => {
+                              setShowMobilePlayOverlay(false);
+                              setMobileVideoFinished(false);
+                            }}
                             onError={() => {
                               const fallbackSrc = getCampaignVideoFallbackSrc(mobileHeroVideo.campaignNumber, mobileHeroVideo.isEnd);
                               if (mobileHeroVideo.src !== fallbackSrc) {
                                 setMobileHeroVideo({ ...mobileHeroVideo, src: fallbackSrc });
                               }
                             }}
-                            onEnded={() => void completeCampaignVideo(mobileHeroVideo)}
+                            onEnded={() => setMobileVideoFinished(true)}
                           >
                             <source src={mobileHeroVideo.src} type={getVideoMimeType(mobileHeroVideo.src)} />
                           </video>
@@ -829,6 +834,17 @@ export default function StudentCampaign() {
                 className="w-full rounded-xl border border-roman-gold/70 bg-linear-to-r from-roman-gold/90 via-amber-300 to-roman-gold/90 px-4 py-3.5 text-sm font-bold uppercase tracking-[0.18em] text-stone-950 shadow-[0_0_22px_rgba(212,175,55,0.35)]"
               >
                 {showMobileEndVideo ? "Watch End Video" : "Watch Intro & Begin"}
+              </button>
+            ) : mobileVideoFinished ? (
+              <button
+                type="button"
+                onClick={() => {
+                  if (!mobileHeroVideo) return;
+                  void completeCampaignVideo(mobileHeroVideo);
+                }}
+                className="w-full rounded-xl border border-roman-gold/70 bg-linear-to-r from-roman-gold/90 via-amber-300 to-roman-gold/90 px-4 py-3.5 text-sm font-bold uppercase tracking-[0.18em] text-stone-950 shadow-[0_0_22px_rgba(212,175,55,0.35)]"
+              >
+                Continue
               </button>
             ) : (
               <p className="py-2 text-center text-stone-400 text-sm">Keep watching to continue</p>
