@@ -116,7 +116,7 @@ export default function Navbar() {
       {/* Top gold accent line */}
       <div className="absolute top-0 left-0 right-0 h-0.5 bg-linear-to-r from-transparent via-roman-gold to-transparent" />
 
-      <div className="w-full flex items-stretch min-h-[4.5rem]">
+      <div className="relative w-full flex items-stretch min-h-[4.5rem]">
         {/* Left — Logo & Title */}
         <div className="flex items-center gap-3 md:gap-4 flex-1 min-w-0">
           <img
@@ -124,7 +124,7 @@ export default function Navbar() {
             alt="Ultimate Warrior"
             className="w-20 md:w-32 self-stretch object-cover"
           />
-          <div className="min-w-0 hidden sm:block">
+          <div className="min-w-0 hidden lg:block">
             <h1 className="text-roman-gold font-bold text-lg md:text-2xl tracking-widest uppercase font-serif leading-tight roman-glow truncate">
               The Ultimate Warrior Challenges
             </h1>
@@ -135,26 +135,30 @@ export default function Navbar() {
         </div>
 
         {/* Center — School info */}
-        <div className="hidden lg:flex flex-1 justify-center items-center">
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center px-24 lg:pointer-events-auto lg:static lg:inset-auto lg:z-auto lg:flex-1 lg:px-0">
           {school && (
-            <div className="flex items-center gap-4 bg-stone-900/80 px-5 py-2.5 border border-roman-gold/20 rounded-full shadow-inner">
-              {school.logoUrl && (
-                <>
-                  <img
-                    src={school.logoUrl}
-                    alt={school.name}
-                    className="w-12 h-12 rounded-full object-cover border border-roman-gold/30"
-                  />
-                  <div className="w-px h-8 bg-roman-gold/20" />
-                </>
-              )}
-              <div className="leading-tight">
-                <div className="text-stone-300 text-lg tracking-wide font-semibold">
-                  {school.name}
+            <>
+              <p className="lg:hidden max-w-full truncate text-center text-stone-200 text-sm font-semibold tracking-wide">
+                {school.name}
+              </p>
+              <div className="hidden lg:flex items-center gap-4 bg-stone-900/80 px-5 py-2.5 border border-roman-gold/20 rounded-full shadow-inner">
+                {school.logoUrl && (
+                  <>
+                    <img
+                      src={school.logoUrl}
+                      alt={school.name}
+                      className="w-12 h-12 rounded-full object-cover border border-roman-gold/30"
+                    />
+                    <div className="w-px h-8 bg-roman-gold/20" />
+                  </>
+                )}
+                <div className="leading-tight">
+                  <div className="text-stone-300 text-lg tracking-wide font-semibold">
+                    {school.name}
+                  </div>
                 </div>
-
               </div>
-            </div>
+            </>
           )}
         </div>
 
