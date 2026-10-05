@@ -20,6 +20,7 @@ import {
   recordStudentAuthorityConsent,
 } from "../lib/firestore";
 import {
+  disableStudentHomeLogin,
   enableStudentHomeLogin,
   generateStudentPassword,
   suggestStudentUsername,
@@ -606,6 +607,37 @@ export default function Campaigns() {
     }
   }
 
+  async function handleRemoveHomeLogin() {
+    if (!currentUser || !selectedStudentForHomeLogin) {
+      setHomeLoginError("Could not remove home login. Please try again.");
+      return;
+    }
+
+    setHomeLoginSaving(true);
+    setHomeLoginError("");
+    try {
+      const idToken = await currentUser.getIdToken();
+      await disableStudentHomeLogin({
+        idToken,
+        studentId: selectedStudentForHomeLogin.uid,
+      });
+      setStudents((prev) =>
+        prev.map((row) =>
+          row.uid === selectedStudentForHomeLogin.uid
+            ? { ...row, homeLoginEnabled: false, homeLoginUsername: undefined }
+            : row
+        )
+      );
+      setShowHomeLoginModal(false);
+      setSelectedStudentForHomeLogin(null);
+      setHomeLoginCredentials(null);
+    } catch (err) {
+      setHomeLoginError(err instanceof Error ? err.message : "Could not remove home login.");
+    } finally {
+      setHomeLoginSaving(false);
+    }
+  }
+
   function handleOpenEditStudent(student: StudentRow) {
     setSelectedStudentForEdit(student);
     setEditName(student.name);
@@ -1184,6 +1216,9 @@ export default function Campaigns() {
                       {!s.hasPendingDeletionRequest && (
                         <button type="button" onClick={() => handleOpenHomeLogin(s)} className="w-full text-left px-4 py-3 text-stone-200 text-sm border-t border-stone-800">{s.homeLoginEnabled ? "Reset Password" : "Add Login"}</button>
                       )}
+                      {!s.hasPendingDeletionRequest && s.homeLoginEnabled && (
+                        <button type="button" onClick={() => handleOpenHomeLogin(s)} className="w-full text-left px-4 py-3 text-red-400 text-sm border-t border-stone-800">Remove Login</button>
+                      )}
                       <button
                         type="button"
                         onClick={() => s.hasPendingDeletionRequest ? handleOpenCancelDeleteRequest(s) : handleOpenDeleteRequest(s)}
@@ -1349,6 +1384,16 @@ export default function Campaigns() {
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-stone-500 group-hover:text-roman-gold/80 transition-colors" viewBox="0 0 20 20" fill="currentColor">
                                   <path fillRule="evenodd" d="M10 2a4 4 0 00-4 4v1H5a2 2 0 00-2 2v7a2 2 0 002 2h10a2 2 0 002-2V9a2 2 0 00-2-2h-1V6a4 4 0 00-4-4zm2 5V6a2 2 0 10-4 0v1h4z" clipRule="evenodd" />
                                 </svg>
+                              </button>
+                            )}
+                            {!s.hasPendingDeletionRequest && s.homeLoginEnabled && (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenHomeLogin(s)}
+                                role="menuitem"
+                                className="group w-full text-left px-4 py-3 text-red-400 text-sm font-medium hover:bg-red-500/10 transition-colors flex items-center justify-between border-t border-stone-800/80"
+                              >
+                                <span>Remove Login</span>
                               </button>
                             )}
                             <button
@@ -1679,6 +1724,16 @@ export default function Campaigns() {
                       {homeLoginSaving ? "Saving..." : selectedStudentForHomeLogin.homeLoginEnabled ? "Reset Password" : "Enable Login"}
                     </button>
                   </div>
+                  {selectedStudentForHomeLogin.homeLoginEnabled && (
+                    <button
+                      type="button"
+                      disabled={homeLoginSaving}
+                      onClick={() => void handleRemoveHomeLogin()}
+                      className="w-full py-2 text-red-400 text-sm font-semibold hover:text-red-300 disabled:opacity-50"
+                    >
+                      Remove mobile access
+                    </button>
+                  )}
                 </div>
               )}
             </div>

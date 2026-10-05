@@ -8,6 +8,7 @@ type RequestBody = {
   username?: string;
   password?: string;
   idToken?: string;
+  removeAccess?: boolean;
 };
 
 type VercelRequest = {
@@ -200,6 +201,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const studentId = req.body?.studentId?.trim();
+    const removeAccess = Boolean(req.body?.removeAccess);
     const password = req.body?.password?.trim() ?? "";
     const requestedUsername = normalizeUsername(req.body?.username ?? "");
 
@@ -207,13 +209,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       res.status(400).json({ error: "Student is required." });
       return;
     }
-    if (!requestedUsername || requestedUsername.length < 3) {
-      res.status(400).json({ error: "Username must be at least 3 letters or numbers." });
-      return;
-    }
-    if (password.length < 6) {
-      res.status(400).json({ error: "Password must be at least 6 characters." });
-      return;
+    if (!removeAccess) {
+      if (!requestedUsername || requestedUsername.length < 3) {
+        res.status(400).json({ error: "Username must be at least 3 letters or numbers." });
+        return;
+      }
+      if (password.length < 6) {
+        res.status(400).json({ error: "Password must be at least 6 characters." });
+        return;
+      }
     }
 
     ensureFirebaseAdmin();
@@ -226,7 +230,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const callerSchoolId = readString(callerSnap, "schoolId");
 
     if (!callerSnap || (callerRole !== "teacher" && callerRole !== "admin")) {
-      res.status(403).json({ error: "Only teachers can enable home login." });
+      res.status(403).json({ error: "Only teachers can manage home login." });
       return;
     }
 
@@ -242,12 +246,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const previousUsername = readString(studentSnap, "homeLoginUsername");
 
     if (studentRole !== "student") {
-      res.status(400).json({ error: "Home login can only be enabled for students." });
+      res.status(400).json({ error: "Home login can only be managed for students." });
       return;
     }
 
     if (callerRole === "teacher" && callerSchoolId !== studentSchoolId) {
       res.status(403).json({ error: "This student is not in your school." });
+      return;
+    }
+
+    if (removeAccess) {
+      try {
+        await adminAuth.updateUser(studentId, { disabled: true });
+        await adminAuth.revokeRefreshTokens(studentId);
+      } catch (err) {
+        const code = (err as { code?: string }).code;
+        if (code !== "auth/user-not-found") throw err;
+      }
+
+      const writes: Array<Record<string, unknown>> = [];
+      if (previousUsername) {
+        writes.push({ delete: documentName(projectId, `studentLoginUsernames/${previousUsername}`) });
+      }
+      writes.push({
+        update: {
+          name: documentName(projectId, `users/${studentId}`),
+          fields: {
+            email: { stringValue: "" },
+            homeLoginEnabled: { booleanValue: false },
+          },
+        },
+        updateMask: {
+          fieldPaths: ["email", "homeLoginEnabled", "homeLoginUsername", "homeLoginEnabledAt"],
+        },
+      });
+      await firestoreCommit(accessToken, projectId, writes);
+
+      res.status(200).json({ homeLoginEnabled: false });
       return;
     }
 

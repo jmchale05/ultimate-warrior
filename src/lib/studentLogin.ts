@@ -116,3 +116,33 @@ export async function enableStudentHomeLogin(input: {
     homeLoginEnabled: Boolean(body.homeLoginEnabled),
   };
 }
+
+export async function disableStudentHomeLogin(input: {
+  idToken: string;
+  studentId: string;
+}): Promise<void> {
+  const response = await fetch("/api/enable-student-home-login", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      studentId: input.studentId,
+      idToken: input.idToken,
+      removeAccess: true,
+    }),
+  });
+
+  const raw = await response.text();
+  let body: { error?: unknown; message?: unknown } = {};
+  if (raw) {
+    try {
+      body = JSON.parse(raw) as typeof body;
+    } catch {
+      body = { message: raw.replace(/\s+/g, " ").trim().slice(0, 180) };
+    }
+  }
+  if (!response.ok) {
+    throw new Error(apiErrorMessage(body, `Could not remove home login (${response.status}).`));
+  }
+}
