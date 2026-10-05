@@ -93,6 +93,14 @@ export default function StudentCampaign() {
     }
   }
 
+  function playMobileHeroVideo() {
+    const video = mobileHeroVideoRef.current;
+    if (!video) return;
+    void video.play().catch((error) => {
+      console.error("Failed to start campaign video:", error);
+    });
+  }
+
   useEffect(() => {
     if (!uid || !appUser) return;
     if (appUser.role === "student" && appUser.uid !== uid) {
@@ -314,6 +322,13 @@ export default function StudentCampaign() {
     myMiles < campaign.milesRequired,
   );
   const remainingMiles = campaign ? roundMiles(campaign.milesRequired - myMiles) : 0;
+  const showMobileStartVideo = Boolean(campaign && status !== "locked" && !watchedCampaigns.has(selectedCampaign));
+  const showMobileEndVideo = Boolean(
+    campaign &&
+    watchedCampaigns.has(selectedCampaign) &&
+    myMiles >= campaign.milesRequired &&
+    !watchedEndVideos.has(selectedCampaign),
+  );
   const showCompletedVideoActions = Boolean(
     campaign &&
     watchedCampaigns.has(selectedCampaign) &&
@@ -575,20 +590,17 @@ export default function StudentCampaign() {
                           {showMobilePlayOverlay && (
                             <button
                               type="button"
-                              onClick={() => {
-                                const video = mobileHeroVideoRef.current;
-                                if (!video) return;
-                                void video.play().catch((error) => {
-                                  console.error("Failed to start campaign video:", error);
-                                });
-                              }}
-                              className="absolute inset-0 z-10 flex cursor-pointer items-center justify-center bg-transparent"
-                              aria-label={mobileHeroVideo.isEnd ? "Play end video" : "Play intro video"}
+                              onClick={playMobileHeroVideo}
+                              className="absolute inset-0 z-10 flex cursor-pointer flex-col items-center justify-center gap-3 bg-stone-950/55"
+                              aria-label={mobileHeroVideo.isEnd ? "Watch end video" : "Watch intro and begin"}
                             >
-                              <span className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-roman-gold bg-stone-950/75 shadow-[0_0_40px_rgba(212,175,55,0.35)]">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="ml-1 h-7 w-7 text-roman-gold" aria-hidden="true">
+                              <span className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-roman-gold bg-roman-gold text-stone-950 shadow-[0_0_40px_rgba(212,175,55,0.55)]">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="ml-1 h-9 w-9" aria-hidden="true">
                                   <path d="M8 5v14l11-7z" />
                                 </svg>
+                              </span>
+                              <span className="rounded-full bg-stone-950/80 px-4 py-1.5 text-sm font-bold uppercase tracking-[0.18em] text-roman-gold">
+                                {mobileHeroVideo.isEnd ? "Watch End Video" : "Watch Intro & Begin"}
                               </span>
                             </button>
                           )}
@@ -686,12 +698,11 @@ export default function StudentCampaign() {
                           <p className="text-stone-500 text-sm leading-relaxed max-w-xs mx-auto">Complete the previous campaign and watch its end video to unlock this one.</p>
                         </div>
                       ) : !watchedCampaigns.has(selectedCampaign) ? (
-                        <div className="text-center py-4">
-                          <p className="lg:hidden text-stone-500 text-sm leading-relaxed">Play the video above to begin this campaign.</p>
+                        <div className="hidden lg:block text-center py-4">
                           <button
                             onClick={() => void openVideoModal(campaign.number)}
                             disabled={Boolean(videoLoadingKey)}
-                            className="hidden lg:inline-flex group relative overflow-hidden px-6 sm:px-10 py-3 sm:py-4 rounded-2xl border border-roman-gold/70 bg-linear-to-r from-roman-gold/90 via-amber-300 to-roman-gold/90 text-stone-950 text-xs sm:text-sm uppercase tracking-[0.2em] font-bold shadow-[0_0_25px_rgba(212,175,55,0.45)] hover:brightness-110 hover:shadow-[0_0_35px_rgba(212,175,55,0.7)] active:scale-[0.98] transition-all animate-pulse cursor-pointer"
+                            className="inline-flex group relative overflow-hidden px-6 sm:px-10 py-3 sm:py-4 rounded-2xl border border-roman-gold/70 bg-linear-to-r from-roman-gold/90 via-amber-300 to-roman-gold/90 text-stone-950 text-xs sm:text-sm uppercase tracking-[0.2em] font-bold shadow-[0_0_25px_rgba(212,175,55,0.45)] hover:brightness-110 hover:shadow-[0_0_35px_rgba(212,175,55,0.7)] active:scale-[0.98] transition-all animate-pulse cursor-pointer"
                           >
                             <span className="absolute inset-0 bg-linear-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
                             <span className="relative flex items-center gap-3">
@@ -699,7 +710,7 @@ export default function StudentCampaign() {
                               <span>{isIntroVideoLoading ? "Loading Video..." : "Watch Intro & Begin"}</span>
                             </span>
                           </button>
-                          <p className="hidden lg:block text-stone-600 text-xs mt-4 uppercase tracking-widest">Watch the intro video to start logging miles</p>
+                          <p className="text-stone-600 text-xs mt-4 uppercase tracking-widest">Watch the intro video to start logging miles</p>
                           {videoError && <p className="text-red-400 text-xs mt-3">{videoError}</p>}
                         </div>
                       ) : showLogMiles ? (
@@ -728,12 +739,11 @@ export default function StudentCampaign() {
                           <p className="text-stone-600 text-xs mt-2">{remainingMiles} miles remaining</p>
                         </div>
                       ) : !watchedEndVideos.has(selectedCampaign) ? (
-                        <div className="text-center py-4">
-                          <p className="lg:hidden text-stone-500 text-sm leading-relaxed">Play the video above to complete this campaign.</p>
+                        <div className="hidden lg:block text-center py-4">
                           <button
                             onClick={() => void openVideoModal(campaign.number, true)}
                             disabled={Boolean(videoLoadingKey)}
-                            className="hidden lg:inline-flex group relative overflow-hidden px-6 sm:px-10 py-3 sm:py-4 rounded-2xl border border-roman-gold/70 bg-linear-to-r from-roman-gold/90 via-amber-300 to-roman-gold/90 text-stone-950 text-xs sm:text-sm uppercase tracking-[0.2em] font-bold shadow-[0_0_25px_rgba(212,175,55,0.45)] hover:brightness-110 hover:shadow-[0_0_35px_rgba(212,175,55,0.7)] active:scale-[0.98] transition-all animate-pulse cursor-pointer"
+                            className="inline-flex group relative overflow-hidden px-6 sm:px-10 py-3 sm:py-4 rounded-2xl border border-roman-gold/70 bg-linear-to-r from-roman-gold/90 via-amber-300 to-roman-gold/90 text-stone-950 text-xs sm:text-sm uppercase tracking-[0.2em] font-bold shadow-[0_0_25px_rgba(212,175,55,0.45)] hover:brightness-110 hover:shadow-[0_0_35px_rgba(212,175,55,0.7)] active:scale-[0.98] transition-all animate-pulse cursor-pointer"
                           >
                             <span className="absolute inset-0 bg-linear-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
                             <span className="relative flex items-center gap-3">
@@ -741,7 +751,7 @@ export default function StudentCampaign() {
                               <span>{isEndVideoLoading ? "Loading Video..." : "Watch End Video"}</span>
                             </span>
                           </button>
-                          <p className="hidden lg:block text-stone-600 text-xs mt-4 uppercase tracking-widest">Watch the closing video to complete the campaign</p>
+                          <p className="text-stone-600 text-xs mt-4 uppercase tracking-widest">Watch the closing video to complete the campaign</p>
                           {videoError && <p className="text-red-400 text-xs mt-3">{videoError}</p>}
                         </div>
                       ) : (
@@ -799,6 +809,21 @@ export default function StudentCampaign() {
             </div>
           )}
         </div>
+        {(showMobileStartVideo || showMobileEndVideo) && (
+          <div className="lg:hidden shrink-0 border-t border-stone-800/60 bg-stone-900 px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            {showMobilePlayOverlay ? (
+              <button
+                type="button"
+                onClick={playMobileHeroVideo}
+                className="w-full rounded-xl border border-roman-gold/70 bg-linear-to-r from-roman-gold/90 via-amber-300 to-roman-gold/90 px-4 py-3.5 text-sm font-bold uppercase tracking-[0.18em] text-stone-950 shadow-[0_0_22px_rgba(212,175,55,0.35)]"
+              >
+                {showMobileEndVideo ? "Watch End Video" : "Watch Intro & Begin"}
+              </button>
+            ) : (
+              <p className="py-2 text-center text-stone-400 text-sm">Keep watching to continue</p>
+            )}
+          </div>
+        )}
         {showLogMiles && campaign && (
           <div className="lg:hidden shrink-0 border-t border-stone-800/60 bg-stone-900 px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             <div className="mb-2 flex items-center justify-between">
