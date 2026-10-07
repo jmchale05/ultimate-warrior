@@ -19,6 +19,7 @@ import {
   updateUserPhoto,
   recordStudentAuthorityConsent,
 } from "../lib/firestore";
+import { downloadXlsx } from "../lib/excelWorkbook";
 import {
   disableStudentHomeLogin,
   enableStudentHomeLogin,
@@ -180,6 +181,17 @@ function MobileLoginIcon({ enabled, className }: { enabled: boolean; className: 
   );
 }
 
+function uniqueStudents(rows: StudentRow[]): StudentRow[] {
+  const seen = new Set<string>();
+  const unique: StudentRow[] = [];
+  for (const row of rows) {
+    if (seen.has(row.uid)) continue;
+    seen.add(row.uid);
+    unique.push(row);
+  }
+  return unique;
+}
+
 function sortStudentRows(rows: StudentRow[]): StudentRow[] {
   return [...rows].sort((a, b) => {
     if (a.hasPendingDeletionRequest !== b.hasPendingDeletionRequest) {
@@ -250,6 +262,13 @@ export default function Campaigns() {
   const [homeLoginSaving, setHomeLoginSaving] = useState(false);
   const [homeLoginError, setHomeLoginError] = useState("");
   const [homeLoginCredentials, setHomeLoginCredentials] = useState<{ name: string; username: string; password: string } | null>(null);
+  const [showHomeLoginReset, setShowHomeLoginReset] = useState(false);
+  const [homeLoginConfirm, setHomeLoginConfirm] = useState<null | "reset" | "remove">(null);
+  const [showBulkLoginModal, setShowBulkLoginModal] = useState(false);
+  const [bulkLoginRunning, setBulkLoginRunning] = useState(false);
+  const [bulkLoginProgress, setBulkLoginProgress] = useState("");
+  const [bulkLoginError, setBulkLoginError] = useState("");
+  const [bulkLoginSummary, setBulkLoginSummary] = useState<{ created: number; failed: string[] } | null>(null);
 
   const yearOptions = YEAR_OPTIONS;
 
@@ -559,6 +578,8 @@ export default function Campaigns() {
     setHomeLoginPassword(generateStudentPassword());
     setHomeLoginError("");
     setHomeLoginCredentials(null);
+    setShowHomeLoginReset(false);
+    setHomeLoginConfirm(null);
     setOpenActionsForStudent(null);
     setShowHomeLoginModal(true);
   }
@@ -600,6 +621,8 @@ export default function Campaigns() {
         username: result.username,
         password: passwordToShow,
       });
+      setShowHomeLoginReset(false);
+      setHomeLoginConfirm(null);
     } catch (err) {
       setHomeLoginError(err instanceof Error ? err.message : "Could not enable home login.");
     } finally {
@@ -631,10 +654,87 @@ export default function Campaigns() {
       setShowHomeLoginModal(false);
       setSelectedStudentForHomeLogin(null);
       setHomeLoginCredentials(null);
+      setShowHomeLoginReset(false);
+      setHomeLoginConfirm(null);
     } catch (err) {
       setHomeLoginError(err instanceof Error ? err.message : "Could not remove home login.");
     } finally {
       setHomeLoginSaving(false);
+    }
+  }
+
+  function openBulkLoginModal() {
+    setBulkLoginError("");
+    setBulkLoginProgress("");
+    setBulkLoginSummary(null);
+    setShowBulkLoginModal(true);
+  }
+
+  async function handleBulkAddLogins() {
+    const roster = uniqueStudents(students);
+    const targets = roster
+      .filter((student) => !student.homeLoginEnabled && !student.hasPendingDeletionRequest)
+      .sort((a, b) => a.className.localeCompare(b.className) || a.name.localeCompare(b.name));
+
+    if (!currentUser || targets.length === 0) {
+      setBulkLoginError("Every student already has a mobile login.");
+      return;
+    }
+
+    setBulkLoginRunning(true);
+    setBulkLoginError("");
+    setBulkLoginSummary(null);
+    const taken = roster
+      .map((student) => student.homeLoginUsername)
+      .filter((username): username is string => Boolean(username));
+    const created: { uid: string; username: string }[] = [];
+    const sheetRows = [["Name", "Year", "Username", "Password"]];
+    const failed: string[] = [];
+
+    try {
+      const idToken = await currentUser.getIdToken();
+      for (let index = 0; index < targets.length; index += 1) {
+        const student = targets[index];
+        setBulkLoginProgress(`Adding login ${index + 1} of ${targets.length}…`);
+        const username = suggestStudentUsername(student.name, taken);
+        const password = generateStudentPassword();
+        try {
+          const result = await enableStudentHomeLogin({
+            idToken,
+            studentId: student.uid,
+            username,
+            password,
+          });
+          taken.push(result.username);
+          created.push({ uid: student.uid, username: result.username });
+          sheetRows.push([student.name, student.className, result.username, password]);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : "Could not add login.";
+          failed.push(`${student.name}: ${message}`);
+        }
+      }
+
+      if (created.length > 0) {
+        const createdById = new Map(created.map((row) => [row.uid, row.username]));
+        setStudents((prev) =>
+          prev.map((row) => {
+            const username = createdById.get(row.uid);
+            return username ? { ...row, homeLoginEnabled: true, homeLoginUsername: username } : row;
+          })
+        );
+        const today = new Date().toISOString().slice(0, 10);
+        downloadXlsx(`mobile-logins-${today}.xlsx`, sheetRows, "Mobile Logins");
+      }
+
+      setBulkLoginSummary({ created: created.length, failed });
+      setBulkLoginProgress("");
+      if (created.length === 0) {
+        setBulkLoginError(failed[0] ?? "Could not add mobile logins.");
+      }
+    } catch (err) {
+      setBulkLoginError(err instanceof Error ? err.message : "Could not add mobile logins.");
+    } finally {
+      setBulkLoginRunning(false);
     }
   }
 
@@ -934,6 +1034,9 @@ export default function Campaigns() {
       String(student.campaignNumber),
     ].some((value) => value.toLowerCase().includes(normalizedSearch));
   });
+  const roster = uniqueStudents(students);
+  const studentsNeedingLogin = roster.filter((student) => !student.homeLoginEnabled && !student.hasPendingDeletionRequest);
+  const studentsWithLogin = roster.filter((student) => student.homeLoginEnabled).length;
   const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE) || 1;
   const paginatedStudents = filtered.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
@@ -1067,6 +1170,19 @@ export default function Campaigns() {
               )}
             </div>
 
+            <button
+              type="button"
+              onClick={openBulkLoginModal}
+              disabled={students.length === 0 || studentsNeedingLogin.length === 0 || bulkLoginRunning}
+              title={studentsNeedingLogin.length === 0 ? "Every student already has a mobile login" : "Add mobile logins and download them as Excel"}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-roman-gold/50 bg-stone-950/85 px-3 sm:px-5 py-3 text-[10px] sm:text-sm font-bold uppercase tracking-wider sm:tracking-[0.2em] text-roman-gold shadow-[0_12px_30px_rgba(0,0,0,0.35)] transition-all hover:bg-stone-900 hover:scale-[1.03] active:scale-[0.97] shrink-0 whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4" aria-hidden="true">
+                <path d="M10.5 1.5H8.25A2.25 2.25 0 0 0 6 3.75v16.5a2.25 2.25 0 0 0 2.25 2.25h7.5A2.25 2.25 0 0 0 18 20.25V3.75a2.25 2.25 0 0 0-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" />
+              </svg>
+              <span className="hidden sm:inline">Add Logins</span>
+              <span className="sm:hidden">Logins</span>
+            </button>
             <button
               type="button"
               onClick={handleTopAddStudentClick}
@@ -1214,10 +1330,10 @@ export default function Campaigns() {
                         <button type="button" onClick={() => handleOpenEditStudent(s)} className="w-full text-left px-4 py-3 text-stone-200 text-sm">Edit Student</button>
                       )}
                       {!s.hasPendingDeletionRequest && (
-                        <button type="button" onClick={() => handleOpenHomeLogin(s)} className="w-full text-left px-4 py-3 text-stone-200 text-sm border-t border-stone-800">{s.homeLoginEnabled ? "Reset Password" : "Add Login"}</button>
-                      )}
-                      {!s.hasPendingDeletionRequest && s.homeLoginEnabled && (
-                        <button type="button" onClick={() => handleOpenHomeLogin(s)} className="w-full text-left px-4 py-3 text-red-400 text-sm border-t border-stone-800">Remove Login</button>
+                        <button type="button" onClick={() => handleOpenHomeLogin(s)} className="w-full text-left px-4 py-3 text-stone-200 text-sm border-t border-stone-800 flex items-center justify-between gap-3">
+                          <span>{s.homeLoginEnabled ? "Mobile Access" : "Add Login"}</span>
+                          <MobileLoginIcon enabled={Boolean(s.homeLoginEnabled)} className="w-4 h-4" />
+                        </button>
                       )}
                       <button
                         type="button"
@@ -1380,20 +1496,8 @@ export default function Campaigns() {
                                 role="menuitem"
                                 className="group w-full text-left px-4 py-3 text-stone-200 text-sm font-medium hover:bg-roman-gold/10 hover:text-roman-gold transition-colors flex items-center justify-between border-t border-stone-800/80"
                               >
-                                <span>{s.homeLoginEnabled ? "Reset Password" : "Add Login"}</span>
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-stone-500 group-hover:text-roman-gold/80 transition-colors" viewBox="0 0 20 20" fill="currentColor">
-                                  <path fillRule="evenodd" d="M10 2a4 4 0 00-4 4v1H5a2 2 0 00-2 2v7a2 2 0 002 2h10a2 2 0 002-2V9a2 2 0 00-2-2h-1V6a4 4 0 00-4-4zm2 5V6a2 2 0 10-4 0v1h4z" clipRule="evenodd" />
-                                </svg>
-                              </button>
-                            )}
-                            {!s.hasPendingDeletionRequest && s.homeLoginEnabled && (
-                              <button
-                                type="button"
-                                onClick={() => handleOpenHomeLogin(s)}
-                                role="menuitem"
-                                className="group w-full text-left px-4 py-3 text-red-400 text-sm font-medium hover:bg-red-500/10 transition-colors flex items-center justify-between border-t border-stone-800/80"
-                              >
-                                <span>Remove Login</span>
+                                <span>{s.homeLoginEnabled ? "Mobile Access" : "Add Login"}</span>
+                                <MobileLoginIcon enabled={Boolean(s.homeLoginEnabled)} className="w-4 h-4" />
                               </button>
                             )}
                             <button
@@ -1616,7 +1720,76 @@ export default function Campaigns() {
         </div>
       )}
 
-      {/* Add Login / Reset Password Modal */}
+      {showBulkLoginModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-stone-950/80 backdrop-blur-sm"
+            onClick={() => {
+              if (bulkLoginRunning) return;
+              setShowBulkLoginModal(false);
+            }}
+          />
+          <div className="relative bg-stone-900 border border-roman-gold/20 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-[addStudentModalZoomIn_180ms_cubic-bezier(0.2,0.8,0.2,1)]">
+            <div className="h-px w-full bg-linear-to-r from-transparent via-roman-gold/50 to-transparent" />
+            <div className="px-8 py-8">
+              <h2 className="text-roman-gold font-serif text-2xl font-bold mb-2 tracking-wide">Add Logins</h2>
+              {bulkLoginSummary ? (
+                <div className="space-y-4">
+                  <p className="text-stone-300 text-sm">
+                    {bulkLoginSummary.created === 0
+                      ? "No logins were added."
+                      : `${bulkLoginSummary.created} login${bulkLoginSummary.created === 1 ? "" : "s"} saved. The Excel file has downloaded. Passwords are only in that file.`}
+                  </p>
+                  {bulkLoginSummary.failed.length > 0 && (
+                    <div className="rounded-lg border border-red-400/30 bg-red-950/30 px-4 py-3 text-red-200 text-sm space-y-1">
+                      {bulkLoginSummary.failed.map((failure) => (
+                        <p key={failure}>{failure}</p>
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowBulkLoginModal(false)}
+                    className="w-full py-3 rounded-xl bg-roman-gold text-stone-950 font-semibold hover:brightness-110 transition-all"
+                  >
+                    Done
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-stone-400 text-sm">
+                    Add a mobile login for {studentsNeedingLogin.length} student{studentsNeedingLogin.length === 1 ? "" : "s"} and download the usernames and passwords as an Excel file.
+                    {studentsWithLogin > 0 ? ` ${studentsWithLogin} student${studentsWithLogin === 1 ? "" : "s"} already ${studentsWithLogin === 1 ? "has" : "have"} a login and will be left unchanged.` : ""}
+                  </p>
+                  <p className="text-stone-500 text-sm">The passwords will not be shown again after the file downloads.</p>
+                  {bulkLoginProgress && <p className="text-roman-gold text-sm">{bulkLoginProgress}</p>}
+                  {bulkLoginError && <p className="text-red-300 text-sm">{bulkLoginError}</p>}
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      disabled={bulkLoginRunning}
+                      onClick={() => setShowBulkLoginModal(false)}
+                      className="flex-1 py-3 rounded-xl border border-stone-700 text-stone-400 hover:text-stone-200 hover:border-stone-500 transition-all disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      disabled={bulkLoginRunning || studentsNeedingLogin.length === 0}
+                      onClick={() => void handleBulkAddLogins()}
+                      className="flex-1 py-3 rounded-xl bg-roman-gold text-stone-950 font-semibold hover:brightness-110 transition-all disabled:opacity-50"
+                    >
+                      {bulkLoginRunning ? "Adding..." : "Add Logins"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Access / Add Login Modal */}
       {showHomeLoginModal && selectedStudentForHomeLogin && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
@@ -1626,17 +1799,19 @@ export default function Campaigns() {
               setShowHomeLoginModal(false);
               setSelectedStudentForHomeLogin(null);
               setHomeLoginCredentials(null);
+              setShowHomeLoginReset(false);
+              setHomeLoginConfirm(null);
             }}
           />
           <div className="relative bg-stone-900 border border-roman-gold/20 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-[addStudentModalZoomIn_180ms_cubic-bezier(0.2,0.8,0.2,1)]">
             <div className="h-px w-full bg-linear-to-r from-transparent via-roman-gold/50 to-transparent" />
             <div className="px-8 py-8">
               <h2 className="text-roman-gold font-serif text-2xl font-bold mb-2 tracking-wide">
-                {selectedStudentForHomeLogin.homeLoginEnabled ? "Reset Password" : "Add Login"}
+                {selectedStudentForHomeLogin.homeLoginEnabled ? "Mobile Access" : "Add Login"}
               </h2>
               <p className="text-stone-400 text-sm mb-6">
                 {selectedStudentForHomeLogin.homeLoginEnabled
-                  ? `${selectedStudentForHomeLogin.name} signs in at home as @${selectedStudentForHomeLogin.homeLoginUsername}. The current password cannot be shown. Set a new one and write it down.`
+                  ? `${selectedStudentForHomeLogin.name} signs in at home with this login.`
                   : `Give ${selectedStudentForHomeLogin.name} a login and password so they can complete campaigns from home. You can still log miles at school.`}
               </p>
 
@@ -1646,6 +1821,7 @@ export default function Campaigns() {
                     Write these down and send them home. The password will not be shown again.
                   </div>
                   <div className="rounded-lg border border-stone-700/70 bg-stone-800/60 px-4 py-3 space-y-2">
+                    <p className="text-stone-400 text-xs uppercase tracking-widest">Username</p>
                     <p className="text-stone-100 font-semibold text-lg">@{homeLoginCredentials.username}</p>
                     <p className="text-stone-400 text-xs uppercase tracking-widest pt-2">Password</p>
                     <p className="text-stone-100 font-semibold text-lg">{homeLoginCredentials.password}</p>
@@ -1656,36 +1832,117 @@ export default function Campaigns() {
                       setShowHomeLoginModal(false);
                       setSelectedStudentForHomeLogin(null);
                       setHomeLoginCredentials(null);
+                      setShowHomeLoginReset(false);
+                      setHomeLoginConfirm(null);
                     }}
                     className="w-full py-3 rounded-xl bg-roman-gold text-stone-950 font-semibold hover:brightness-110 transition-all"
                   >
                     Done
                   </button>
                 </div>
+              ) : selectedStudentForHomeLogin.homeLoginEnabled ? (
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-stone-400 text-xs uppercase tracking-widest mb-2">Username</p>
+                    <p className="rounded-lg border border-stone-700/70 bg-stone-800/60 px-4 py-3 text-stone-100 font-semibold text-lg">
+                      @{selectedStudentForHomeLogin.homeLoginUsername}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-stone-400 text-xs uppercase tracking-widest mb-2">Password</p>
+                    <p className="rounded-lg border border-stone-700/70 bg-stone-800/60 px-4 py-3 text-stone-100 font-semibold text-lg tracking-[0.3em]" aria-label="Password hidden">
+                      ********
+                    </p>
+                  </div>
+                  {showHomeLoginReset ? (
+                    <div>
+                      <label className="block text-stone-400 text-xs uppercase tracking-widest mb-2">New Password</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={homeLoginPassword}
+                          onChange={(e) => setHomeLoginPassword(e.target.value)}
+                          className="flex-1 bg-stone-800 border border-stone-700 rounded-lg px-4 py-3 text-stone-100 focus:outline-none focus:border-roman-gold/60"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setHomeLoginPassword(generateStudentPassword())}
+                          className="px-3 rounded-lg border border-stone-600 text-stone-300 text-xs uppercase tracking-wider hover:border-roman-gold/50 hover:text-roman-gold"
+                        >
+                          New
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setHomeLoginPassword(generateStudentPassword());
+                        setHomeLoginError("");
+                        setShowHomeLoginReset(true);
+                      }}
+                      className="w-full py-3 rounded-xl border border-roman-gold/40 text-roman-gold font-semibold hover:bg-roman-gold/10 transition-all"
+                    >
+                      Reset Password
+                    </button>
+                  )}
+                  {homeLoginError && <p className="text-red-300 text-sm">{homeLoginError}</p>}
+                  {showHomeLoginReset && (
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                      onClick={() => {
+                        if (homeLoginSaving) return;
+                        setShowHomeLoginReset(false);
+                        setHomeLoginError("");
+                        setHomeLoginConfirm(null);
+                      }}
+                        className="flex-1 py-3 rounded-xl border border-stone-700 text-stone-400 hover:text-stone-200 hover:border-stone-500 transition-all"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setHomeLoginError("");
+                          setHomeLoginConfirm("reset");
+                        }}
+                        disabled={homeLoginSaving}
+                        className="flex-1 py-3 rounded-xl bg-roman-gold text-stone-950 font-semibold hover:brightness-110 transition-all disabled:opacity-50"
+                      >
+                        Reset Password
+                      </button>
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    disabled={homeLoginSaving}
+                    onClick={() => {
+                      setHomeLoginError("");
+                      setHomeLoginConfirm("remove");
+                    }}
+                    className="w-full py-2 text-red-400 text-sm font-semibold hover:text-red-300 disabled:opacity-50"
+                  >
+                    Remove mobile access
+                  </button>
+                </div>
               ) : (
                 <div className="space-y-4">
                   <div>
-                    {selectedStudentForHomeLogin.homeLoginEnabled ? (
-                      <p className="rounded-lg border border-stone-700/70 bg-stone-800/60 px-4 py-3 text-stone-100 font-semibold text-lg">
-                        @{selectedStudentForHomeLogin.homeLoginUsername}
-                      </p>
-                    ) : (
-                      <div className="flex items-center rounded-lg border border-stone-700 bg-stone-800 focus-within:border-roman-gold/60">
-                        <span className="pl-4 text-stone-400 font-semibold text-lg">@</span>
-                        <input
-                          type="text"
-                          value={homeLoginUsername}
-                          onChange={(e) => setHomeLoginUsername(e.target.value.toLowerCase())}
-                          aria-label="Login"
-                          className="w-full bg-transparent px-2 py-3 text-stone-100 font-semibold text-lg focus:outline-none"
-                        />
-                      </div>
-                    )}
+                    <p className="text-stone-400 text-xs uppercase tracking-widest mb-2">Username</p>
+                    <div className="flex items-center rounded-lg border border-stone-700 bg-stone-800 focus-within:border-roman-gold/60">
+                      <span className="pl-4 text-stone-400 font-semibold text-lg">@</span>
+                      <input
+                        type="text"
+                        value={homeLoginUsername}
+                        onChange={(e) => setHomeLoginUsername(e.target.value.toLowerCase())}
+                        aria-label="Username"
+                        className="w-full bg-transparent px-2 py-3 text-stone-100 font-semibold text-lg focus:outline-none"
+                      />
+                    </div>
                   </div>
                   <div>
-                    <label className="block text-stone-400 text-xs uppercase tracking-widest mb-2">
-                      {selectedStudentForHomeLogin.homeLoginEnabled ? "New Password" : "Password"}
-                    </label>
+                    <label className="block text-stone-400 text-xs uppercase tracking-widest mb-2">Password</label>
                     <div className="flex gap-2">
                       <input
                         type="text"
@@ -1721,21 +1978,65 @@ export default function Campaigns() {
                       disabled={homeLoginSaving}
                       className="flex-1 py-3 rounded-xl bg-roman-gold text-stone-950 font-semibold hover:brightness-110 transition-all disabled:opacity-50"
                     >
-                      {homeLoginSaving ? "Saving..." : selectedStudentForHomeLogin.homeLoginEnabled ? "Reset Password" : "Enable Login"}
+                      {homeLoginSaving ? "Saving..." : "Enable Login"}
                     </button>
                   </div>
-                  {selectedStudentForHomeLogin.homeLoginEnabled && (
-                    <button
-                      type="button"
-                      disabled={homeLoginSaving}
-                      onClick={() => void handleRemoveHomeLogin()}
-                      className="w-full py-2 text-red-400 text-sm font-semibold hover:text-red-300 disabled:opacity-50"
-                    >
-                      Remove mobile access
-                    </button>
-                  )}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {homeLoginConfirm && selectedStudentForHomeLogin && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-stone-950/80 backdrop-blur-sm"
+            onClick={() => {
+              if (homeLoginSaving) return;
+              setHomeLoginConfirm(null);
+              setHomeLoginError("");
+            }}
+          />
+          <div className={`relative bg-stone-900 border rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-[addStudentModalZoomIn_180ms_cubic-bezier(0.2,0.8,0.2,1)] ${homeLoginConfirm === "remove" ? "border-red-400/30" : "border-roman-gold/20"}`}>
+            <div className={`h-px w-full bg-linear-to-r from-transparent to-transparent ${homeLoginConfirm === "remove" ? "via-red-400/50" : "via-roman-gold/50"}`} />
+            <div className="px-8 py-8">
+              <h2 className={`font-serif text-2xl font-bold mb-2 tracking-wide ${homeLoginConfirm === "remove" ? "text-red-300" : "text-roman-gold"}`}>
+                {homeLoginConfirm === "remove" ? "Remove Mobile Access" : "Reset Password"}
+              </h2>
+              <p className="text-stone-400 text-sm mb-6">
+                {homeLoginConfirm === "remove"
+                  ? `Remove mobile access for ${selectedStudentForHomeLogin.name}? They will not be able to sign in at home until a login is added again.`
+                  : `Reset the password for ${selectedStudentForHomeLogin.name}? The current password will stop working.`}
+              </p>
+              {homeLoginConfirm === "reset" && (
+                <div className="rounded-lg border border-stone-700/70 bg-stone-800/60 px-4 py-3 mb-5">
+                  <p className="text-stone-400 text-xs uppercase tracking-widest">New Password</p>
+                  <p className="text-stone-100 font-semibold text-lg mt-1">{homeLoginPassword}</p>
+                </div>
+              )}
+              {homeLoginError && <p className="text-red-300 text-sm mb-4">{homeLoginError}</p>}
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (homeLoginSaving) return;
+                    setHomeLoginConfirm(null);
+                    setHomeLoginError("");
+                  }}
+                  className="flex-1 py-3 rounded-xl border border-stone-700 text-stone-400 hover:text-stone-200 hover:border-stone-500 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={homeLoginSaving}
+                  onClick={() => void (homeLoginConfirm === "remove" ? handleRemoveHomeLogin() : handleEnableHomeLogin())}
+                  className={`flex-1 py-3 rounded-xl font-semibold hover:brightness-110 transition-all disabled:opacity-50 ${homeLoginConfirm === "remove" ? "bg-red-300 text-stone-950" : "bg-roman-gold text-stone-950"}`}
+                >
+                  {homeLoginSaving ? "Saving..." : homeLoginConfirm === "remove" ? "Remove Access" : "Reset Password"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
