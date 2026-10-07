@@ -244,9 +244,10 @@ export default function LoginPage() {
   }
 
   const isSignup = mode === "signup";
+  const fieldClass = "roman-input min-h-11 text-base";
 
   return (
-    <div className={`min-h-dvh flex flex-col items-center px-4 relative overflow-x-hidden ${isSignup ? "justify-start py-6 sm:py-8 lg:py-6" : "justify-center py-6 sm:py-8 lg:py-6"}`}>
+    <div className={`min-h-dvh w-full flex flex-col items-center px-4 pb-[max(1rem,env(safe-area-inset-bottom))] relative overflow-x-hidden ${isSignup ? "justify-start pt-4 md:py-6" : "justify-start pt-4 md:justify-center md:py-6"}`}>
       {logoutMessage && (
         <div className="fixed top-5 right-5 z-50 pointer-events-none">
           <div className="rounded-lg border border-emerald-300/40 bg-emerald-500/15 text-emerald-100 px-4 py-3 shadow-lg backdrop-blur-sm text-sm font-semibold tracking-wide">
@@ -266,36 +267,36 @@ export default function LoginPage() {
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-150 h-150 bg-roman-red/5 rounded-full blur-[200px]" />
 
       {/* Hero header */}
-      <div className={`text-center relative ${isSignup ? "mb-4 sm:mb-5 lg:mb-4" : "mb-8 lg:mb-6"}`}>
+      <div className={`text-center relative w-full max-w-md ${isSignup ? "mb-3 md:mb-4" : "mb-3 md:mb-6"}`}>
         {/* Glow behind logo */}
         <div className="absolute inset-0 flex items-center justify-center -top-4">
-          <div className="w-40 h-40 bg-roman-gold/10 rounded-full blur-3xl" />
+          <div className="w-28 h-28 md:w-40 md:h-40 bg-roman-gold/10 rounded-full blur-3xl" />
         </div>
         <img
           src="/logo-new.png"
           alt="Ultimate Warrior"
-          className={`w-full h-auto object-contain mx-auto relative z-10 [image-rendering:--webkit-optimize-contrast] transform-gpu ${isSignup ? "max-w-64 sm:max-w-72 lg:max-w-64 mb-3 lg:mb-2" : "max-w-96 lg:max-w-80 mb-5 lg:mb-4"}`}
+          className={`w-full h-auto object-contain mx-auto relative z-10 [image-rendering:--webkit-optimize-contrast] transform-gpu ${isSignup ? "max-w-28 md:max-w-64 mb-2" : "max-w-36 md:max-w-80 mb-2 md:mb-4"}`}
         />
-        <h1 className={`text-roman-gold-light font-serif font-bold tracking-widest uppercase relative z-10 [text-shadow:0_2px_12px_rgba(0,0,0,0.9),0_0_30px_rgba(0,0,0,0.7)] ${isSignup ? "text-2xl sm:text-3xl lg:text-2xl" : "text-4xl lg:text-3xl"}`}>
+        <h1 className={`text-roman-gold-light font-serif font-bold uppercase relative z-10 leading-none [text-shadow:0_2px_12px_rgba(0,0,0,0.9),0_0_30px_rgba(0,0,0,0.7)] text-[clamp(1.125rem,5.5vw,1.5rem)] tracking-[0.1em] ${isSignup ? "md:text-2xl md:tracking-widest" : "md:text-3xl md:tracking-widest"}`}>
           Ultimate Warrior
         </h1>
-        <div className="roman-divider text-roman-gold text-xs font-serif mt-2 lg:mt-1.5 [text-shadow:0_1px_8px_rgba(0,0,0,0.9)]">
+        <div className="roman-divider my-1.5 md:my-4 text-roman-gold text-[10px] md:text-xs font-serif [text-shadow:0_1px_8px_rgba(0,0,0,0.9)]">
           ⚔ CHALLENGES OF THE LEGION ⚔
         </div>
       </div>
 
       {/* Card */}
-      <div className={`w-full max-w-md roman-card rounded-2xl relative z-10 ${isSignup ? "p-5 sm:p-6 lg:p-5" : "p-8 lg:p-6"}`}>
-        <h2 className="text-roman-gold font-serif text-xl font-bold tracking-widest uppercase text-center mb-1">
+      <div className={`w-full max-w-md roman-card rounded-2xl relative z-10 ${isSignup ? "p-4 md:p-5" : "p-4 sm:p-5 md:p-6"}`}>
+        <h2 className="text-roman-gold font-serif text-lg md:text-xl font-bold tracking-widest uppercase text-center mb-1">
           {mode === "signin" ? "Sign In" : "Join the Legion"}
         </h2>
-        <p className={`text-stone-500 text-xs text-center italic font-serif ${isSignup ? "mb-4 lg:mb-3" : "mb-6 lg:mb-4"}`}>
+        <p className={`text-stone-500 text-xs text-center italic font-serif ${isSignup ? "mb-3" : "mb-4"}`}>
           {mode === "signin"
             ? "Sign in with your email or username"
             : "Register to lead your warriors to glory"}
         </p>
 
-        <form onSubmit={handleSubmit} className={isSignup ? "space-y-3" : "space-y-4"}>
+        <form onSubmit={handleSubmit} className={isSignup ? "space-y-3" : "space-y-3 md:space-y-4"}>
           {mode === "signup" && (
             <div>
               <label className="block text-roman-gold/70 text-xs uppercase tracking-wider mb-1.5 font-semibold">
@@ -322,7 +323,7 @@ export default function LoginPage() {
                 }}
                 disabled={accessCodeConfirmed}
                 placeholder="ABC123"
-                className={`roman-input uppercase tracking-[0.3em] disabled:cursor-not-allowed disabled:opacity-70 ${accessCodeError ? "border-red-400 focus:border-red-300 focus:ring-red-300/30" : ""}`}
+                className={`${fieldClass} uppercase tracking-[0.2em] sm:tracking-[0.3em] disabled:cursor-not-allowed disabled:opacity-70 ${accessCodeError ? "border-red-400 focus:border-red-300 focus:ring-red-300/30" : ""}`}
               />
               {accessCodeError && (
                 <p className="mt-1.5 text-red-400 text-xs">{accessCodeError}</p>
@@ -332,13 +333,13 @@ export default function LoginPage() {
                   type="button"
                   onClick={handleConfirmAccessCode}
                   disabled={confirmingCode || !accessCode.trim()}
-                  className="mt-3 w-full rounded-lg border border-roman-gold/40 bg-roman-gold/10 px-4 py-2.5 text-xs font-semibold uppercase tracking-widest text-roman-gold transition-colors hover:bg-roman-gold/15 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="mt-3 w-full min-h-11 rounded-lg border border-roman-gold/40 bg-roman-gold/10 px-4 py-2.5 text-xs font-semibold uppercase tracking-widest text-roman-gold transition-colors hover:bg-roman-gold/15 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {confirmingCode ? "Checking Code..." : "Confirm Access Code"}
                 </button>
               )}
               {accessCodeConfirmed && confirmedSchoolName && (
-                <p className="mt-2 text-xs text-roman-gold/80 uppercase tracking-widest">
+                <p className="mt-2 text-xs leading-relaxed text-roman-gold/80 uppercase tracking-wide md:tracking-widest">
                   {confirmedSignupRole === "admin"
                     ? "Admin access code confirmed"
                     : `Access code confirmed for ${confirmedSchoolName}`}
@@ -355,7 +356,7 @@ export default function LoginPage() {
               <select
                 value={suffix}
                 onChange={(e) => setSuffix(e.target.value)}
-                className="roman-input"
+                className={fieldClass}
               >
                 <option value="Mr">Mr</option>
                 <option value="Mrs">Mrs</option>
@@ -381,7 +382,7 @@ export default function LoginPage() {
                   if (displayNameError) setDisplayNameError(null);
                 }}
                 placeholder={confirmedSignupRole === "teacher" ? "Smith" : "Marcus Aurelius"}
-                className={`roman-input ${displayNameError ? "border-red-400 focus:border-red-300 focus:ring-red-300/30" : ""}`}
+                className={`${fieldClass} ${displayNameError ? "border-red-400 focus:border-red-300 focus:ring-red-300/30" : ""}`}
               />
               {displayNameError && (
                 <p className="mt-1.5 text-red-400 text-xs">{displayNameError}</p>
@@ -404,7 +405,7 @@ export default function LoginPage() {
                   if (emailError) setEmailError(null);
                 }}
                 placeholder={mode === "signin" ? "email or username" : "your@email.com"}
-                className={`roman-input ${emailError ? "border-red-400 focus:border-red-300 focus:ring-red-300/30" : ""}`}
+                className={`${fieldClass} ${emailError ? "border-red-400 focus:border-red-300 focus:ring-red-300/30" : ""}`}
               />
               {emailError && (
                 <p className="mt-1.5 text-red-400 text-xs">{emailError}</p>
@@ -429,13 +430,13 @@ export default function LoginPage() {
                     if (passwordError) setPasswordError(null);
                   }}
                   placeholder="••••••••"
-                  className={`roman-input pr-12 ${passwordError ? "border-red-400 focus:border-red-300 focus:ring-red-300/30" : ""}`}
+                  className={`${fieldClass} pr-12 ${passwordError ? "border-red-400 focus:border-red-300 focus:ring-red-300/30" : ""}`}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((prev) => !prev)}
                   aria-label={showPassword ? "Hide password" : "Show password"}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-roman-gold transition-colors"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 grid h-11 w-11 place-items-center text-stone-400 hover:text-roman-gold transition-colors"
                 >
                   {showPassword ? (
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -481,20 +482,6 @@ export default function LoginPage() {
             </p>
           )}
 
-          {(mode === "signin" || accessCodeConfirmed) && (
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-linear-to-r from-roman-red to-roman-red-dark hover:from-roman-red/90 hover:to-roman-red-dark/90 text-roman-gold font-bold uppercase tracking-widest py-3 rounded-lg border border-roman-gold/40 transition-all shadow-[0_0_15px_rgba(139,28,28,0.4)] hover:shadow-[0_0_25px_rgba(139,28,28,0.6)] disabled:opacity-50 disabled:cursor-not-allowed mt-2"
-            >
-              {loading
-                ? <><ButtonSpinner /> Entering...</>
-                : mode === "signin"
-                ? "Enter the Arena"
-                : "Enlist Now"}
-            </button>
-          )}
-
           {mode === "signup" && confirmedSignupRole === "teacher" && accessCodeConfirmed && (
             <label className={`flex items-start gap-2.5 text-stone-400 text-xs leading-relaxed border rounded-lg px-3 py-2.5 ${signupConsentError ? "border-red-400/70" : "border-stone-700/60"}`}>
               <input
@@ -504,7 +491,7 @@ export default function LoginPage() {
                   setSignupConsentChecked(e.target.checked);
                   if (signupConsentError) setSignupConsentError(null);
                 }}
-                className="mt-0.5 accent-roman-gold"
+                className="mt-0.5 h-5 w-5 shrink-0 accent-roman-gold"
               />
               <span>
                 <span className="text-roman-gold/80 font-semibold mr-1">*</span>
@@ -527,9 +514,23 @@ export default function LoginPage() {
           {signupConsentError && mode === "signup" && confirmedSignupRole === "teacher" && accessCodeConfirmed && (
             <p className="text-red-400 text-xs -mt-2">{signupConsentError}</p>
           )}
+
+          {(mode === "signin" || accessCodeConfirmed) && (
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full min-h-11 bg-linear-to-r from-roman-red to-roman-red-dark hover:from-roman-red/90 hover:to-roman-red-dark/90 text-roman-gold font-bold uppercase tracking-widest py-3 rounded-lg border border-roman-gold/40 transition-all shadow-[0_0_15px_rgba(139,28,28,0.4)] hover:shadow-[0_0_25px_rgba(139,28,28,0.6)] disabled:opacity-50 disabled:cursor-not-allowed mt-1 md:mt-2"
+            >
+              {loading
+                ? <><ButtonSpinner /> Entering...</>
+                : mode === "signin"
+                ? "Enter the Arena"
+                : "Enlist Now"}
+            </button>
+          )}
         </form>
 
-        <div className="roman-divider text-stone-600 text-xs mt-6">◆</div>
+        <div className="roman-divider text-stone-600 text-xs my-3! md:my-4">◆</div>
 
         <p className="text-center text-stone-500 text-sm">
           {mode === "signin" ? (
@@ -587,11 +588,16 @@ export default function LoginPage() {
         </p>
       </div>
 
-      {/* Support Button (Floating) */}
+      {/* Footer motto */}
+      <p className={`text-stone-600 text-[11px] md:text-xs font-serif italic tracking-wider text-center select-none px-2 ${isSignup ? "mt-3 md:mb-1" : "mt-4 md:mt-6"}`}>
+        "Audentes Fortuna Iuvat" — Fortune Favors the Bold
+      </p>
+
+      {/* Support sits under the form on phones, and in the corner from tablet width up */}
       <button
         type="button"
         onClick={openSupportModal}
-        className="absolute bottom-4 right-4 z-20 flex items-center justify-center gap-2 rounded-full border border-roman-gold/30 bg-stone-900/80 px-3 py-2 text-roman-gold text-[10px] font-semibold uppercase tracking-widest backdrop-blur-sm shadow-[0_0_15px_rgba(212,175,55,0.15)] hover:bg-roman-gold/20 hover:border-roman-gold/60 transition-all sm:bottom-6 sm:right-6 sm:px-4 sm:py-2.5 sm:text-xs"
+        className="z-20 mt-3 flex min-h-11 items-center justify-center gap-2 rounded-full border border-roman-gold/30 bg-stone-900/80 px-4 py-2 text-roman-gold text-[10px] font-semibold uppercase tracking-widest backdrop-blur-sm shadow-[0_0_15px_rgba(212,175,55,0.15)] hover:bg-roman-gold/20 hover:border-roman-gold/60 transition-all md:absolute md:bottom-6 md:right-6 md:mt-0 md:min-h-0 md:px-4 md:py-2.5 md:text-xs"
       >
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
           <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>
@@ -608,7 +614,7 @@ export default function LoginPage() {
       {showForgotPassword && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-stone-950/85 backdrop-blur-sm" onClick={() => setShowForgotPassword(false)} />
-          <div className="relative w-full max-w-md roman-card rounded-2xl p-7 z-10">
+          <div className="relative w-full max-w-md roman-card rounded-2xl p-5 sm:p-7 z-10 max-h-[calc(100dvh-2rem)] overflow-y-auto">
             <h3 className="text-roman-gold font-serif text-lg font-bold uppercase tracking-wider mb-2">Reset Password</h3>
             <p className="text-stone-400 text-sm mb-5">
               Enter your account email and we will send a reset link.
@@ -626,7 +632,7 @@ export default function LoginPage() {
                   value={resetEmail}
                   onChange={(e) => setResetEmail(e.target.value)}
                   placeholder="your@email.com"
-                  className="roman-input"
+                  className={fieldClass}
                 />
               </div>
 
@@ -642,7 +648,7 @@ export default function LoginPage() {
                 </p>
               )}
 
-              <div className="flex gap-3 pt-1">
+              <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:gap-3">
                 <button
                   type="button"
                   onClick={() => setShowForgotPassword(false)}
@@ -663,10 +669,6 @@ export default function LoginPage() {
         </div>
       )}
 
-      {/* Footer motto */}
-      <p className={`text-stone-700 text-xs font-serif italic tracking-wider select-none ${isSignup ? "mt-4 mb-2 lg:mt-3 lg:mb-1" : "mt-8 lg:mt-6"}`}>
-        "Audentes Fortuna Iuvat" — Fortune Favors the Bold
-      </p>
     </div>
   );
 }
