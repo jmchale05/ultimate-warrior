@@ -14,6 +14,19 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // On phones, pulling past the top or bottom of the form shouldn't bounce the
+  // page and show the plain colour behind the background picture.
+  useEffect(() => {
+    const html = document.documentElement;
+    const previous = { overscroll: html.style.overscrollBehaviorY, background: html.style.backgroundColor };
+    html.style.overscrollBehaviorY = "none";
+    html.style.backgroundColor = "#0c0a09";
+    return () => {
+      html.style.overscrollBehaviorY = previous.overscroll;
+      html.style.backgroundColor = previous.background;
+    };
+  }, []);
+
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -256,11 +269,15 @@ export default function LoginPage() {
         </div>
       )}
 
+      {/* Dark backing that runs well past the screen edges, so a bounce at the
+          top or bottom on a phone shows dark, not a strip of plain colour. */}
+      <div className="fixed inset-x-0 -top-[50vh] -bottom-[50vh] bg-[#0c0a09]" />
       {/* Fallback background shown immediately while hero image loads */}
       <div className="fixed inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(212,175,55,0.16),transparent_46%),radial-gradient(circle_at_85%_80%,rgba(139,28,28,0.2),transparent_50%),linear-gradient(155deg,#1f1b16_0%,#121212_55%,#25130f_100%)]" />
       {/* Background image */}
       <div className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-90" style={{ backgroundImage: "url('/BACKGROUND-login.webp')" }} />
-      <div className="absolute inset-0 bg-stone-950/45" />
+      {/* Darkening stays pinned with the picture rather than scrolling over it. */}
+      <div className="fixed inset-0 bg-stone-950/45" />
       {/* Atmospheric corner glows. Not on phones: blurs this big make phones
           slow to draw the page, and redraw it on every scroll and keyboard open. */}
       <div className="hidden md:block absolute top-0 left-0 w-96 h-96 bg-roman-red/10 rounded-full blur-[120px] -translate-x-1/2 -translate-y-1/2" />
