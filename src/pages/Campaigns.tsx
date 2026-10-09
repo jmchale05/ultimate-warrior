@@ -1081,7 +1081,7 @@ export default function Campaigns() {
         </div>
       )}
 
-      <div className="flex-1 min-h-0 flex overflow-hidden relative" style={{ backgroundImage: 'url(/full-background.png)', backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}>
+      <div className="flex-1 min-h-0 flex overflow-hidden relative" style={{ backgroundImage: 'url(/full-background.webp)', backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}>
         {/* Main content */}
         <div className="flex-1 min-w-0 px-4 py-6 overflow-y-auto overflow-x-hidden flex flex-col items-center sm:px-6 md:px-8 lg:px-12 lg:py-14">
           <div className="w-full max-w-360">
@@ -1270,7 +1270,7 @@ export default function Campaigns() {
                     }`}>
                       {s.photoUrl
                         ? <img src={s.photoUrl} alt={s.name} className={`w-full h-full object-cover ${s.hasPendingDeletionRequest ? "opacity-60 grayscale" : ""}`} />
-                        : <img src="/profile-pics.png" alt={s.name} className={`w-full h-full object-cover opacity-60 ${s.hasPendingDeletionRequest ? "grayscale" : ""}`} />
+                        : <img src="/profile-pics.webp" alt={s.name} className={`w-full h-full object-cover opacity-60 ${s.hasPendingDeletionRequest ? "grayscale" : ""}`} />
                       }
                     </div>
                     <div className="min-w-0 flex-1">
@@ -1381,7 +1381,7 @@ export default function Campaigns() {
                         }`}>
                           {s.photoUrl
                             ? <img src={s.photoUrl} alt={s.name} className={`w-full h-full object-cover ${s.hasPendingDeletionRequest ? 'opacity-60 grayscale' : ''}`} />
-                            : <img src="/profile-pics.png" alt={s.name} className={`w-full h-full object-cover opacity-60 ${s.hasPendingDeletionRequest ? 'grayscale' : ''}`} />
+                            : <img src="/profile-pics.webp" alt={s.name} className={`w-full h-full object-cover opacity-60 ${s.hasPendingDeletionRequest ? 'grayscale' : ''}`} />
                           }
                         </div>
                         <div className="min-w-0">
@@ -2069,7 +2069,7 @@ export default function Campaigns() {
                   >
                     {editPhotoPreview
                       ? <img src={editPhotoPreview} alt="Student preview" className="w-full h-full object-cover transition-transform group-hover:scale-105" />
-                      : <img src="/profile-pics.png" alt="Student" className="w-full h-full object-cover opacity-50 group-hover:opacity-80 transition-opacity" />
+                      : <img src="/profile-pics.webp" alt="Student" className="w-full h-full object-cover opacity-50 group-hover:opacity-80 transition-opacity" />
                     }
                   </button>
                   <span className="text-stone-400 text-xs font-semibold uppercase tracking-wider">{editPhotoPreview ? "Change photo" : "Add photo (optional)"}</span>
@@ -2178,7 +2178,7 @@ export default function Campaigns() {
                   >
                     {formPhotoPreview
                       ? <img src={formPhotoPreview} alt="preview" className="w-full h-full object-cover transition-transform group-hover:scale-105" />
-                      : <img src="/profile-pics.png" alt="Warrior" className="w-full h-full object-cover opacity-50 group-hover:opacity-80 transition-opacity" />
+                      : <img src="/profile-pics.webp" alt="Warrior" className="w-full h-full object-cover opacity-50 group-hover:opacity-80 transition-opacity" />
                     }
                   </button>
                   <span className="text-stone-400 text-xs font-semibold uppercase tracking-wider">{formPhotoPreview ? "Change photo" : "Add photo (optional)"}</span>

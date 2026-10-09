@@ -446,7 +446,7 @@ export default function StudentCampaign() {
                       {student?.photoUrl ? (
                         <img src={student.photoUrl} alt={student.displayName} className="w-full h-full object-cover" />
                       ) : (
-                        <img src="/profile-pics.png" alt="Warrior" className="w-full h-full object-cover opacity-60" />
+                        <img src="/profile-pics.webp" alt="Warrior" className="w-full h-full object-cover opacity-60" />
                       )}
                     </div>
                   </div>

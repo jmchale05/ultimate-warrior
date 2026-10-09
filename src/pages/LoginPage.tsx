@@ -259,12 +259,13 @@ export default function LoginPage() {
       {/* Fallback background shown immediately while hero image loads */}
       <div className="fixed inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(212,175,55,0.16),transparent_46%),radial-gradient(circle_at_85%_80%,rgba(139,28,28,0.2),transparent_50%),linear-gradient(155deg,#1f1b16_0%,#121212_55%,#25130f_100%)]" />
       {/* Background image */}
-      <div className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-90" style={{ backgroundImage: "url('/BACKGROUND-login.png')" }} />
+      <div className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-90" style={{ backgroundImage: "url('/BACKGROUND-login.webp')" }} />
       <div className="absolute inset-0 bg-stone-950/45" />
-      {/* Atmospheric corner glows */}
-      <div className="absolute top-0 left-0 w-96 h-96 bg-roman-red/10 rounded-full blur-[120px] -translate-x-1/2 -translate-y-1/2" />
-      <div className="absolute bottom-0 right-0 w-80 h-80 bg-roman-gold/5 rounded-full blur-[100px] translate-x-1/3 translate-y-1/3" />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-150 h-150 bg-roman-red/5 rounded-full blur-[200px]" />
+      {/* Atmospheric corner glows. Not on phones: blurs this big make phones
+          slow to draw the page, and redraw it on every scroll and keyboard open. */}
+      <div className="hidden md:block absolute top-0 left-0 w-96 h-96 bg-roman-red/10 rounded-full blur-[120px] -translate-x-1/2 -translate-y-1/2" />
+      <div className="hidden md:block absolute bottom-0 right-0 w-80 h-80 bg-roman-gold/5 rounded-full blur-[100px] translate-x-1/3 translate-y-1/3" />
+      <div className="hidden md:block absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-150 h-150 bg-roman-red/5 rounded-full blur-[200px]" />
 
       {/* Hero header */}
       <div className={`text-center relative w-full max-w-md ${isSignup ? "mb-3 md:mb-4" : "mb-3 md:mb-6"}`}>
@@ -273,7 +274,7 @@ export default function LoginPage() {
           <div className="w-28 h-28 md:w-40 md:h-40 bg-roman-gold/10 rounded-full blur-3xl" />
         </div>
         <img
-          src="/logo-new.png"
+          src="/logo-new.webp"
           alt="Ultimate Warrior"
           className={`w-full h-auto object-contain mx-auto relative z-10 [image-rendering:--webkit-optimize-contrast] transform-gpu ${isSignup ? "max-w-28 md:max-w-64 mb-2" : "max-w-36 md:max-w-80 mb-2 md:mb-4"}`}
         />

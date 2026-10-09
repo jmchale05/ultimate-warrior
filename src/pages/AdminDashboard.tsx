@@ -832,7 +832,7 @@ export default function AdminDashboard() {
       <div
         className="h-dvh text-stone-100 flex flex-col overflow-hidden bg-stone-900"
         style={{
-          backgroundImage: "linear-gradient(rgba(12, 10, 8, 0.5), rgba(12, 10, 8, 0.6)), url('/admin-page.png')",
+          backgroundImage: "linear-gradient(rgba(12, 10, 8, 0.5), rgba(12, 10, 8, 0.6)), url('/admin-page.webp')",
           backgroundSize: "cover",
           backgroundPosition: "center top",
           backgroundRepeat: "no-repeat",
@@ -859,7 +859,7 @@ export default function AdminDashboard() {
     <div
       className="h-dvh text-stone-100 flex flex-col overflow-hidden bg-stone-900"
       style={{
-        backgroundImage: "linear-gradient(rgba(12, 10, 8, 0.5), rgba(12, 10, 8, 0.6)), url('/admin-page.png')",
+        backgroundImage: "linear-gradient(rgba(12, 10, 8, 0.5), rgba(12, 10, 8, 0.6)), url('/admin-page.webp')",
         backgroundSize: "cover",
         backgroundPosition: "center top",
         backgroundRepeat: "no-repeat",
@@ -1680,7 +1680,7 @@ export default function AdminDashboard() {
                       {schoolLogoPreview ? (
                         <img src={schoolLogoPreview} alt="School logo preview" className="h-full w-full object-cover transition-transform group-hover:scale-105" />
                       ) : (
-                        <img src="/warriorschool.png" alt="Default school logo" className="h-full w-full object-cover opacity-40 transition-opacity group-hover:opacity-70" />
+                        <img src="/warriorschool.webp" alt="Default school logo" className="h-full w-full object-cover opacity-40 transition-opacity group-hover:opacity-70" />
                       )}
                     </button>
                     <div className="min-w-0 flex-1">

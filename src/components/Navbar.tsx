@@ -129,7 +129,7 @@ export default function Navbar() {
             aria-label="Home"
           >
             <img
-              src="/logo-new.png"
+              src="/logo-new.webp"
               alt="Ultimate Warrior"
               className="w-20 md:w-32 h-full object-cover"
             />
