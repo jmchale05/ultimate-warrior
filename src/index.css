@@ -51,6 +51,10 @@
     @apply bg-stone-900 text-stone-100 font-sans;
     font-family: "Plus Jakarta Sans", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
     -webkit-font-smoothing: antialiased;
+    /* No rubber-band bounce of the whole page on phones: pages that fit the
+       screen can't be dragged into empty space. Content that's taller than the
+       screen still scrolls inside its own area. */
+    overscroll-behavior-y: none;
   }
 
   h1,

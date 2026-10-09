@@ -101,7 +101,10 @@ export function localApiPlugin(): Plugin {
   return {
     name: "local-api",
     configureServer(server) {
-      const env = loadEnv(server.config.mode, process.cwd(), "");
+      // Read .env files from the app's own folder (Vite's envDir/root), not
+      // wherever the dev server happened to be started from.
+      const envDir = typeof server.config.envDir === "string" ? server.config.envDir : server.config.root;
+      const env = loadEnv(server.config.mode, envDir, "");
       Object.assign(process.env, env);
 
       server.middlewares.use(async (req, res, next) => {

@@ -406,7 +406,7 @@ export default function StudentCampaign() {
       <Navbar />
 
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden relative">
-        <div className="flex-1 min-h-0 w-full overflow-y-auto lg:overflow-hidden">
+        <div className="flex-1 min-h-0 w-full overflow-y-auto overscroll-y-contain lg:overflow-hidden">
           {loading ? (
             <div className="px-4 py-6 md:px-10 lg:px-14 lg:py-10">
               <StudentCampaignSkeleton />
@@ -601,7 +601,12 @@ export default function StudentCampaign() {
                             }}
                             onEnded={() => setMobileVideoFinished(true)}
                           >
-                            <source src={mobileHeroVideo.src} type={getVideoMimeType(mobileHeroVideo.src)} />
+                            {/* "#t=0.001" makes phones (iPhones especially) load and show the
+                                video's first frame instead of a black box before it plays. */}
+                            <source
+                              src={mobileHeroVideo.src.includes("#") ? mobileHeroVideo.src : `${mobileHeroVideo.src}#t=0.001`}
+                              type={getVideoMimeType(mobileHeroVideo.src)}
+                            />
                           </video>
                           {needsMobileWatchAction && showMobilePlayOverlay && (
                             <button
