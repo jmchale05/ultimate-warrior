@@ -590,8 +590,8 @@ export default function StudentCampaign() {
                               }
                             }}
                             onPlay={() => {
+                              // Replaying doesn't undo having reached the end: Continue stays.
                               setShowMobilePlayOverlay(false);
-                              setMobileVideoFinished(false);
                             }}
                             onError={() => {
                               const fallbackSrc = getCampaignVideoFallbackSrc(mobileHeroVideo.campaignNumber, mobileHeroVideo.isEnd);
@@ -599,7 +599,12 @@ export default function StudentCampaign() {
                                 setMobileHeroVideo({ ...mobileHeroVideo, src: fallbackSrc });
                               }
                             }}
-                            onEnded={() => setMobileVideoFinished(true)}
+                            onEnded={() => {
+                              setMobileVideoFinished(true);
+                              // Reaching the end of the intro unlocks Log Miles straight away, as on
+                              // desktop. The end video keeps its Continue step (it opens the award).
+                              if (!mobileHeroVideo.isEnd) void completeCampaignVideo(mobileHeroVideo);
+                            }}
                           >
                             {/* "#t=0.001" makes phones (iPhones especially) load and show the
                                 video's first frame instead of a black box before it plays. */}
@@ -967,9 +972,12 @@ export default function StudentCampaign() {
             </div>
             <div className="w-full px-4 md:px-8 py-4 flex items-center justify-between z-10 bg-linear-to-t from-black/80 to-transparent">
               <div>
-                <p className="text-stone-600 text-xs uppercase tracking-[0.25em] font-semibold">
-                  {videoModal.isEnd ? "Complete this video to unlock the next campaign" : "Watch this video to begin logging miles"}
-                </p>
+                {/* Only the first watch unlocks something; a rewatch needs no instruction. */}
+                {!(videoModal.isEnd ? watchedEndVideos : watchedCampaigns).has(videoModal.campaignNumber) && (
+                  <p className="text-stone-600 text-xs uppercase tracking-[0.25em] font-semibold">
+                    {videoModal.isEnd ? "Complete this video to unlock the next campaign" : "Watch this video to begin logging miles"}
+                  </p>
+                )}
                 {videoPlaybackNotice && (
                   <p className="mt-2 text-xs text-amber-300 max-w-xl">
                     {videoPlaybackNotice}

@@ -229,6 +229,11 @@ export default function LoginPage() {
       setResetError("Please enter your email address.");
       return;
     }
+    // Students sign in with a username and have no email to send a link to.
+    if (!normalizedEmail.includes("@")) {
+      setResetError("Students: ask your teacher to reset your password. Teachers: enter your email address.");
+      return;
+    }
 
     setResetLoading(true);
     try {

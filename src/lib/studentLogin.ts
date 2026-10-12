@@ -25,6 +25,7 @@ export function suggestStudentUsername(displayName: string, takenUsernames: stri
   return `${base}${n}`;
 }
 
+// Easy to spell and read aloud; 171 words with three digits is about 154,000 passwords.
 const KID_PASSWORD_WORDS = [
   "lion",
   "wolf",
@@ -36,34 +37,173 @@ const KID_PASSWORD_WORDS = [
   "frog",
   "duck",
   "horse",
+  "tiger",
+  "zebra",
+  "panda",
+  "koala",
+  "otter",
+  "beaver",
+  "badger",
+  "rabbit",
+  "hare",
+  "deer",
+  "moose",
+  "camel",
+  "llama",
+  "goat",
+  "sheep",
+  "lamb",
+  "pony",
+  "donkey",
+  "mouse",
+  "hippo",
+  "rhino",
+  "whale",
+  "shark",
+  "seal",
+  "dolphin",
+  "crab",
+  "squid",
+  "snail",
+  "beetle",
+  "ant",
+  "bee",
+  "wasp",
+  "moth",
+  "robin",
+  "finch",
+  "crow",
+  "raven",
+  "swan",
+  "goose",
+  "heron",
+  "parrot",
+  "puffin",
+  "penguin",
+  "falcon",
+  "gecko",
+  "lizard",
+  "turtle",
+  "toad",
+  "newt",
+  "salmon",
+  "trout",
+  "pike",
   "star",
   "moon",
   "sun",
-  "oak",
-  "tree",
+  "comet",
+  "planet",
+  "cloud",
+  "rain",
+  "snow",
+  "storm",
+  "frost",
+  "thunder",
+  "rainbow",
+  "breeze",
+  "wave",
+  "ocean",
   "river",
+  "lake",
+  "pond",
+  "island",
+  "beach",
+  "desert",
+  "forest",
+  "meadow",
+  "valley",
+  "hill",
+  "canyon",
+  "cave",
+  "rock",
   "stone",
-  "gold",
-  "fire",
+  "pebble",
+  "crystal",
+  "oak",
+  "pine",
+  "maple",
+  "willow",
+  "cedar",
+  "acorn",
   "leaf",
-  "bird",
-  "fish",
-  "boat",
-  "flag",
-  "drum",
+  "fern",
+  "moss",
+  "tulip",
+  "daisy",
+  "rose",
+  "lily",
+  "poppy",
+  "clover",
+  "berry",
+  "apple",
+  "cherry",
+  "lemon",
+  "mango",
+  "peach",
+  "plum",
+  "melon",
+  "gold",
+  "silver",
+  "bronze",
+  "copper",
+  "ruby",
+  "amber",
+  "jade",
+  "pearl",
   "helm",
   "shield",
   "spear",
+  "sword",
   "torch",
   "crown",
+  "banner",
+  "castle",
+  "tower",
+  "arch",
+  "temple",
+  "chariot",
+  "legion",
+  "arena",
+  "forum",
+  "column",
+  "scroll",
+  "quill",
+  "sandal",
+  "tunic",
+  "laurel",
+  "legend",
+  "hero",
+  "champion",
+  "boat",
+  "flag",
+  "drum",
+  "kite",
+  "rocket",
+  "robot",
+  "pencil",
+  "paint",
+  "music",
+  "piano",
+  "violin",
+  "trumpet",
+  "guitar",
+  "ball",
+  "bike",
+  "skate",
+  "sled",
+  "train",
+  "wagon",
+  "lantern",
+  "compass",
+  "anchor",
+  "map",
 ];
 
 export function generateStudentPassword(): string {
   const word = KID_PASSWORD_WORDS[Math.floor(Math.random() * KID_PASSWORD_WORDS.length)];
-  const digitsNeeded = Math.max(2, 6 - word.length);
-  const min = 10 ** (digitsNeeded - 1);
-  const max = 10 ** digitsNeeded;
-  const number = String(Math.floor(min + Math.random() * (max - min)));
+  // Always three digits (100–999), so every password is at least six characters.
+  const number = String(100 + Math.floor(Math.random() * 900));
   return `${word}${number}`;
 }
 
@@ -144,5 +284,35 @@ export async function disableStudentHomeLogin(input: {
   }
   if (!response.ok) {
     throw new Error(apiErrorMessage(body, `Could not remove home login (${response.status}).`));
+  }
+}
+
+/** When a student is deleted: removes their sign-in account and frees their username. */
+export async function deleteStudentLogin(input: {
+  idToken: string;
+  studentId: string;
+}): Promise<void> {
+  const response = await fetch("/api/enable-student-home-login", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      studentId: input.studentId,
+      idToken: input.idToken,
+      deleteLogin: true,
+    }),
+  });
+
+  // 404: the student record is already gone, so there's nothing left to remove.
+  if (!response.ok && response.status !== 404) {
+    const raw = await response.text();
+    let body: { error?: unknown; message?: unknown } = {};
+    try {
+      body = raw ? JSON.parse(raw) as typeof body : {};
+    } catch {
+      body = { message: raw.replace(/\s+/g, " ").trim().slice(0, 180) };
+    }
+    throw new Error(apiErrorMessage(body, `Could not remove the student's login (${response.status}).`));
   }
 }

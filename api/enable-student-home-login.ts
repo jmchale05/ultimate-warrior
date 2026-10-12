@@ -9,6 +9,8 @@ type RequestBody = {
   password?: string;
   idToken?: string;
   removeAccess?: boolean;
+  /** The student is being deleted: remove their sign-in account and free the username. */
+  deleteLogin?: boolean;
 };
 
 type VercelRequest = {
@@ -201,7 +203,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const studentId = req.body?.studentId?.trim();
-    const removeAccess = Boolean(req.body?.removeAccess);
+    const deleteLogin = Boolean(req.body?.deleteLogin);
+    const removeAccess = Boolean(req.body?.removeAccess) || deleteLogin;
     const password = req.body?.password?.trim() ?? "";
     const requestedUsername = normalizeUsername(req.body?.username ?? "");
 
@@ -257,10 +260,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (removeAccess) {
       try {
-        await adminAuth.updateUser(studentId, { disabled: true });
-        await adminAuth.revokeRefreshTokens(studentId);
+        if (deleteLogin) {
+          // Deleting the student: nothing of their sign-in account is kept.
+          await adminAuth.deleteUser(studentId);
+        } else {
+          await adminAuth.updateUser(studentId, { disabled: true });
+          await adminAuth.revokeRefreshTokens(studentId);
+        }
       } catch (err) {
-        const code = (err as { code?: string }).code;
+        const code = (err as { code?: string }).code
+          ?? (err as { errorInfo?: { code?: string } }).errorInfo?.code;
         if (code !== "auth/user-not-found") throw err;
       }
 

@@ -113,12 +113,34 @@ service cloud.firestore {
     }
 
     // ── /users ────────────────────────────────────────────────────────────────
-    // Users can read/write their own doc.
-    // Teachers can read docs for students in their school.
+    // Users can read their own doc and edit their own profile, but never their
+    // role, school, class or login fields.
+    // Teachers can read docs for students in their school and manage those
+    // students (but not change who is a student or which school they're in).
     // Admins have full access.
-    // All authenticated users can list (needed for querying admin emails).
+    // Listing: admins, and teachers looking up admins (deletion-request emails).
+    // Students can't list users at all.
+
+    // Fields only an admin (or the server) may change on someone's own record.
+    // Students also can't change their own name; their teacher sets it.
+    function keepsProtectedUserFields() {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      return !changed.hasAny([
+        'uid', 'role', 'schoolId', 'classId', 'email', 'createdAt',
+        'homeLoginEnabled', 'homeLoginUsername', 'homeLoginEnabledAt'
+      ]) && !(resource.data.role == 'student' && changed.hasAny(['displayName']));
+    }
+
+    // What a teacher may not change on one of their students.
+    function teacherKeepsStudentIdentity() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        'uid', 'role', 'schoolId', 'email',
+        'homeLoginEnabled', 'homeLoginUsername', 'homeLoginEnabledAt'
+      ]);
+    }
+
     match /users/{uid} {
-      allow list: if isAuthed();
+      allow list: if isAdmin() || (isTeacher() && resource.data.role in ['admin', 'Admin']);
       allow read: if isAuthed() && (
         request.auth.uid == uid ||
         isAdmin() ||
@@ -128,10 +150,15 @@ service cloud.firestore {
       // Allow initial self-profile creation on signup, plus teacher/admin managed creation.
       allow create: if isAuthed() && (
         (
+          // A teacher signing up must hold a real access code for the school
+          // they're joining; checked here, not just in the browser.
           request.auth.uid == uid &&
           request.resource.data.uid == uid &&
           request.resource.data.role == 'teacher' &&
-          exists(/databases/$(database)/documents/schools/$(request.resource.data.schoolId))
+          exists(/databases/$(database)/documents/schools/$(request.resource.data.schoolId)) &&
+          request.resource.data.signupAccessCode is string &&
+          exists(/databases/$(database)/documents/schoolAccessCodes/$(request.resource.data.signupAccessCode)) &&
+          get(/databases/$(database)/documents/schoolAccessCodes/$(request.resource.data.signupAccessCode)).data.schoolId == request.resource.data.schoolId
         ) ||
         (
           request.auth.uid == uid &&
@@ -140,14 +167,27 @@ service cloud.firestore {
           exists(/databases/$(database)/documents/adminSignupTokens/$(uid))
         ) ||
         isAdmin() ||
-        (isTeacher() && sameSchool(request.resource.data.schoolId))
+        (
+          isTeacher() &&
+          request.resource.data.role == 'student' &&
+          sameSchool(request.resource.data.schoolId)
+        )
       );
       allow update: if isAuthed() && (
-        request.auth.uid == uid ||
+        (request.auth.uid == uid && keepsProtectedUserFields()) ||
         isAdmin() ||
-        (isTeacher() && sameSchool(userSchoolId()))
+        (
+          isTeacher() &&
+          resource.data.role == 'student' &&
+          sameSchool(userSchoolId()) &&
+          teacherKeepsStudentIdentity()
+        )
       );
-      allow delete: if isAdmin() || (isTeacher() && sameSchool(userSchoolId()));
+      allow delete: if isAdmin() || (
+        isTeacher() &&
+        resource.data.role == 'student' &&
+        sameSchool(userSchoolId())
+      );
     }
 
     // ── /classes ──────────────────────────────────────────────────────────────
@@ -180,7 +220,11 @@ service cloud.firestore {
         (
           isStudent() &&
           request.resource.data.studentId == request.auth.uid &&
-          sameSchool(requestedResultSchoolId())
+          sameSchool(requestedResultSchoolId()) &&
+          // One log is never more than a campaign needs (campaign 12 is 12 miles).
+          request.resource.data.distanceMiles is number &&
+          request.resource.data.distanceMiles > 0 &&
+          request.resource.data.distanceMiles <= 12
         )
       );
       allow update: if isAdmin() || (isTeacher() && sameSchool(resultSchoolId()));

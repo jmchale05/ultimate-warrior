@@ -16,7 +16,8 @@ import {
   deleteDoc,
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { db, storage } from "./firebase";
+import { auth, db, storage } from "./firebase";
+import { deleteStudentLogin } from "./studentLogin";
 import type { AppUser, School, SchoolAccessCode, SchoolType, Class, Result } from "../types";
 
 async function createAuditReference(value: string): Promise<string> {
@@ -540,6 +541,11 @@ export async function approveStudentDeletionRequest(
     throw new Error("Deletion request has already been reviewed.");
   }
 
+  // Their sign-in account (home login) goes first, while the student record
+  // still exists for the server to check; then the record and results.
+  const currentUser = auth.currentUser;
+  if (!currentUser) throw new Error("You must be signed in.");
+  await deleteStudentLogin({ idToken: await currentUser.getIdToken(), studentId: request.studentId });
   await deleteStudentWithCleanup(request.studentId, request.classId);
 
   const reviewedAt = Date.now();

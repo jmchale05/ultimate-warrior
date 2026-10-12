@@ -40,6 +40,8 @@ export interface AppUser {
   classId?: string; // for students
   homeLoginEnabled?: boolean;
   homeLoginUsername?: string;
+  /** The school access code a teacher signed up with; the database checks it belongs to their school. */
+  signupAccessCode?: string;
   homeLoginEnabledAt?: number;
   age?: number;
   photoUrl?: string;

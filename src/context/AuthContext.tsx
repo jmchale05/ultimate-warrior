@@ -201,6 +201,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       privacyConsentAt: Date.now(),
       role: "teacher",
       schoolId: school.id,
+      // The database only accepts a new teacher whose code belongs to this school.
+      signupAccessCode: normalizedAccessCode,
       createdAt: Date.now(),
     };
     savePendingSignup(newUser);

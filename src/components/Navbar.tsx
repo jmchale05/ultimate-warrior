@@ -82,7 +82,8 @@ export default function Navbar() {
     event.preventDefault();
     if (!appUser || !currentUser) return;
 
-    const trimmedName = editDisplayName.trim();
+    // Students keep the name their teacher gave them.
+    const trimmedName = appUser.role === "student" ? appUser.displayName : editDisplayName.trim();
     if (!trimmedName) {
       setEditProfileError("Name is required.");
       return;
@@ -316,12 +317,17 @@ export default function Navbar() {
                 <span className="block text-stone-400 text-xs uppercase tracking-widest mb-2">
                   {appUser.role === "teacher" ? "Last Name" : "Name"}
                 </span>
+                {/* A student's real name is set by their teacher; they can only change their nickname. */}
                 <input
                   type="text"
                   value={editDisplayName}
                   onChange={(e) => setEditDisplayName(e.target.value)}
-                  className="w-full bg-stone-800 border border-stone-700 rounded-lg px-4 py-3 text-stone-100 focus:outline-none focus:border-roman-gold/60"
+                  readOnly={appUser.role === "student"}
+                  className="w-full bg-stone-800 border border-stone-700 rounded-lg px-4 py-3 text-stone-100 focus:outline-none focus:border-roman-gold/60 read-only:opacity-60 read-only:cursor-not-allowed"
                 />
+                {appUser.role === "student" && (
+                  <span className="block mt-1.5 text-stone-500 text-xs">Ask your teacher if your name needs changing.</span>
+                )}
               </label>
 
               {appUser.role === "student" && (
