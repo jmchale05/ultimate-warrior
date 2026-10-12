@@ -1280,7 +1280,7 @@ export default function Campaigns() {
                       </p>
                       <p className="text-stone-400 text-sm mt-1">{s.className} · #{s.campaignNumber} {s.campaignName}</p>
                       {s.homeLoginUsername && (
-                        <p className="text-roman-gold/80 text-sm mt-1 font-semibold">@{s.homeLoginUsername}</p>
+                        <p className="text-roman-gold/80 text-sm mt-1 font-semibold">{s.homeLoginUsername}</p>
                       )}
                     </div>
                     <button
@@ -1390,7 +1390,7 @@ export default function Campaigns() {
                             <MobileLoginIcon enabled={Boolean(s.homeLoginEnabled)} className="w-6 h-6" />
                           </p>
                           {s.homeLoginUsername && (
-                            <p className="text-stone-400 text-base mt-1.5 font-semibold">@{s.homeLoginUsername}</p>
+                            <p className="text-stone-400 text-base mt-1.5 font-semibold">{s.homeLoginUsername}</p>
                           )}
                           <div className="flex flex-wrap items-center gap-2 mt-2.5">
                             {s.hasPendingDeletionRequest && (
@@ -1822,7 +1822,7 @@ export default function Campaigns() {
                   </div>
                   <div className="rounded-lg border border-stone-700/70 bg-stone-800/60 px-4 py-3 space-y-2">
                     <p className="text-stone-400 text-xs uppercase tracking-widest">Username</p>
-                    <p className="text-stone-100 font-semibold text-lg">@{homeLoginCredentials.username}</p>
+                    <p className="text-stone-100 font-semibold text-lg">{homeLoginCredentials.username}</p>
                     <p className="text-stone-400 text-xs uppercase tracking-widest pt-2">Password</p>
                     <p className="text-stone-100 font-semibold text-lg">{homeLoginCredentials.password}</p>
                   </div>
@@ -1845,7 +1845,7 @@ export default function Campaigns() {
                   <div>
                     <p className="text-stone-400 text-xs uppercase tracking-widest mb-2">Username</p>
                     <p className="rounded-lg border border-stone-700/70 bg-stone-800/60 px-4 py-3 text-stone-100 font-semibold text-lg">
-                      @{selectedStudentForHomeLogin.homeLoginUsername}
+                      {selectedStudentForHomeLogin.homeLoginUsername}
                     </p>
                   </div>
                   <div>
@@ -1931,13 +1931,12 @@ export default function Campaigns() {
                   <div>
                     <p className="text-stone-400 text-xs uppercase tracking-widest mb-2">Username</p>
                     <div className="flex items-center rounded-lg border border-stone-700 bg-stone-800 focus-within:border-roman-gold/60">
-                      <span className="pl-4 text-stone-400 font-semibold text-lg">@</span>
                       <input
                         type="text"
                         value={homeLoginUsername}
                         onChange={(e) => setHomeLoginUsername(e.target.value.toLowerCase())}
                         aria-label="Username"
-                        className="w-full bg-transparent px-2 py-3 text-stone-100 font-semibold text-lg focus:outline-none"
+                        className="w-full bg-transparent px-4 py-3 text-stone-100 font-semibold text-lg focus:outline-none"
                       />
                     </div>
                   </div>
