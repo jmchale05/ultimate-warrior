@@ -17,6 +17,10 @@ import type { AppUser, Result } from "../types";
 
 
 
+// The one gold "do this next" button pinned at the bottom on phones.
+const MOBILE_PRIMARY_BUTTON =
+  "w-full rounded-xl border border-roman-gold/70 bg-linear-to-r from-roman-gold/90 via-amber-300 to-roman-gold/90 px-4 py-3.5 text-sm font-bold uppercase tracking-[0.18em] text-stone-950 shadow-[0_0_22px_rgba(212,175,55,0.35)] disabled:opacity-50";
+
 export default function StudentCampaign() {
   const { uid } = useParams<{ uid: string }>();
   const navigate = useNavigate();
@@ -356,6 +360,11 @@ export default function StudentCampaign() {
     myMiles >= campaign.milesRequired &&
     watchedEndVideos.has(selectedCampaign),
   );
+  // The campaign the student is on: the first one not yet finished (miles
+  // done and end video watched).
+  const currentCampaignNumber = CAMPAIGNS.find((c) =>
+    (campaignMiles[c.number] ?? 0) < c.milesRequired || !watchedEndVideos.has(c.number),
+  )?.number ?? CAMPAIGNS.length;
 
   useEffect(() => {
     if (!campaign || status === "locked" || typeof window === "undefined") {
@@ -851,7 +860,7 @@ export default function StudentCampaign() {
               <button
                 type="button"
                 onClick={playMobileHeroVideo}
-                className="w-full rounded-xl border border-roman-gold/70 bg-linear-to-r from-roman-gold/90 via-amber-300 to-roman-gold/90 px-4 py-3.5 text-sm font-bold uppercase tracking-[0.18em] text-stone-950 shadow-[0_0_22px_rgba(212,175,55,0.35)]"
+                className={MOBILE_PRIMARY_BUTTON}
               >
                 {showMobileEndVideo ? "Watch End Video" : "Watch Intro & Begin"}
               </button>
@@ -860,14 +869,21 @@ export default function StudentCampaign() {
                 type="button"
                 onClick={() => {
                   if (!mobileHeroVideo) return;
-                  void completeCampaignVideo(mobileHeroVideo);
+                  const finished = mobileHeroVideo;
+                  void completeCampaignVideo(finished);
+                  // After a campaign's end video, Continue moves on to the next
+                  // campaign (the last one shows the finale instead).
+                  if (finished.isEnd && finished.campaignNumber < CAMPAIGNS.length) {
+                    setSelectedCampaign(finished.campaignNumber + 1);
+                    setMileInput("");
+                  }
                 }}
-                className="w-full rounded-xl border border-roman-gold/70 bg-linear-to-r from-roman-gold/90 via-amber-300 to-roman-gold/90 px-4 py-3.5 text-sm font-bold uppercase tracking-[0.18em] text-stone-950 shadow-[0_0_22px_rgba(212,175,55,0.35)]"
+                className={MOBILE_PRIMARY_BUTTON}
               >
                 Continue
               </button>
             ) : (
-              <p className="py-2 text-center text-stone-400 text-sm">Keep watching to continue</p>
+              <button type="button" disabled className={MOBILE_PRIMARY_BUTTON}>Keep watching to continue</button>
             )}
           </div>
         )}
@@ -892,7 +908,7 @@ export default function StudentCampaign() {
               <button
                 onClick={() => handleLogMiles(campaign.number, campaign.milesRequired)}
                 disabled={submitting}
-                className="shrink-0 rounded-lg border border-roman-gold/40 bg-roman-gold/15 px-5 py-3 text-sm font-bold uppercase tracking-wider text-roman-gold hover:bg-roman-gold/25 transition-colors cursor-pointer disabled:opacity-50"
+                className="shrink-0 rounded-xl border border-roman-gold/70 bg-linear-to-r from-roman-gold/90 via-amber-300 to-roman-gold/90 px-5 py-3 text-sm font-bold uppercase tracking-wider text-stone-950 shadow-[0_0_18px_rgba(212,175,55,0.3)] cursor-pointer disabled:opacity-50"
               >
                 {submitting ? "Saving..." : "Log"}
               </button>
@@ -900,25 +916,58 @@ export default function StudentCampaign() {
             {logMilesError && <p className="text-red-400 text-xs mt-2">{logMilesError}</p>}
           </div>
         )}
+        {/* Finished campaign: the one gold action moves on; rewatching is a small link. */}
         {showCompletedVideoActions && campaign && (
-          <div className="lg:hidden shrink-0 border-t border-stone-800/60 bg-stone-900 px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <div className="lg:hidden shrink-0 border-t border-stone-800/60 bg-stone-900 px-3 pt-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             {videoError && <p className="text-red-400 text-xs text-center mb-2">{videoError}</p>}
-            <div className="flex gap-2">
+            <div className="mb-2.5 flex items-center justify-center gap-3 text-xs text-stone-400">
               <button
+                type="button"
                 onClick={() => void openVideoModal(campaign.number)}
                 disabled={Boolean(videoLoadingKey)}
-                className="flex-1 rounded-xl border border-roman-gold/70 bg-roman-gold/15 px-2 py-3.5 text-[11px] font-bold uppercase tracking-wide text-roman-gold shadow-[0_0_18px_rgba(212,175,55,0.22)] hover:bg-roman-gold/25 transition-colors cursor-pointer disabled:opacity-50"
+                className="underline underline-offset-2 hover:text-roman-gold disabled:opacity-50"
               >
-                {isIntroVideoLoading ? "Loading..." : "Watch Intro Video"}
+                {isIntroVideoLoading ? "Loading..." : "Rewatch intro"}
               </button>
+              <span aria-hidden="true">·</span>
               <button
+                type="button"
                 onClick={() => void openVideoModal(campaign.number, true)}
                 disabled={Boolean(videoLoadingKey)}
-                className="flex-1 rounded-xl border border-roman-gold/70 bg-roman-gold/15 px-2 py-3.5 text-[11px] font-bold uppercase tracking-wide text-roman-gold shadow-[0_0_18px_rgba(212,175,55,0.22)] hover:bg-roman-gold/25 transition-colors cursor-pointer disabled:opacity-50"
+                className="underline underline-offset-2 hover:text-roman-gold disabled:opacity-50"
               >
-                {isEndVideoLoading ? "Loading..." : "Watch End Video"}
+                {isEndVideoLoading ? "Loading..." : "Rewatch end video"}
               </button>
             </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (campaign.number < CAMPAIGNS.length) {
+                  setSelectedCampaign(campaign.number + 1);
+                  setMileInput("");
+                } else {
+                  setShowGrandFinale(true);
+                }
+              }}
+              className={MOBILE_PRIMARY_BUTTON}
+            >
+              {campaign.number < CAMPAIGNS.length ? "Next Campaign →" : "See Your Shield"}
+            </button>
+          </div>
+        )}
+        {/* Locked campaign: take them back to the campaign they're on. */}
+        {status === "locked" && campaign && (
+          <div className="lg:hidden shrink-0 border-t border-stone-800/60 bg-stone-900 px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedCampaign(currentCampaignNumber);
+                setMileInput("");
+              }}
+              className={MOBILE_PRIMARY_BUTTON}
+            >
+              Go to Campaign {currentCampaignNumber}
+            </button>
           </div>
         )}
       </div>
