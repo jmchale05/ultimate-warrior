@@ -203,14 +203,17 @@ export default function Navbar() {
                   role="menu"
                   className="md:hidden absolute right-0 top-[calc(100%+0.5rem)] z-50 w-44 rounded-xl border border-roman-gold/25 bg-stone-950/95 shadow-[0_16px_40px_rgba(0,0,0,0.55)] backdrop-blur-md overflow-hidden origin-top-right actions-dropdown-in"
                 >
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={openEditProfile}
-                    className="w-full text-left px-4 py-3 text-stone-200 text-sm font-medium hover:bg-roman-gold/10 hover:text-roman-gold"
-                  >
-                    Edit Profile
-                  </button>
+                  {/* Students' details are set by their teacher; they can't edit their profile. */}
+                  {appUser.role !== "student" && (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={openEditProfile}
+                      className="w-full text-left px-4 py-3 text-stone-200 text-sm font-medium hover:bg-roman-gold/10 hover:text-roman-gold"
+                    >
+                      Edit Profile
+                    </button>
+                  )}
                   <button
                     type="button"
                     role="menuitem"

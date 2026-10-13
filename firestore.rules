@@ -125,13 +125,16 @@ service cloud.firestore {
     // Students can't list users at all.
 
     // Fields only an admin (or the server) may change on someone's own record.
-    // Students also can't change their own name; their teacher sets it.
+    // Students can only record which campaign videos they've watched; their
+    // name, nickname, photo and everything else are set by their teacher.
     function keepsProtectedUserFields() {
       let changed = request.resource.data.diff(resource.data).affectedKeys();
-      return !changed.hasAny([
-        'uid', 'role', 'schoolId', 'classId', 'email', 'createdAt',
-        'homeLoginEnabled', 'homeLoginUsername', 'homeLoginEnabledAt'
-      ]) && !(resource.data.role == 'student' && changed.hasAny(['displayName']));
+      return resource.data.role == 'student'
+        ? changed.hasOnly(['watchedCampaignVideos', 'watchedCampaignEndVideos'])
+        : !changed.hasAny([
+            'uid', 'role', 'schoolId', 'classId', 'email', 'createdAt',
+            'homeLoginEnabled', 'homeLoginUsername', 'homeLoginEnabledAt'
+          ]);
     }
 
     // What a teacher may not change on one of their students.
