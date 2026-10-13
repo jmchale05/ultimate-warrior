@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import confetti from "canvas-confetti";
 import Navbar from "../components/Navbar";
 import { StudentCampaignSkeleton } from "../components/LoadingSpinner";
-import { getUserDoc, getResultsByStudent, submitResult, updateUserCampaignVideoProgress } from "../lib/firestore";
+import { getUserDoc, getResultsByStudent, updateUserCampaignVideoProgress } from "../lib/firestore";
 import {
   CAMPAIGNS,
   TOTAL_MILES,
@@ -12,6 +12,7 @@ import {
   resolveVideoUrl,
 } from "../lib/campaignConfig";
 import { useAuth } from "../context/AuthContext";
+import { logCampaignMiles } from "../lib/miles";
 import type { AppUser, Result } from "../types";
 
 
@@ -20,7 +21,7 @@ export default function StudentCampaign() {
   const { uid } = useParams<{ uid: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { appUser } = useAuth();
+  const { appUser, currentUser } = useAuth();
   const [student, setStudent] = useState<AppUser | null>(null);
   const [campaignMiles, setCampaignMiles] = useState<Record<number, number>>({});
   const [loading, setLoading] = useState(true);
@@ -33,6 +34,7 @@ export default function StudentCampaign() {
   const [awardModalCampaign, setAwardModalCampaign] = useState<number | null>(null);
   const [mileInput, setMileInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [logMilesError, setLogMilesError] = useState("");
   const [videoLoadingKey, setVideoLoadingKey] = useState<string | null>(null);
   const [videoError, setVideoError] = useState("");
   const [videoPlaybackNotice, setVideoPlaybackNotice] = useState("");
@@ -67,17 +69,24 @@ export default function StudentCampaign() {
     const already = campaignMiles[campaignNumber] ?? 0;
     const remaining = milesRequired - already;
     const toLog = roundMiles(Math.min(input, remaining));
-    if (toLog <= 0) return;
+    if (toLog <= 0 || !currentUser) return;
     setSubmitting(true);
-    await submitResult({
-      challengeId: `campaign-${campaignNumber}`,
-      studentId: uid,
-      classId: student.classId ?? "",
-      schoolId: student.schoolId ?? "",
-      distanceMiles: toLog,
-      completedAt: Date.now(),
-    });
-    const newTotal = already + toLog;
+    setLogMilesError("");
+    let newTotal: number;
+    try {
+      // The server checks the campaign's running total and saves at most what's left.
+      const saved = await logCampaignMiles({
+        idToken: await currentUser.getIdToken(),
+        studentId: uid,
+        campaignNumber,
+        miles: toLog,
+      });
+      newTotal = saved.total;
+    } catch (error) {
+      setLogMilesError(error instanceof Error ? error.message : "Could not log miles. Please try again.");
+      setSubmitting(false);
+      return;
+    }
     setCampaignMiles((prev) => ({ ...prev, [campaignNumber]: newTotal }));
     setMileInput("");
     setSubmitting(false);
@@ -763,6 +772,7 @@ export default function StudentCampaign() {
                             </button>
                           </div>
                           <p className="text-stone-600 text-xs mt-2">{remainingMiles} miles remaining</p>
+                          {logMilesError && <p className="text-red-400 text-xs mt-2">{logMilesError}</p>}
                         </div>
                       ) : !watchedEndVideos.has(selectedCampaign) ? (
                         <div className="hidden lg:block text-center py-4">
@@ -887,6 +897,7 @@ export default function StudentCampaign() {
                 {submitting ? "Saving..." : "Log"}
               </button>
             </div>
+            {logMilesError && <p className="text-red-400 text-xs mt-2">{logMilesError}</p>}
           </div>
         )}
         {showCompletedVideoActions && campaign && (

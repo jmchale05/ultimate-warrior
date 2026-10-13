@@ -208,7 +208,7 @@ service cloud.firestore {
     }
 
     // ── /results ──────────────────────────────────────────────────────────────
-    // Students can submit their own results.
+    // Students log their own results through the server (api/log-miles).
     // Teachers can read results for their school.
     // Admins have full access.
     match /results/{resultId} {
@@ -219,16 +219,9 @@ service cloud.firestore {
       );
       allow create: if isAuthed() && (
         isAdmin() ||
-        (isTeacher() && sameSchool(requestedResultSchoolId())) ||
-        (
-          isStudent() &&
-          request.resource.data.studentId == request.auth.uid &&
-          sameSchool(requestedResultSchoolId()) &&
-          // One log is never more than a campaign needs (campaign 12 is 12 miles).
-          request.resource.data.distanceMiles is number &&
-          request.resource.data.distanceMiles > 0 &&
-          request.resource.data.distanceMiles <= 12
-        )
+        (isTeacher() && sameSchool(requestedResultSchoolId()))
+        // Students log miles through the server (api/log-miles), which checks
+        // the campaign's running total; they can't save results directly.
       );
       allow update: if isAdmin() || (isTeacher() && sameSchool(resultSchoolId()));
       allow delete: if isAdmin() || (isTeacher() && sameSchool(resultSchoolId()));

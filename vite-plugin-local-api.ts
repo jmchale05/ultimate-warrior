@@ -6,6 +6,7 @@ const API_ROUTES: Record<string, string> = {
   "/api/send-admin-deletion-email": "/api/send-admin-deletion-email.ts",
   "/api/send-password-reset-email": "/api/send-password-reset-email.ts",
   "/api/enable-student-home-login": "/api/enable-student-home-login.ts",
+  "/api/log-miles": "/api/log-miles.ts",
 };
 
 type VercelLikeRequest = {
