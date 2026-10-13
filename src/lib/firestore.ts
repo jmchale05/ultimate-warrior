@@ -83,11 +83,12 @@ export async function createSchool(
   const accessCode = generateAccessCode();
   const createdAt = Date.now();
   const trimmedAddress = address?.trim();
+  // The access code is kept only in schoolAccessCodes (admins can read it there),
+  // not on the school record, which students can read.
   const ref = await addDoc(collection(db, "schools"), {
     name,
     schoolType,
     ...(trimmedAddress ? { address: trimmedAddress } : {}),
-    accessCode,
     createdAt,
   });
   await saveSchoolAccessCodeIndex(ref.id, accessCode, name, createdAt);
@@ -98,11 +99,12 @@ export async function deleteSchool(schoolId: string): Promise<void> {
   const school = await getSchoolById(schoolId);
   if (!school) return;
 
-  const [classesSnap, usersSnap, resultsSnap, deletionRequestsSnap] = await Promise.all([
+  const [classesSnap, usersSnap, resultsSnap, deletionRequestsSnap, accessCodesSnap] = await Promise.all([
     getDocs(query(collection(db, "classes"), where("schoolId", "==", schoolId))),
     getDocs(query(collection(db, "users"), where("schoolId", "==", schoolId))),
     getDocs(query(collection(db, "results"), where("schoolId", "==", schoolId))),
     getDocs(query(collection(db, "studentDeletionRequests"), where("schoolId", "==", schoolId))),
+    getDocs(query(collection(db, "schoolAccessCodes"), where("schoolId", "==", schoolId))),
   ]);
 
   const docRefs = [
@@ -110,8 +112,8 @@ export async function deleteSchool(schoolId: string): Promise<void> {
     ...usersSnap.docs.map((snapshot) => snapshot.ref),
     ...resultsSnap.docs.map((snapshot) => snapshot.ref),
     ...deletionRequestsSnap.docs.map((snapshot) => snapshot.ref),
+    ...accessCodesSnap.docs.map((snapshot) => snapshot.ref),
     doc(db, "schools", schoolId),
-    doc(db, "schoolAccessCodes", accessCodeDocId(school.accessCode)),
   ];
 
   await deleteDocumentRefsInBatches(docRefs);
@@ -169,18 +171,22 @@ export async function deleteAdminSignupToken(uid: string): Promise<void> {
   await deleteDoc(doc(db, "adminSignupTokens", uid));
 }
 
+/** Every school, with its access code from schoolAccessCodes (admins only). */
 export async function getAllSchools(): Promise<School[]> {
-  const snap = await getDocs(collection(db, "schools"));
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as School));
-}
-
-export async function ensureSchoolAccessCodeIndex(
-  schoolId: string,
-  accessCode: string,
-  schoolName: string,
-  createdAt: number
-): Promise<void> {
-  await saveSchoolAccessCodeIndex(schoolId, accessCode, schoolName, createdAt);
+  const [schoolsSnap, codesSnap] = await Promise.all([
+    getDocs(collection(db, "schools")),
+    getDocs(collection(db, "schoolAccessCodes")),
+  ]);
+  // The code is the document's ID; each points at its school.
+  const codeBySchool = new Map<string, string>();
+  codesSnap.docs.forEach((d) => {
+    const schoolId = (d.data() as { schoolId?: string }).schoolId;
+    if (schoolId) codeBySchool.set(schoolId, d.id);
+  });
+  return schoolsSnap.docs.map((d) => {
+    const data = d.data() as Omit<School, "id">;
+    return { ...data, id: d.id, accessCode: codeBySchool.get(d.id) ?? data.accessCode ?? "" } as School;
+  });
 }
 
 export async function initializeSchoolCampaignStart(

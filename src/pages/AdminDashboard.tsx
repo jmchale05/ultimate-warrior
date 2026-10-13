@@ -19,7 +19,6 @@ import {
   createUserDoc,
   addStudentToClass,
   recordStudentAuthorityConsent,
-  ensureSchoolAccessCodeIndex,
   updateStudentProfileAndClass,
 } from "../lib/firestore";
 import { YEAR_OPTIONS } from "../lib/yearOptions";
@@ -149,17 +148,6 @@ export default function AdminDashboard() {
         getAllResults(),
         getStudentDeletionRequests("pending"),
       ]);
-
-      await Promise.all(
-        schools.map((school) =>
-          ensureSchoolAccessCodeIndex(
-            school.id,
-            school.accessCode,
-            school.name,
-            school.createdAt
-          )
-        )
-      );
 
       setAllUsers(users);
       setAllResults(results);
