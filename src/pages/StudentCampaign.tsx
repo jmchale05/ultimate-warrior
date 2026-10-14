@@ -116,6 +116,15 @@ export default function StudentCampaign() {
     });
   }
 
+  // Right after sign-in the profile arrives twice (from sign-in, then from
+  // Firebase's signed-in notice). Reload only when who's viewing actually
+  // changes, not for a fresh copy of the same profile; that double reload kept
+  // students on the loading skeleton for a long time after signing in.
+  const viewerUid = appUser?.uid;
+  const viewerRole = appUser?.role;
+  const viewerSchoolId = appUser?.schoolId;
+  const loadedStudentUidRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (!uid || !appUser) return;
     if (appUser.role === "student" && appUser.uid !== uid) {
@@ -123,15 +132,19 @@ export default function StudentCampaign() {
       return;
     }
     const studentUid = uid;
+    // A student on their own page: the app already has their profile.
+    const ownProfile = appUser.role === "student" && appUser.uid === studentUid ? appUser : null;
     async function loadData() {
-      setLoading(true);
+      // The skeleton only shows the first time; reloading the same student is quiet.
+      if (loadedStudentUidRef.current !== studentUid) setLoading(true);
       setLoadError("");
       try {
         const resultsSchoolId = appUser?.role === "teacher" ? appUser.schoolId : undefined;
         const [user, results] = await Promise.all([
-          getUserDoc(studentUid),
+          ownProfile ? Promise.resolve(ownProfile) : getUserDoc(studentUid),
           getResultsByStudent(studentUid, resultsSchoolId),
         ]);
+        loadedStudentUidRef.current = studentUid;
 
         setStudent(user);
         setWatchedCampaigns(new Set(user?.watchedCampaignVideos ?? []));
@@ -184,7 +197,9 @@ export default function StudentCampaign() {
       }
     }
     loadData();
-  }, [uid, appUser, navigate, searchParams]);
+    // Keyed on who's viewing, not the profile object (see above).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uid, viewerUid, viewerRole, viewerSchoolId, navigate, searchParams]);
 
   const totalMiles = CAMPAIGNS.reduce((sum, c) => sum + Math.min(campaignMiles[c.number] ?? 0, c.milesRequired), 0);
 
