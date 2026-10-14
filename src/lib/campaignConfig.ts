@@ -31,7 +31,7 @@ export const CAMPAIGNS: Campaign[] = [
     endVideo: "/mars-complete.mp4",
     startVideoStoragePath: "campaign-videos/mars-welcome.mp4",
     endVideoStoragePath: "campaign-videos/mars-complete.mp4",
-    image: "/campaigns/mars.png",
+    image: "/campaigns/mars.webp",
     description:
       "Every warrior's journey begins with a single step. Mars, the God of War, watches over those brave enough to take the first stride. Complete your first mile and prove you are worthy of the path ahead.",
   },
@@ -44,7 +44,7 @@ export const CAMPAIGNS: Campaign[] = [
     endVideo: "/foundations-end.mp4",
     startVideoStoragePath: "campaign-videos/the-foundations.mp4",
     endVideoStoragePath: "campaign-videos/foundations-end.mp4",
-    image: "/campaigns/romulus.png",
+    image: "/campaigns/romulus.webp",
     description:
       "Twin brothers raised by wolves founded the greatest civilisation the world has ever known. Like Romulus and Remus, you must build strong foundations. Run 2 miles to lay the first stones of your empire.",
   },
@@ -57,7 +57,7 @@ export const CAMPAIGNS: Campaign[] = [
     endVideo: "/augustus-complete.mp4",
     startVideoStoragePath: "campaign-videos/Augustus-welcome.mp4",
     endVideoStoragePath: "campaign-videos/augustus-complete.mp4",
-    image: "/campaigns/augustus.png",
+    image: "/campaigns/augustus.webp",
     description:
       "Augustus transformed Rome from a republic into an unstoppable empire. To follow in his footsteps, you must show discipline and endurance. Conquer 3 miles to claim the imperial mantle.",
   },
@@ -70,7 +70,7 @@ export const CAMPAIGNS: Campaign[] = [
     endVideo: "/TUWC/legion-complete.mp4",
     startVideoStoragePath: "campaign-videos/legion-welcome.mp4",
     endVideoStoragePath: "campaign-videos/legion-complete.mp4",
-    image: "/campaigns/legion.png",
+    image: "/campaigns/legion.webp",
     description:
       "The Roman Legion was the most feared fighting force in the ancient world. Discipline, formation, and relentless marching made them unstoppable. Push through 4 miles and earn your place in the ranks.",
   },
@@ -83,7 +83,7 @@ export const CAMPAIGNS: Campaign[] = [
     endVideo: "/TUWC/trajan-complete.mp4",
     startVideoStoragePath: "campaign-videos/trajan-welcome.mp4",
     endVideoStoragePath: "campaign-videos/trajan-complete.mp4",
-    image: "/campaigns/Trajan1.jpg",
+    image: "/campaigns/Trajan1.webp",
     description:
       "Under Trajan, the Roman Empire reached its greatest territorial extent. His campaigns stretched across mountains and deserts. Cover 5 miles to expand the borders of your own empire.",
   },
@@ -96,7 +96,7 @@ export const CAMPAIGNS: Campaign[] = [
     endVideo: "/hero-end.mp4",
     startVideoStoragePath: "campaign-videos/aurelius-welcome.mp4",
     endVideoStoragePath: "campaign-videos/hero-end.mp4",
-    image: "/campaigns/aurelius.png",
+    image: "/campaigns/aurelius.webp",
     description:
       "Marcus Aurelius, the philosopher emperor, believed strength comes from within. He led from the front lines while writing his Meditations. Run 6 miles with the wisdom and courage of a true hero.",
   },
@@ -109,7 +109,7 @@ export const CAMPAIGNS: Campaign[] = [
     endVideo: "/TUWC/Hadrian-complete.mp4",
     startVideoStoragePath: "campaign-videos/Hadrian-welcome.mp4",
     endVideoStoragePath: "campaign-videos/Hadrian-complete.mp4",
-    image: "/campaigns/Hadrian6.jpg",
+    image: "/campaigns/Hadrian6.webp",
     description:
       "Hadrian built a wall that stretched 73 miles across Britannia - a monument to Roman engineering and determination. Push through 7 miles and build your own unbreakable barrier.",
   },
@@ -122,7 +122,7 @@ export const CAMPAIGNS: Campaign[] = [
     endVideo: "/aurelian-complete.mp4",
     startVideoStoragePath: "campaign-videos/aurelian-welcome.mp4",
     endVideoStoragePath: "campaign-videos/aurelian-complete.mp4",
-    image: "/campaigns/Aurelian7.jpg",
+    image: "/campaigns/Aurelian7.webp",
     description:
       "When the empire was fracturing, Aurelian reunited it through sheer force of will. He earned the title Restitutor Orbis - Restorer of the World. Complete 8 miles to restore your own strength.",
   },
@@ -135,7 +135,7 @@ export const CAMPAIGNS: Campaign[] = [
     endVideo: "/TUWC/Hannibal-complete.mp4",
     startVideoStoragePath: "campaign-videos/hannibal-welcome.mp4",
     endVideoStoragePath: "campaign-videos/Hannibal-complete.mp4",
-    image: "/campaigns/Hannibal3.jpg",
+    image: "/campaigns/Hannibal3.webp",
     description:
       "Hannibal Barca marched elephants across the Alps to strike at the heart of Rome. He was the greatest enemy Rome ever faced. Endure 9 miles and prove you can overcome any obstacle in your path.",
   },
@@ -148,7 +148,7 @@ export const CAMPAIGNS: Campaign[] = [
     endVideo: "/spartacus-complete.mp4",
     startVideoStoragePath: "campaign-videos/spartacus-welcome.mp4",
     endVideoStoragePath: "campaign-videos/spartacus-complete.mp4",
-    image: "/campaigns/Spartacus5.jpg",
+    image: "/campaigns/Spartacus5.webp",
     description:
       "Spartacus rose from slavery to lead the greatest rebellion Rome had ever seen. His courage inspired thousands to fight for freedom. Push through 10 miles with the heart of a gladiator.",
   },
@@ -161,7 +161,7 @@ export const CAMPAIGNS: Campaign[] = [
     endVideo: "/fall-of-rome-complete.mp4",
     startVideoStoragePath: "campaign-videos/fall-of-rome-welcome.mp4",
     endVideoStoragePath: "campaign-videos/fall-of-rome-complete.mp4",
-    image: "/campaigns/TheFallofRome2.jpg",
+    image: "/campaigns/TheFallofRome2.webp",
     description:
       "The barbarian hordes descended on Rome from every direction. Only the strongest warriors survived the fall. Fight through 11 miles and prove you can endure when all seems lost.",
   },
@@ -174,7 +174,7 @@ export const CAMPAIGNS: Campaign[] = [
     endVideo: "/TUWC/julius-complete.mp4",
     startVideoStoragePath: "campaign-videos/julius-welcome.mp4",
     endVideoStoragePath: "campaign-videos/julius-complete.mp4",
-    image: "/campaigns/julius.png",
+    image: "/campaigns/julius.webp",
     description:
       "Julius Caesar conquered Gaul, crossed the Rubicon, and changed the world forever. He is the ultimate warrior. Complete the final 12 miles and cement your legacy as a true champion of Rome.",
   },

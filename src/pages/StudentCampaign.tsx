@@ -661,6 +661,9 @@ export default function StudentCampaign() {
                       <img
                         src={campaign.image}
                         alt={campaign.name}
+                        // Desktop-only panel: "lazy" stops phones (where it's hidden) downloading it.
+                        loading="lazy"
+                        decoding="async"
                         className={`w-full h-full object-cover transition-all duration-500 ${status === "locked" ? "grayscale brightness-50 blur-sm scale-105" : ""}`}
                         onError={() => setImgError((prev) => new Set(prev).add(campaign.number))}
                       />
@@ -802,8 +805,29 @@ export default function StudentCampaign() {
                       ) : (
                         <div className="text-center py-4">
                           <span className="text-5xl mb-4 block">{"\uD83C\uDFC6"}</span>
-                          <p className="text-roman-gold font-serif font-bold text-xl mb-8">Campaign Complete!</p>
-                          
+                          <p className="text-roman-gold font-serif font-bold text-xl mb-3 lg:mb-8">Campaign Complete!</p>
+                          {/* Phones: rewatching sits here; the bottom bar keeps just Next Campaign. */}
+                          <div className="lg:hidden mt-4 grid grid-cols-2 gap-2.5">
+                            {[
+                              { isEnd: false, label: "Rewatch Intro", loading: isIntroVideoLoading },
+                              { isEnd: true, label: "Rewatch End", loading: isEndVideoLoading },
+                            ].map((video) => (
+                              <button
+                                key={video.label}
+                                type="button"
+                                onClick={() => void openVideoModal(campaign.number, video.isEnd)}
+                                disabled={Boolean(videoLoadingKey)}
+                                className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-roman-gold/50 bg-roman-gold/10 px-3 py-3 text-sm font-semibold text-roman-gold transition-colors hover:bg-roman-gold/20 disabled:opacity-50"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 shrink-0" aria-hidden="true">
+                                  <path d="M8 5v14l11-7z" />
+                                </svg>
+                                {video.loading ? "Loading..." : video.label}
+                              </button>
+                            ))}
+                          </div>
+                          {videoError && <p className="lg:hidden text-red-400 text-xs mt-2">{videoError}</p>}
+
                           <div className="hidden lg:block pt-6 border-t border-stone-800/50 text-center">
                             <p className="text-stone-500 text-xs uppercase tracking-[0.25em] font-semibold mb-4">Video Access</p>
                             <div className="flex flex-wrap items-center justify-center gap-4">
@@ -916,29 +940,9 @@ export default function StudentCampaign() {
             {logMilesError && <p className="text-red-400 text-xs mt-2">{logMilesError}</p>}
           </div>
         )}
-        {/* Finished campaign: the one gold action moves on; rewatching is a small link. */}
+        {/* Finished campaign: the one gold action moves on (rewatch links sit under "Campaign Complete!"). */}
         {showCompletedVideoActions && campaign && (
-          <div className="lg:hidden shrink-0 border-t border-stone-800/60 bg-stone-900 px-3 pt-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-            {videoError && <p className="text-red-400 text-xs text-center mb-2">{videoError}</p>}
-            <div className="mb-2.5 flex items-center justify-center gap-3 text-xs text-stone-400">
-              <button
-                type="button"
-                onClick={() => void openVideoModal(campaign.number)}
-                disabled={Boolean(videoLoadingKey)}
-                className="underline underline-offset-2 hover:text-roman-gold disabled:opacity-50"
-              >
-                {isIntroVideoLoading ? "Loading..." : "Rewatch intro"}
-              </button>
-              <span aria-hidden="true">·</span>
-              <button
-                type="button"
-                onClick={() => void openVideoModal(campaign.number, true)}
-                disabled={Boolean(videoLoadingKey)}
-                className="underline underline-offset-2 hover:text-roman-gold disabled:opacity-50"
-              >
-                {isEndVideoLoading ? "Loading..." : "Rewatch end video"}
-              </button>
-            </div>
+          <div className="lg:hidden shrink-0 border-t border-stone-800/60 bg-stone-900 px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             <button
               type="button"
               onClick={() => {
