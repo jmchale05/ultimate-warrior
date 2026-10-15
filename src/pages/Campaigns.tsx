@@ -1628,8 +1628,27 @@ export default function Campaigns() {
           />
           <div className="relative bg-stone-900 border border-roman-gold/20 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-[addStudentModalZoomIn_180ms_cubic-bezier(0.2,0.8,0.2,1)]">
             <div className="h-px w-full bg-linear-to-r from-transparent via-roman-gold/50 to-transparent" />
+            {/* Close: the same as clicking outside the window. */}
+            <button
+              type="button"
+              aria-label="Close"
+              title="Close"
+              disabled={homeLoginSaving}
+              onClick={() => {
+                setShowHomeLoginModal(false);
+                setSelectedStudentForHomeLogin(null);
+                setHomeLoginCredentials(null);
+                setShowHomeLoginReset(false);
+                setHomeLoginConfirm(null);
+              }}
+              className="absolute top-4 right-4 z-10 flex h-9 w-9 items-center justify-center rounded-lg text-stone-400 transition-colors hover:bg-stone-800 hover:text-stone-100 disabled:opacity-40"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" className="h-5 w-5" aria-hidden="true">
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </button>
             <div className="px-8 py-8">
-              <h2 className="text-roman-gold font-serif text-2xl font-bold mb-2 tracking-wide">
+              <h2 className="text-roman-gold font-serif text-2xl font-bold mb-2 tracking-wide pr-8">
                 {selectedStudentForHomeLogin.homeLoginEnabled ? "Mobile Access" : "Add Login"}
               </h2>
               <p className="text-stone-400 text-sm mb-6">
