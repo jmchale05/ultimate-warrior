@@ -78,7 +78,9 @@ service cloud.firestore {
     // Admins: full access
     // Teachers/students: read only their own school document (no listing all schools)
     match /schools/{schoolId} {
-      allow get: if true;
+      // Pre-auth signup/login resolves schools via the public schoolAccessCodes
+      // index, so the school document itself only needs same-school/admin reads.
+      allow get: if isAuthed() && (isAdmin() || sameSchool(schoolId));
       allow list: if isAdmin();
       allow create: if isAdmin();
       allow update: if isAdmin() || (isTeacher() && sameSchool(schoolId));
@@ -154,6 +156,7 @@ service cloud.firestore {
         (isTeacher() && resource.data.role == 'admin')
       );
       // Allow initial self-profile creation on signup, plus teacher/admin managed creation.
+      // Teachers may only create student records (never other teachers/admins).
       allow create: if isAuthed() && (
         (
           // A teacher signing up must hold a real access code for the school
@@ -179,6 +182,9 @@ service cloud.firestore {
           sameSchool(request.resource.data.schoolId)
         )
       );
+      // Admins may update freely. Everyone else may update their permitted docs
+      // but can never change identity-defining fields (role, uid, schoolId),
+      // preventing privilege escalation or cross-school moves.
       allow update: if isAuthed() && (
         (request.auth.uid == uid && keepsProtectedUserFields()) ||
         isAdmin() ||
@@ -189,11 +195,8 @@ service cloud.firestore {
           teacherKeepsStudentIdentity()
         )
       );
-      allow delete: if isAdmin() || (
-        isTeacher() &&
-        resource.data.role == 'student' &&
-        sameSchool(userSchoolId())
-      );
+      // Hard deletes are admin-only; teachers use the deletion-request workflow.
+      allow delete: if isAdmin();
     }
 
     // ── /classes ──────────────────────────────────────────────────────────────
@@ -220,12 +223,16 @@ service cloud.firestore {
         (isTeacher() && sameSchool(resultSchoolId())) ||
         (isStudent() && resource.data.studentId == request.auth.uid)
       );
-      allow create: if isAuthed() && (
-        isAdmin() ||
-        (isTeacher() && sameSchool(requestedResultSchoolId()))
-        // Students log miles through the server (api/log-miles), which checks
-        // the campaign's running total; they can't save results directly.
-      );
+      allow create: if isAuthed() &&
+        request.resource.data.distanceMiles is number &&
+        request.resource.data.distanceMiles >= 0 &&
+        request.resource.data.studentId is string &&
+        request.resource.data.challengeId is string && (
+          isAdmin() ||
+          (isTeacher() && sameSchool(requestedResultSchoolId()))
+          // Students log miles through the server (api/log-miles), which checks
+          // the campaign's running total; they can't save results directly.
+        );
       allow update: if isAdmin() || (isTeacher() && sameSchool(resultSchoolId()));
       allow delete: if isAdmin() || (isTeacher() && sameSchool(resultSchoolId()));
     }
@@ -242,6 +249,22 @@ service cloud.firestore {
         sameSchool(resource.data.schoolId) &&
         resource.data.status == 'pending'
       );
+    }
+
+    // ── /auditLogs ────────────────────────────────────────────────────────────
+    // Append-only audit trail. Any signed-in user may record an action attributed
+    // to themselves; only admins can read. Entries are immutable.
+    match /auditLogs/{logId} {
+      allow create: if isAuthed() && request.resource.data.actorUid == request.auth.uid;
+      allow read: if isAdmin();
+      allow update, delete: if false;
+    }
+
+    // ── /rateLimits ───────────────────────────────────────────────────────────
+    // Managed exclusively by trusted server code via the Admin SDK (which bypasses
+    // these rules). No client access is permitted.
+    match /rateLimits/{id} {
+      allow read, write: if false;
     }
   }
 }

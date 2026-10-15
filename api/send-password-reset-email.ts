@@ -1,12 +1,18 @@
-import { cert, getApps, initializeApp } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
+import {
+  ConfigurationError,
+  enforceRateLimit,
+  ensureFirebaseAdmin,
+  escapeHtml,
+  getAdminAuth,
+  getClientIp,
+  type MinimalRequest,
+} from "./_lib/firebaseAdmin";
 
 type PasswordResetRequestBody = {
   email?: string;
 };
 
-type VercelRequest = {
-  method?: string;
+type VercelRequest = MinimalRequest & {
   body?: PasswordResetRequestBody;
 };
 
@@ -15,67 +21,6 @@ type VercelResponse = {
   json: (body: unknown) => void;
   setHeader: (name: string, value: string) => void;
 };
-
-class ConfigurationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ConfigurationError";
-  }
-}
-
-function getFirebasePrivateKey(): string | undefined {
-  const rawKey = process.env.FIREBASE_PRIVATE_KEY;
-  if (!rawKey) return undefined;
-
-  return rawKey
-    .trim()
-    .replace(/^['"]|['"]$/g, "")
-    .replace(/\\n/g, "\n");
-}
-
-function ensureFirebaseAdmin() {
-  if (getApps().length > 0) return;
-
-  const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const privateKey = getFirebasePrivateKey();
-
-  if (!projectId || !clientEmail || !privateKey) {
-    const missing = [
-      !projectId ? "FIREBASE_PROJECT_ID" : undefined,
-      !clientEmail ? "FIREBASE_CLIENT_EMAIL" : undefined,
-      !privateKey ? "FIREBASE_PRIVATE_KEY" : undefined,
-    ].filter(Boolean);
-
-    throw new ConfigurationError(`Firebase Admin credentials are missing: ${missing.join(", ")}`);
-  }
-
-  if (!privateKey.includes("BEGIN PRIVATE KEY") || !privateKey.includes("END PRIVATE KEY")) {
-    throw new ConfigurationError("FIREBASE_PRIVATE_KEY is not a valid service-account private key");
-  }
-
-  try {
-    initializeApp({
-      credential: cert({
-        projectId,
-        clientEmail,
-        privateKey,
-      }),
-    });
-  } catch (err) {
-    console.error("Failed to initialize Firebase Admin:", err);
-    throw new ConfigurationError("Firebase Admin credentials could not initialize. Check FIREBASE_PRIVATE_KEY formatting in Vercel.");
-  }
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader("Content-Type", "application/json");
@@ -95,15 +40,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const email = req.body?.email?.trim().toLowerCase();
-  if (!email || !email.includes("@")) {
+  if (!email || !email.includes("@") || email.length > 320) {
     res.status(400).json({ error: "A valid email address is required" });
+    return;
+  }
+
+  // ── Rate limiting: throttle per email and per client IP to deter abuse ─────
+  const [perEmail, perIp] = await Promise.all([
+    enforceRateLimit({ key: `pwreset-email:${email}`, limit: 5, windowMs: 15 * 60 * 1000 }),
+    enforceRateLimit({ key: `pwreset-ip:${getClientIp(req)}`, limit: 20, windowMs: 15 * 60 * 1000 }),
+  ]);
+  if (!perEmail.allowed || !perIp.allowed) {
+    const retryAfter = Math.max(perEmail.retryAfterSeconds ?? 0, perIp.retryAfterSeconds ?? 0);
+    if (retryAfter) res.setHeader("Retry-After", String(retryAfter));
+    res.status(429).json({ error: "Too many password reset requests. Please try again later." });
     return;
   }
 
   try {
     ensureFirebaseAdmin();
 
-    const resetLink = await getAuth().generatePasswordResetLink(email);
+    const resetLink = await getAdminAuth().generatePasswordResetLink(email);
     const escapedResetLink = escapeHtml(resetLink);
 
     const emailPayload = {

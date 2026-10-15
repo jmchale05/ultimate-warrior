@@ -69,6 +69,16 @@ function calculateBusinessDays(startTimestamp: number): number {
   return count;
 }
 
+function getCampaignDayCount(campaignStartAt?: number): number {
+  if (typeof campaignStartAt !== "number") return 0;
+  return Math.min(200, calculateBusinessDays(campaignStartAt));
+}
+
+function getCampaignDaysRemaining(campaignStartAt?: number): number {
+  if (typeof campaignStartAt !== "number") return 200;
+  return Math.max(0, 200 - getCampaignDayCount(campaignStartAt));
+}
+
 export default function AdminDashboard() {
   const { appUser } = useAuth();
   const [schoolStats, setSchoolStats] = useState<SchoolStats[]>([]);
@@ -774,23 +784,8 @@ export default function AdminDashboard() {
       sorted.sort((a, b) => b.completedStudents - a.completedStudents);
     } else if (schoolSort === "daysRemaining") {
       sorted.sort((a, b) => {
-        const teacherStartCandidatesA = a.teachers
-          .map((t) => t.createdAt)
-          .filter((ts) => Number.isFinite(ts));
-        const firstTeacherStartA = teacherStartCandidatesA.length > 0
-          ? Math.min(...teacherStartCandidatesA)
-          : undefined;
-        const campaignStartA = a.school.campaignStartAt ?? firstTeacherStartA ?? a.school.createdAt;
-        const daysRemainingA = Math.max(0, 200 - Math.min(200, calculateBusinessDays(campaignStartA)));
-
-        const teacherStartCandidatesB = b.teachers
-          .map((t) => t.createdAt)
-          .filter((ts) => Number.isFinite(ts));
-        const firstTeacherStartB = teacherStartCandidatesB.length > 0
-          ? Math.min(...teacherStartCandidatesB)
-          : undefined;
-        const campaignStartB = b.school.campaignStartAt ?? firstTeacherStartB ?? b.school.createdAt;
-        const daysRemainingB = Math.max(0, 200 - Math.min(200, calculateBusinessDays(campaignStartB)));
+        const daysRemainingA = getCampaignDaysRemaining(a.school.campaignStartAt);
+        const daysRemainingB = getCampaignDaysRemaining(b.school.campaignStartAt);
 
         return daysRemainingA - daysRemainingB;
       });
@@ -1165,14 +1160,7 @@ export default function AdminDashboard() {
               </div>
             ) : (
               paginatedSchools.map((s) => {
-                const teacherStartCandidates = s.teachers
-                  .map((t) => t.createdAt)
-                  .filter((ts) => Number.isFinite(ts));
-                const firstTeacherStart = teacherStartCandidates.length > 0
-                  ? Math.min(...teacherStartCandidates)
-                  : undefined;
-                const campaignStart = s.school.campaignStartAt ?? firstTeacherStart ?? s.school.createdAt;
-                const dayCount = Math.min(200, calculateBusinessDays(campaignStart));
+                const dayCount = getCampaignDayCount(s.school.campaignStartAt);
                 const isExpanded = expandedSchoolId === s.school.id;
 
                 return (
@@ -1395,14 +1383,7 @@ export default function AdminDashboard() {
                   </tr>
                 ) : (
                   paginatedSchools.map((s) => {
-                    const teacherStartCandidates = s.teachers
-                      .map((t) => t.createdAt)
-                      .filter((ts) => Number.isFinite(ts));
-                    const firstTeacherStart = teacherStartCandidates.length > 0
-                      ? Math.min(...teacherStartCandidates)
-                      : undefined;
-                    const campaignStart = s.school.campaignStartAt ?? firstTeacherStart ?? s.school.createdAt;
-                    const dayCount = Math.min(200, calculateBusinessDays(campaignStart));
+                    const dayCount = getCampaignDayCount(s.school.campaignStartAt);
                     const isExpanded = expandedSchoolId === s.school.id;
                     return (
                       <React.Fragment key={s.school.id}>

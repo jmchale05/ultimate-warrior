@@ -1,5 +1,13 @@
+import {
+  ConfigurationError,
+  enforceRateLimit,
+  escapeHtml,
+  getAdminFirestore,
+  verifyBearerToken,
+  type MinimalRequest,
+} from "./_lib/firebaseAdmin";
+
 type DeletionEmailRequestBody = {
-  recipients?: string[];
   requestId?: string;
   studentName?: string;
   studentRomanNickname?: string;
@@ -10,8 +18,7 @@ type DeletionEmailRequestBody = {
   reason?: string;
 };
 
-type VercelRequest = {
-  method?: string;
+type VercelRequest = MinimalRequest & {
   body?: DeletionEmailRequestBody;
 };
 
@@ -20,6 +27,23 @@ type VercelResponse = {
   json: (body: unknown) => void;
   setHeader: (name: string, value: string) => void;
 };
+
+async function getAdminRecipientEmails(): Promise<string[]> {
+  const db = getAdminFirestore();
+  // Support both the canonical "admin" role and the legacy capitalized "Admin".
+  const [lower, upper] = await Promise.all([
+    db.collection("users").where("role", "==", "admin").get(),
+    db.collection("users").where("role", "==", "Admin").get(),
+  ]);
+
+  return Array.from(
+    new Set(
+      [...lower.docs, ...upper.docs]
+        .map((d) => String((d.data() as { email?: string }).email ?? "").trim().toLowerCase())
+        .filter((email) => email.includes("@"))
+    )
+  );
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader("Content-Type", "application/json");
@@ -38,8 +62,45 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
+  // ── Authentication: caller must present a valid Firebase ID token ──────────
+  let caller;
+  try {
+    caller = await verifyBearerToken(req);
+  } catch (err) {
+    if (err instanceof ConfigurationError) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    throw err;
+  }
+
+  if (!caller) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+
+  // ── Authorization: only teachers/admins may trigger deletion notifications ─
+  const db = getAdminFirestore();
+  const callerSnap = await db.collection("users").doc(caller.uid).get();
+  const callerRole = callerSnap.exists ? String((callerSnap.data() as { role?: string }).role ?? "") : "";
+  if (!["teacher", "admin", "Admin"].includes(callerRole)) {
+    res.status(403).json({ error: "You do not have permission to perform this action" });
+    return;
+  }
+
+  // ── Rate limiting (per caller) ─────────────────────────────────────────────
+  const rate = await enforceRateLimit({
+    key: `deletion-email:${caller.uid}`,
+    limit: 30,
+    windowMs: 60 * 60 * 1000,
+  });
+  if (!rate.allowed) {
+    if (rate.retryAfterSeconds) res.setHeader("Retry-After", String(rate.retryAfterSeconds));
+    res.status(429).json({ error: "Too many requests. Please try again later." });
+    return;
+  }
+
   const {
-    recipients = [],
     requestId,
     studentName,
     studentRomanNickname,
@@ -50,12 +111,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     reason,
   } = req.body ?? {};
 
-  const validRecipients = Array.from(
-    new Set(recipients.map((email) => email.trim().toLowerCase()).filter((email) => email.includes("@")))
-  );
-
-  if (!requestId || !studentName || !className || !schoolName || !requestedByName || !reason || validRecipients.length === 0) {
+  if (!requestId || !studentName || !className || !schoolName || !requestedByName || !reason) {
     res.status(400).json({ error: "Missing required email payload fields" });
+    return;
+  }
+
+  // ── Recipients are derived server-side (never trusted from the client) ─────
+  let validRecipients: string[];
+  try {
+    validRecipients = await getAdminRecipientEmails();
+  } catch (err) {
+    console.error("Failed to load admin recipients:", err);
+    res.status(500).json({ error: "Could not resolve admin recipients" });
+    return;
+  }
+
+  if (validRecipients.length === 0) {
+    res.status(200).json({ sent: 0, id: null });
     return;
   }
 
@@ -63,6 +135,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     .map((value) => value?.trim())
     .filter(Boolean)
     .join(" ");
+
+  const safeStudentName = escapeHtml(studentName);
+  const safeRomanNickname = studentRomanNickname ? escapeHtml(studentRomanNickname) : "";
+  const safeClassName = escapeHtml(className);
+  const safeSchoolName = escapeHtml(schoolName);
+  const safeRequestedBy = escapeHtml(requestedByDisplayName);
+  const safeReason = escapeHtml(reason);
+  const safeRequestId = escapeHtml(requestId);
 
   const emailPayload = {
     from: `${fromName} <${fromEmail}>`,
@@ -134,17 +214,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                   <h3>Student Information</h3>
                   <div class="detail-row">
                     <div class="detail-label">Name</div>
-                    <div class="detail-value">${studentName}</div>
+                    <div class="detail-value">${safeStudentName}</div>
                   </div>
-                  ${studentRomanNickname ? `
+                  ${safeRomanNickname ? `
                   <div class="detail-row">
                     <div class="detail-label">Roman Name</div>
-                    <div class="detail-value">${studentRomanNickname}</div>
+                    <div class="detail-value">${safeRomanNickname}</div>
                   </div>
                   ` : ""}
                   <div class="detail-row">
                     <div class="detail-label">Year/Class</div>
-                    <div class="detail-value">${className}</div>
+                    <div class="detail-value">${safeClassName}</div>
                   </div>
                 </div>
 
@@ -152,25 +232,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                   <h3>Request Details</h3>
                   <div class="detail-row">
                     <div class="detail-label">Requested By</div>
-                    <div class="detail-value">${requestedByDisplayName}</div>
+                    <div class="detail-value">${safeRequestedBy}</div>
                   </div>
                   <div class="detail-row">
                     <div class="detail-label">School</div>
-                    <div class="detail-value">${schoolName}</div>
+                    <div class="detail-value">${safeSchoolName}</div>
                   </div>
                 </div>
 
                 <div class="details-section">
                   <h3>Reason for Deletion</h3>
                   <div class="reason-box">
-                    <p>${reason}</p>
+                    <p>${safeReason}</p>
                   </div>
                 </div>
               </div>
 
               <div class="footer">
                 <p><strong>Next Steps:</strong> Log into the admin dashboard to approve or reject this deletion request.</p>
-                <p style="font-size: 11px; color: #8f8370; margin-top: 15px; border-top: 1px solid rgba(212,175,55,0.12); padding-top: 10px;">Request ID: <span class="request-id">${requestId}</span></p>
+                <p style="font-size: 11px; color: #8f8370; margin-top: 15px; border-top: 1px solid rgba(212,175,55,0.12); padding-top: 10px;">Request ID: <span class="request-id">${safeRequestId}</span></p>
                 <p>This is an automated message. Do not reply to this email.</p>
               </div>
             </div>

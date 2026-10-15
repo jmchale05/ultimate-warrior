@@ -1,9 +1,11 @@
+import { TERMS_AND_CONDITIONS_PDF_URL } from "../lib/legalDocuments";
+
 type TeacherSupportModalProps = {
   onClose: () => void;
 };
 
 const supportEmail = "support@tuwc.online";
-const policiesHref = "/Terms%20%26%20Conditions.docx.pdf";
+const policiesHref = TERMS_AND_CONDITIONS_PDF_URL;
 
 const supportQuestions = [
   {

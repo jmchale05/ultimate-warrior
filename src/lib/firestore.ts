@@ -20,6 +20,34 @@ import { auth, db, storage } from "./firebase";
 import { deleteStudentLogin } from "./studentLogin";
 import type { AppUser, School, SchoolAccessCode, SchoolType, Class, Result } from "../types";
 
+// ─── Audit logging ──────────────────────────────────────────────────────────
+// Appends an immutable audit entry attributed to the current user. Best-effort:
+// failures are logged but never interrupt the action being audited.
+export async function writeAuditLog(entry: {
+  action: string;
+  targetType?: string;
+  targetId?: string;
+  schoolId?: string;
+  metadata?: Record<string, unknown>;
+}): Promise<void> {
+  try {
+    const actor = auth.currentUser;
+    if (!actor) return;
+
+    await addDoc(collection(db, "auditLogs"), {
+      actorUid: actor.uid,
+      action: entry.action,
+      ...(entry.targetType ? { targetType: entry.targetType } : {}),
+      ...(entry.targetId ? { targetId: entry.targetId } : {}),
+      ...(entry.schoolId ? { schoolId: entry.schoolId } : {}),
+      ...(entry.metadata ? { metadata: entry.metadata } : {}),
+      createdAt: Date.now(),
+    });
+  } catch (err) {
+    console.error("Failed to write audit log:", err);
+  }
+}
+
 async function createAuditReference(value: string): Promise<string> {
   const encoder = new TextEncoder();
   const digest = await crypto.subtle.digest("SHA-256", encoder.encode(value));
@@ -92,6 +120,13 @@ export async function createSchool(
     createdAt,
   });
   await saveSchoolAccessCodeIndex(ref.id, accessCode, name, createdAt);
+  void writeAuditLog({
+    action: "school.create",
+    targetType: "school",
+    targetId: ref.id,
+    schoolId: ref.id,
+    metadata: { name },
+  });
   return { id: ref.id, accessCode };
 }
 
@@ -117,6 +152,13 @@ export async function deleteSchool(schoolId: string): Promise<void> {
   ];
 
   await deleteDocumentRefsInBatches(docRefs);
+  void writeAuditLog({
+    action: "school.delete",
+    targetType: "school",
+    targetId: schoolId,
+    schoolId,
+    metadata: { name: school.name },
+  });
 }
 
 export async function updateSchool(
@@ -129,6 +171,12 @@ export async function updateSchool(
     name,
     schoolType,
     address: address || deleteField(),
+  });
+  void writeAuditLog({
+    action: "school.update",
+    targetType: "school",
+    targetId: schoolId,
+    schoolId,
   });
 }
 
@@ -146,6 +194,25 @@ export async function getSchoolByAccessCode(accessCode: string): Promise<School 
 
   const codeData = codeSnap.data() as Omit<SchoolAccessCode, "id">;
   return getSchoolById(codeData.schoolId);
+}
+
+/**
+ * Resolves the school id + name for an access code using only the public
+ * access-code index document. Used during signup/login BEFORE the user is
+ * authenticated, so it must not read the protected `schools` collection.
+ */
+export async function getSchoolSummaryByAccessCode(
+  accessCode: string
+): Promise<{ id: string; name: string } | null> {
+  const normalizedCode = accessCodeDocId(accessCode);
+  if (!normalizedCode) return null;
+
+  const codeSnap = await getDoc(doc(db, "schoolAccessCodes", normalizedCode));
+  if (!codeSnap.exists()) return null;
+
+  const codeData = codeSnap.data() as Omit<SchoolAccessCode, "id">;
+  if (!codeData.schoolId) return null;
+  return { id: codeData.schoolId, name: codeData.schoolName ?? "" };
 }
 
 export async function getAdminAccessCodeStatus(accessCode: string): Promise<boolean> {
@@ -346,6 +413,11 @@ export async function deleteStudentWithCleanup(
   batch.delete(doc(db, "users", studentId));
 
   await batch.commit();
+  void writeAuditLog({
+    action: "student.delete",
+    targetType: "user",
+    targetId: studentId,
+  });
 }
 
 interface StudentDeletionRequestInput {
@@ -479,25 +551,22 @@ export async function createStudentDeletionRequestAndNotifyAdmins(
 ): Promise<{ requestId: string; queuedEmails: number }> {
   const requestId = await createStudentDeletionRequest(request);
 
-  try {
-    const [adminsLowercaseSnap, adminsCapitalizedSnap, schoolSnap] = await Promise.all([
-      getDocs(query(collection(db, "users"), where("role", "==", "admin"))),
-      getDocs(query(collection(db, "users"), where("role", "==", "Admin"))),
-      getDoc(doc(db, "schools", request.schoolId)),
-    ]);
+  void writeAuditLog({
+    action: "studentDeletionRequest.create",
+    targetType: "studentDeletionRequest",
+    targetId: requestId,
+    schoolId: request.schoolId,
+  });
 
+  try {
+    // The school name is shown in the email. Admin recipients are resolved
+    // server-side from a verified token, so they are never sent from the client.
+    const schoolSnap = await getDoc(doc(db, "schools", request.schoolId));
     const schoolName = (schoolSnap.data() as School)?.name ?? "Unknown School";
 
-    const adminEmails = Array.from(
-      new Set(
-        [...adminsLowercaseSnap.docs, ...adminsCapitalizedSnap.docs]
-          .map((d) => (d.data() as AppUser).email?.trim().toLowerCase())
-          .filter((email): email is string => Boolean(email && email.includes("@")))
-      )
-    );
-
-    if (adminEmails.length === 0) {
-      console.warn("No admin email recipients found for deletion request", { requestId, schoolId: request.schoolId });
+    const token = await auth.currentUser?.getIdToken();
+    if (!token) {
+      console.warn("No authenticated session to send deletion request email", { requestId });
       return { requestId, queuedEmails: 0 };
     }
 
@@ -505,9 +574,9 @@ export async function createStudentDeletionRequestAndNotifyAdmins(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
-        recipients: adminEmails,
         requestId,
         studentName: request.studentName,
         studentRomanNickname: request.studentRomanNickname,
@@ -525,7 +594,7 @@ export async function createStudentDeletionRequestAndNotifyAdmins(
 
     const emailResult = (await emailResponse.json()) as { sent?: number };
 
-    return { requestId, queuedEmails: emailResult.sent ?? adminEmails.length };
+    return { requestId, queuedEmails: emailResult.sent ?? 0 };
   } catch (err) {
     console.error("Failed to queue admin deletion-request emails:", err);
     return { requestId, queuedEmails: 0 };
@@ -576,6 +645,13 @@ export async function approveStudentDeletionRequest(
     reason: deleteField(),
     className: deleteField(),
   });
+
+  void writeAuditLog({
+    action: "studentDeletionRequest.approve",
+    targetType: "studentDeletionRequest",
+    targetId: requestId,
+    schoolId: request.schoolId,
+  });
 }
 
 export async function rejectStudentDeletionRequest(
@@ -614,6 +690,13 @@ export async function rejectStudentDeletionRequest(
     requestedByName: deleteField(),
     reason: deleteField(),
     className: deleteField(),
+  });
+
+  void writeAuditLog({
+    action: "studentDeletionRequest.reject",
+    targetType: "studentDeletionRequest",
+    targetId: requestId,
+    schoolId: request.schoolId,
   });
 }
 

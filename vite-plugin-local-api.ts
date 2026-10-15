@@ -12,7 +12,7 @@ const API_ROUTES: Record<string, string> = {
 type VercelLikeRequest = {
   method?: string;
   body?: unknown;
-  headers?: IncomingMessage["headers"];
+  headers?: Record<string, string | string[] | undefined>;
 };
 
 type VercelLikeResponse = {
@@ -92,7 +92,7 @@ async function handleApiRequest(
     {
       method: req.method,
       body,
-      headers: req.headers,
+      headers: req.headers as Record<string, string | string[] | undefined>,
     },
     createVercelResponse(res)
   );

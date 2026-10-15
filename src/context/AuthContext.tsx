@@ -18,7 +18,7 @@ import {
   createUserDoc,
   deleteAdminSignupToken,
   getAdminAccessCodeStatus,
-  getSchoolByAccessCode,
+  getSchoolSummaryByAccessCode,
   getUserDoc,
   initializeSchoolCampaignStart,
 } from "../lib/firestore";
@@ -185,7 +185,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const school = await getSchoolByAccessCode(normalizedAccessCode);
+    const school = await getSchoolSummaryByAccessCode(normalizedAccessCode);
     if (!school) {
       throw new Error("Invalid access code. Please check the code and try again.");
     }

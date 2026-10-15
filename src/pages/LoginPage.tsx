@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { ButtonSpinner } from "../components/LoadingSpinner";
-import { getAdminAccessCodeStatus, getSchoolByAccessCode } from "../lib/firestore";
+import { getAdminAccessCodeStatus, getSchoolSummaryByAccessCode } from "../lib/firestore";
 import TeacherSupportModal from "../components/TeacherSupportModal";
 
 type Mode = "signin" | "signup";
@@ -196,7 +196,7 @@ export default function LoginPage() {
         setConfirmedSignupRole("admin");
         setConfirmedSchoolName("Administrator Account");
       } else {
-        const school = await getSchoolByAccessCode(accessCode);
+        const school = await getSchoolSummaryByAccessCode(accessCode);
         if (!school) {
           setAccessCodeConfirmed(false);
           setConfirmedSignupRole(null);

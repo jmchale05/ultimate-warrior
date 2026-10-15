@@ -800,6 +800,15 @@ export default function StudentCampaign() {
                           </div>
                           <p className="text-stone-600 text-xs mt-2">{remainingMiles} miles remaining</p>
                           {logMilesError && <p className="text-red-400 text-xs mt-2">{logMilesError}</p>}
+                          <button
+                            type="button"
+                            onClick={() => void openVideoModal(campaign.number)}
+                            disabled={Boolean(videoLoadingKey)}
+                            className="mt-4 inline-flex items-center gap-2 text-roman-gold/80 text-xs uppercase tracking-wider font-semibold hover:text-roman-gold transition-colors cursor-pointer disabled:opacity-50"
+                          >
+                            <span>{"⏵"}</span>
+                            <span>{isIntroVideoLoading ? "Loading Intro..." : "Rewatch Intro Video"}</span>
+                          </button>
                         </div>
                       ) : !watchedEndVideos.has(selectedCampaign) ? (
                         <div className="hidden lg:block text-center py-4">
@@ -816,6 +825,16 @@ export default function StudentCampaign() {
                           </button>
                           <p className="text-stone-600 text-xs mt-4 uppercase tracking-widest">Watch the closing video to complete the campaign</p>
                           {videoError && <p className="text-red-400 text-xs mt-3">{videoError}</p>}
+                          <div className="mt-6 pt-5 border-t border-stone-800/50">
+                            <p className="text-stone-500 text-xs uppercase tracking-[0.25em] font-semibold mb-3">Video Access</p>
+                            <button
+                              onClick={() => void openVideoModal(campaign.number)}
+                              disabled={Boolean(videoLoadingKey)}
+                              className="px-5 py-2.5 rounded-xl border border-roman-gold/30 text-roman-gold text-xs uppercase tracking-wider font-semibold hover:bg-roman-gold/10 transition-colors cursor-pointer"
+                            >
+                              {isIntroVideoLoading ? "Loading Intro..." : "Watch Intro Video"}
+                            </button>
+                          </div>
                         </div>
                       ) : (
                         <div className="text-center py-4">

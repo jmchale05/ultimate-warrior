@@ -1,6 +1,5 @@
 import { useNavigate } from "react-router-dom";
-
-const TERMS_PDF_PATH = "/Terms%20%26%20Conditions.docx.pdf";
+import { TERMS_AND_CONDITIONS_PDF_URL } from "../lib/legalDocuments";
 
 export default function TermsConditionsPage() {
   const navigate = useNavigate();
@@ -27,7 +26,7 @@ export default function TermsConditionsPage() {
         </div>
         <div className="flex items-center gap-3">
           <a
-            href={TERMS_PDF_PATH}
+            href={TERMS_AND_CONDITIONS_PDF_URL}
             target="_blank"
             rel="noreferrer"
             className="text-xs font-sans bg-gray-100 border border-gray-300 text-gray-700 px-3 py-1.5 rounded hover:bg-gray-200 transition-colors"
@@ -39,11 +38,18 @@ export default function TermsConditionsPage() {
 
       <main className="flex-1 bg-gray-100 p-4 md:p-6 lg:p-8">
         <div className="w-full h-full min-h-[calc(100vh-120px)] bg-white border border-gray-300 shadow-sm rounded overflow-hidden">
-          <iframe
+          <object
+            data={TERMS_AND_CONDITIONS_PDF_URL}
+            type="application/pdf"
             title="Terms and Conditions"
-            src={TERMS_PDF_PATH}
             className="w-full h-[calc(100vh-120px)]"
-          />
+          >
+            <iframe
+              title="Terms and Conditions"
+              src={TERMS_AND_CONDITIONS_PDF_URL}
+              className="w-full h-[calc(100vh-120px)]"
+            />
+          </object>
         </div>
       </main>
     </div>
