@@ -19,7 +19,6 @@ import {
   updateUserPhoto,
   recordStudentAuthorityConsent,
 } from "../lib/firestore";
-import { downloadXlsx } from "../lib/excelWorkbook";
 import {
   disableStudentHomeLogin,
   enableStudentHomeLogin,
@@ -181,17 +180,6 @@ function MobileLoginIcon({ enabled, className }: { enabled: boolean; className: 
   );
 }
 
-function uniqueStudents(rows: StudentRow[]): StudentRow[] {
-  const seen = new Set<string>();
-  const unique: StudentRow[] = [];
-  for (const row of rows) {
-    if (seen.has(row.uid)) continue;
-    seen.add(row.uid);
-    unique.push(row);
-  }
-  return unique;
-}
-
 function sortStudentRows(rows: StudentRow[]): StudentRow[] {
   return [...rows].sort((a, b) => {
     if (a.hasPendingDeletionRequest !== b.hasPendingDeletionRequest) {
@@ -264,11 +252,6 @@ export default function Campaigns() {
   const [homeLoginCredentials, setHomeLoginCredentials] = useState<{ name: string; username: string; password: string } | null>(null);
   const [showHomeLoginReset, setShowHomeLoginReset] = useState(false);
   const [homeLoginConfirm, setHomeLoginConfirm] = useState<null | "reset" | "remove">(null);
-  const [showBulkLoginModal, setShowBulkLoginModal] = useState(false);
-  const [bulkLoginRunning, setBulkLoginRunning] = useState(false);
-  const [bulkLoginProgress, setBulkLoginProgress] = useState("");
-  const [bulkLoginError, setBulkLoginError] = useState("");
-  const [bulkLoginSummary, setBulkLoginSummary] = useState<{ created: number; failed: string[] } | null>(null);
 
   const yearOptions = YEAR_OPTIONS;
 
@@ -663,81 +646,6 @@ export default function Campaigns() {
     }
   }
 
-  function openBulkLoginModal() {
-    setBulkLoginError("");
-    setBulkLoginProgress("");
-    setBulkLoginSummary(null);
-    setShowBulkLoginModal(true);
-  }
-
-  async function handleBulkAddLogins() {
-    const roster = uniqueStudents(students);
-    const targets = roster
-      .filter((student) => !student.homeLoginEnabled && !student.hasPendingDeletionRequest)
-      .sort((a, b) => a.className.localeCompare(b.className) || a.name.localeCompare(b.name));
-
-    if (!currentUser || targets.length === 0) {
-      setBulkLoginError("Every student already has a mobile login.");
-      return;
-    }
-
-    setBulkLoginRunning(true);
-    setBulkLoginError("");
-    setBulkLoginSummary(null);
-    const taken = roster
-      .map((student) => student.homeLoginUsername)
-      .filter((username): username is string => Boolean(username));
-    const created: { uid: string; username: string }[] = [];
-    const sheetRows = [["Name", "Year", "Username", "Password"]];
-    const failed: string[] = [];
-
-    try {
-      const idToken = await currentUser.getIdToken();
-      for (let index = 0; index < targets.length; index += 1) {
-        const student = targets[index];
-        setBulkLoginProgress(`Adding login ${index + 1} of ${targets.length}…`);
-        const username = suggestStudentUsername(student.name, taken);
-        const password = generateStudentPassword();
-        try {
-          const result = await enableStudentHomeLogin({
-            idToken,
-            studentId: student.uid,
-            username,
-            password,
-          });
-          taken.push(result.username);
-          created.push({ uid: student.uid, username: result.username });
-          sheetRows.push([student.name, student.className, result.username, password]);
-        } catch (err) {
-          const message = err instanceof Error ? err.message : "Could not add login.";
-          failed.push(`${student.name}: ${message}`);
-        }
-      }
-
-      if (created.length > 0) {
-        const createdById = new Map(created.map((row) => [row.uid, row.username]));
-        setStudents((prev) =>
-          prev.map((row) => {
-            const username = createdById.get(row.uid);
-            return username ? { ...row, homeLoginEnabled: true, homeLoginUsername: username } : row;
-          })
-        );
-        const today = new Date().toISOString().slice(0, 10);
-        downloadXlsx(`mobile-logins-${today}.xlsx`, sheetRows, "Mobile Logins");
-      }
-
-      setBulkLoginSummary({ created: created.length, failed });
-      setBulkLoginProgress("");
-      if (created.length === 0) {
-        setBulkLoginError(failed[0] ?? "Could not add mobile logins.");
-      }
-    } catch (err) {
-      setBulkLoginError(err instanceof Error ? err.message : "Could not add mobile logins.");
-    } finally {
-      setBulkLoginRunning(false);
-    }
-  }
-
   function handleOpenEditStudent(student: StudentRow) {
     setSelectedStudentForEdit(student);
     setEditName(student.name);
@@ -1034,9 +942,6 @@ export default function Campaigns() {
       String(student.campaignNumber),
     ].some((value) => value.toLowerCase().includes(normalizedSearch));
   });
-  const roster = uniqueStudents(students);
-  const studentsNeedingLogin = roster.filter((student) => !student.homeLoginEnabled && !student.hasPendingDeletionRequest);
-  const studentsWithLogin = roster.filter((student) => student.homeLoginEnabled).length;
   const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE) || 1;
   const paginatedStudents = filtered.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
@@ -1170,19 +1075,6 @@ export default function Campaigns() {
               )}
             </div>
 
-            <button
-              type="button"
-              onClick={openBulkLoginModal}
-              disabled={students.length === 0 || studentsNeedingLogin.length === 0 || bulkLoginRunning}
-              title={studentsNeedingLogin.length === 0 ? "Every student already has a mobile login" : "Add mobile logins and download them as Excel"}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-roman-gold/50 bg-stone-950/85 px-3 sm:px-5 py-3 text-[10px] sm:text-sm font-bold uppercase tracking-wider sm:tracking-[0.2em] text-roman-gold shadow-[0_12px_30px_rgba(0,0,0,0.35)] transition-all hover:bg-stone-900 hover:scale-[1.03] active:scale-[0.97] shrink-0 whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4" aria-hidden="true">
-                <path d="M10.5 1.5H8.25A2.25 2.25 0 0 0 6 3.75v16.5a2.25 2.25 0 0 0 2.25 2.25h7.5A2.25 2.25 0 0 0 18 20.25V3.75a2.25 2.25 0 0 0-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" />
-              </svg>
-              <span className="hidden sm:inline">Add Logins</span>
-              <span className="sm:hidden">Logins</span>
-            </button>
             <button
               type="button"
               onClick={handleTopAddStudentClick}
@@ -1715,75 +1607,6 @@ export default function Campaigns() {
                   {removingDeleteRequestForStudentId === selectedStudentForCancelDeleteRequest.uid ? "Canceling..." : "Cancel Request"}
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showBulkLoginModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-stone-950/80 backdrop-blur-sm"
-            onClick={() => {
-              if (bulkLoginRunning) return;
-              setShowBulkLoginModal(false);
-            }}
-          />
-          <div className="relative bg-stone-900 border border-roman-gold/20 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-[addStudentModalZoomIn_180ms_cubic-bezier(0.2,0.8,0.2,1)]">
-            <div className="h-px w-full bg-linear-to-r from-transparent via-roman-gold/50 to-transparent" />
-            <div className="px-8 py-8">
-              <h2 className="text-roman-gold font-serif text-2xl font-bold mb-2 tracking-wide">Add Logins</h2>
-              {bulkLoginSummary ? (
-                <div className="space-y-4">
-                  <p className="text-stone-300 text-sm">
-                    {bulkLoginSummary.created === 0
-                      ? "No logins were added."
-                      : `${bulkLoginSummary.created} login${bulkLoginSummary.created === 1 ? "" : "s"} saved. The Excel file has downloaded. Passwords are only in that file.`}
-                  </p>
-                  {bulkLoginSummary.failed.length > 0 && (
-                    <div className="rounded-lg border border-red-400/30 bg-red-950/30 px-4 py-3 text-red-200 text-sm space-y-1">
-                      {bulkLoginSummary.failed.map((failure) => (
-                        <p key={failure}>{failure}</p>
-                      ))}
-                    </div>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setShowBulkLoginModal(false)}
-                    className="w-full py-3 rounded-xl bg-roman-gold text-stone-950 font-semibold hover:brightness-110 transition-all"
-                  >
-                    Done
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <p className="text-stone-400 text-sm">
-                    Add a mobile login for {studentsNeedingLogin.length} student{studentsNeedingLogin.length === 1 ? "" : "s"} and download the usernames and passwords as an Excel file.
-                    {studentsWithLogin > 0 ? ` ${studentsWithLogin} student${studentsWithLogin === 1 ? "" : "s"} already ${studentsWithLogin === 1 ? "has" : "have"} a login and will be left unchanged.` : ""}
-                  </p>
-                  <p className="text-stone-500 text-sm">The passwords will not be shown again after the file downloads.</p>
-                  {bulkLoginProgress && <p className="text-roman-gold text-sm">{bulkLoginProgress}</p>}
-                  {bulkLoginError && <p className="text-red-300 text-sm">{bulkLoginError}</p>}
-                  <div className="flex gap-3 pt-2">
-                    <button
-                      type="button"
-                      disabled={bulkLoginRunning}
-                      onClick={() => setShowBulkLoginModal(false)}
-                      className="flex-1 py-3 rounded-xl border border-stone-700 text-stone-400 hover:text-stone-200 hover:border-stone-500 transition-all disabled:opacity-50"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      disabled={bulkLoginRunning || studentsNeedingLogin.length === 0}
-                      onClick={() => void handleBulkAddLogins()}
-                      className="flex-1 py-3 rounded-xl bg-roman-gold text-stone-950 font-semibold hover:brightness-110 transition-all disabled:opacity-50"
-                    >
-                      {bulkLoginRunning ? "Adding..." : "Add Logins"}
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>
